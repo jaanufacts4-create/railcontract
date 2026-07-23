@@ -22,9 +22,12 @@ const ANNEX_B_DEFS: { slot: number; label: string; rate: string }[] = [
 
 const CRITERIA_COUNT = 4
 
-export default function EditSecTripPage({ params }: { params: { id: string } }) {
+import { use } from 'react'
+
+export default function EditSecTripPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
-  const id = params.id
+  const resolvedParams = use(params)
+  const id = resolvedParams.id
 
   const [trains,               setTrains]               = useState<SecTrain[]>([])
   const [ratePerCoach,         setRatePerCoach]         = useState(322.49)

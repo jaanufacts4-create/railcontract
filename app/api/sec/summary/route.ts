@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db, ensureDB } from '@/lib/db'
-import { ANNEX_B_SLOTS, ANNEX_B_LABELS } from '../trips/route'
+import { ANNEX_B_SLOTS, ANNEX_B_LABELS } from '@/lib/constants'
 
 /** GET /api/sec/summary?month_year=YYYY-MM */
 export async function GET(req: Request) {

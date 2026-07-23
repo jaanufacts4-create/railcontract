@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server'
 import { db, ensureDB } from '@/lib/db'
 
 /* ─── GET /api/sec/trips/[id] ─── */
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   await ensureDB()
-  const id = Number(params.id)
+  const { id: paramId } = await params;
+  const id = Number(paramId)
 
   const [tripRes, ratingsRes, annexRes] = await Promise.all([
     db.execute({ sql: 'SELECT * FROM sec_trips WHERE id=?', args: [id] }),
@@ -49,9 +50,10 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 }
 
 /* ─── PUT /api/sec/trips/[id] ─── */
-export async function PUT(req: Request, { params }: { params: { id: string } }) {
+export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   await ensureDB()
-  const id = Number(params.id)
+  const { id: paramId } = await params;
+  const id = Number(paramId)
   const body = await req.json()
   const {
     date, train_no, cleaning_type, coach_count,
@@ -107,8 +109,9 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
 }
 
 /* ─── DELETE /api/sec/trips/[id] ─── */
-export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   await ensureDB()
-  await db.execute({ sql: 'DELETE FROM sec_trips WHERE id=?', args: [Number(params.id)] })
+  const { id: paramId } = await params;
+  await db.execute({ sql: 'DELETE FROM sec_trips WHERE id=?', args: [Number(paramId)] })
   return NextResponse.json({ ok: true })
 }

@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Download, Train, CheckCircle2, Clock, CalendarDays, BarChart3, ListFilter, TrendingUp, TrendingDown, IndianRupee, AlertCircle, Users, Zap } from 'lucide-react'
 
@@ -84,7 +84,7 @@ const SLAB_HEADERS = ['≥86%', '76–85%', '66–75%', '50–65%', '<50%']
 type MainTab = 'status' | 'summary'
 type StatusTab = 'detail' | 'daily' | 'trains'
 
-export default function ReportsPage() {
+function ReportsContent() {
   const params = useSearchParams()
   const [mainTab,   setMainTab]   = useState<MainTab>(() => (params.get('tab') === 'summary' ? 'summary' : 'status'))
   const [statusTab, setStatusTab] = useState<StatusTab>('detail')
@@ -475,5 +475,13 @@ export default function ReportsPage() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function ReportsPage() {
+  return (
+    <Suspense fallback={<div style={{ padding: 40, color: 'var(--text-4)' }}>Loading...</div>}>
+      <ReportsContent />
+    </Suspense>
   )
 }
