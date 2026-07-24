@@ -41,6 +41,17 @@ export async function POST(req: NextRequest) {
   const rates: Record<number, number> = {}
   loa.forEach(r => { rates[Number(r.item_no)] = Number(r.rate_gst) })
 
+  // ── Cumulative "upto date" from previous bills ───────────────────────────
+  const { rows: cumRows } = await db.execute(
+    'SELECT item_no, upto_qty, upto_payment FROM billing_cumulative ORDER BY item_no'
+  )
+  const prevUptoQty: Record<number, number> = {}
+  const prevUptoPay: Record<number, number> = {}
+  cumRows.forEach(r => {
+    prevUptoQty[Number(r.item_no)] = Number(r.upto_qty)     || 0
+    prevUptoPay[Number(r.item_no)] = Number(r.upto_payment) || 0
+  })
+
   const m = mcc[0]  ?? {}
   const o = obhs[0] ?? {}
 
@@ -297,28 +308,42 @@ export async function POST(req: NextRequest) {
     { desc: 'Supervision/ monitoring of OBHS staff in all rakes of trains',        unit: 'Hours'   },
   ]
 
-  let totalPayment = 0
-  const sincePayments: number[] = []
+  let totalSincePayment = 0
+  let totalUptoPayment  = 0
 
   // N18:N26 single merged remarks cell
   merge(18,14,26,14)
   set(18,14,'Bills and documents submitted late by Contractor',
     { size: 8, border: allB, halign: 'left' })
 
+  // Track new cumulative for DB update after Excel is built
+  const newUptoQty: number[]     = []
+  const newUptoPay: number[]     = []
+
   for (let i = 0; i < 9; i++) {
-    const dr   = 18 + i
-    const rate = rates[i + 1] ?? 0
-    const qty  = jQty[i]      ?? 0
-    const payment = Math.round(qty * rate * 100) / 100
-    totalPayment += payment
-    sincePayments.push(payment)
+    const itemNo = i + 1
+    const dr     = 18 + i
+    const rate   = rates[itemNo]         ?? 0
+    const sinceQty    = jQty[i]          ?? 0
+    const prevQty     = prevUptoQty[itemNo] ?? 0
+    const prevPay     = prevUptoPay[itemNo] ?? 0
+    const sincePay    = Math.round(sinceQty * rate * 100) / 100
+    const uptoQty     = Math.round((prevQty + sinceQty) * 100) / 100
+    const uptoPay     = Math.round((prevPay + sincePay)  * 100) / 100
+
+    totalSincePayment += sincePay
+    totalUptoPayment  += uptoPay
+    newUptoQty.push(uptoQty)
+    newUptoPay.push(uptoPay)
 
     ws.getRow(dr).height = 68.25
 
-    // A, B, C — previous cert totals (left blank for manual fill)
-    set(dr,1,'', { border: allB })
-    set(dr,2,'', { border: allB })
-    set(dr,3,'', { border: allB })
+    // A — as per last certificate (previous cumulative qty)
+    set(dr,1, prevQty || '', { size: 9, border: allB, numFmt: prevQty ? '#,##0.00' : undefined })
+    // B — since last certificate qty
+    set(dr,2, sinceQty || '', { size: 9, border: allB, numFmt: sinceQty ? '#,##0.00' : undefined })
+    // C — upto date qty
+    set(dr,3, uptoQty || '', { size: 9, border: allB, numFmt: uptoQty ? '#,##0.00' : undefined })
 
     // D:F — item description
     merge(dr,4,dr,6)
@@ -331,17 +356,17 @@ export async function POST(req: NextRequest) {
     merge(dr,8,dr,9)
     set(dr,8,rate, { size: 9, border: allB, numFmt: '#,##0.00' })
 
-    // J — since last certificate qty (OUR DATA)
-    set(dr,10,qty, { bold: true, size: 10, border: allB, numFmt: '#,##0.00' })
+    // J — since last certificate qty (current month — OUR DATA)
+    set(dr,10, sinceQty, { bold: true, size: 10, border: allB, numFmt: '#,##0.00' })
 
-    // K — upto date qty (blank for manual)
-    set(dr,11,'', { border: allB })
+    // K — upto date qty (cumulative)
+    set(dr,11, uptoQty, { size: 9, border: allB, numFmt: '#,##0.00' })
 
-    // L — upto date payment (blank for manual)
-    set(dr,12,'', { border: allB })
+    // L — upto date payment (cumulative)
+    set(dr,12, uptoPay, { size: 9, border: allB, numFmt: '#,##0.00' })
 
-    // M — since last certificate payment
-    set(dr,13,payment, { size: 9, border: allB, numFmt: '#,##0.00' })
+    // M — since last certificate payment (current month)
+    set(dr,13, sincePay, { size: 9, border: allB, numFmt: '#,##0.00' })
   }
 
   // ── ROW 27: Total ────────────────────────────────────────────────────────
@@ -355,7 +380,7 @@ export async function POST(req: NextRequest) {
   set(27,10,'', { border: allB })
   merge(27,11,27,12)
   set(27,11,'Total', { bold: true, size: 10, border: allB })
-  set(27,13,totalPayment, { bold: true, size: 10, border: allB, numFmt: '#,##0.00' })
+  set(27,13, totalSincePayment, { bold: true, size: 10, border: allB, numFmt: '#,##0.00' })
   set(27,14,'',  { border: allB })
 
   // ── ROW 28: blank spacer ─────────────────────────────────────────────────
@@ -364,7 +389,7 @@ export async function POST(req: NextRequest) {
   set(28,1,'', {})
 
   // ── ROWS 29-36: Payment summary ──────────────────────────────────────────
-  const totalInclGST = totalPayment
+  const totalInclGST = totalSincePayment
   const gst18        = Math.round(totalInclGST * 18 / 118 * 100) / 100
   const exclGST      = Math.round((totalInclGST - gst18) * 100) / 100
   const incomeTax    = Math.round(exclGST * 0.02 * 100) / 100
@@ -403,8 +428,17 @@ export async function POST(req: NextRequest) {
     'Certified that  M/s MAISUR PROJECTS PRIVATE LIMITED,  PLOT NO 6/C-973, SECTOR 6, GOMTI NAGAR EXTENTION, LUCKNOW, UTTAR PRADESH-226010 has carried out work mentioned in the abstract and completed it as prescribed. The quantities entered above for payment have been carefully checked and are correct. The work done since last certificate and up to date is as noted above. The measurement have been taken with reference to the actual approved design and the quantities have been computed correctly in the Measurement Book. It is certified that no payment has been made to the contractor for this work other than what is entered in the Payment Certificate (Form No-1338).',
     { size: 8, halign: 'left', valign: 'top', border: allB })
 
-  // ── Stream response ───────────────────────────────────────────────────────
+  // ── Build buffer ─────────────────────────────────────────────────────────
   const buf = await wb.xlsx.writeBuffer()
+
+  // ── Update cumulative AFTER buffer is ready (so a write error doesn't corrupt DB) ──
+  for (let i = 0; i < 9; i++) {
+    await db.execute({
+      sql:  'UPDATE billing_cumulative SET upto_qty=?, upto_payment=? WHERE item_no=?',
+      args: [newUptoQty[i], newUptoPay[i], i + 1],
+    })
+  }
+
   return new NextResponse(buf as ArrayBuffer, {
     headers: {
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

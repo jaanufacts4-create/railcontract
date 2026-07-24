@@ -12,6 +12,7 @@ let _migrated        = false
 let _scheduleEnsured = false
 let _secMigrated     = false
 let _loaMigrated     = false
+let _billingMigrated = false
 export async function ensureDB() {
   if (!_migrated) {
     await migrate()
@@ -28,6 +29,10 @@ export async function ensureDB() {
   if (!_loaMigrated) {
     await migrateLOA()
     _loaMigrated = true
+  }
+  if (!_billingMigrated) {
+    await migrateBillingCumulative()
+    _billingMigrated = true
   }
 }
 
@@ -323,6 +328,26 @@ async function migrateLOA() {
     await db.execute({
       sql:  'INSERT OR IGNORE INTO loa_quantities (item_no, item_name, unit, rate_gst, loa_qty) VALUES (?,?,?,?,?)',
       args: [item_no, item_name, unit, rate_gst, loa_qty],
+    })
+  }
+}
+
+/** ─── Billing cumulative (running upto-date totals) ─────────────────────── */
+async function migrateBillingCumulative() {
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS billing_cumulative (
+      item_no         INTEGER PRIMARY KEY,
+      upto_qty        REAL NOT NULL DEFAULT 0,
+      upto_payment    REAL NOT NULL DEFAULT 0
+    )
+  `)
+  // Seed 9 rows if empty
+  const { rows } = await db.execute('SELECT COUNT(*) as cnt FROM billing_cumulative')
+  if (Number(rows[0].cnt) > 0) return
+  for (let i = 1; i <= 9; i++) {
+    await db.execute({
+      sql:  'INSERT OR IGNORE INTO billing_cumulative (item_no, upto_qty, upto_payment) VALUES (?,0,0)',
+      args: [i],
     })
   }
 }
