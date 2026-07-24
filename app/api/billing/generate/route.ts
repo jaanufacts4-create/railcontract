@@ -84,6 +84,10 @@ export async function POST(req: NextRequest) {
   ws.pageSetup.fitToPage = true
   ws.pageSetup.fitToWidth = 1
 
+  // View: Page Break Preview at 35% zoom
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ws.views = [{ view: 'pageBreakPreview', zoomScale: 35 } as any]
+
   // Column widths (A-N exact from original)
   const colWidths = [16.11, 16.33, 13.33, 18.78, 15.66, 20.44, 23.33, 19.33, 29.78, 16.44, 25.0, 23.55, 24.89, 31.22]
   colWidths.forEach((w, i) => { ws.getColumn(i + 1).width = w })
@@ -102,7 +106,7 @@ export async function POST(req: NextRequest) {
     row: number, col: number,
     value: ExcelJS.CellValue,
     {
-      bold = false, size = 10, italic = false,
+      bold = false, size = 20, italic = false,
       halign = 'center' as ExcelJS.Alignment['horizontal'],
       valign = 'middle' as ExcelJS.Alignment['vertical'],
       wrap = true,
@@ -135,17 +139,17 @@ export async function POST(req: NextRequest) {
   ws.getRow(1).height = 40.8
   merge(1,1,1,14)
   set(1,1,'Northern Railway                                                                Form-1337',
-    { bold: true, size: 12 })
+    { bold: true, size: 20 })
 
   // ── ROW 2: Department ────────────────────────────────────────────────────
   ws.getRow(2).height = 32.25
   merge(2,1,2,14)
-  set(2,1,'Mechanical C&W Deptt.', { bold: true, size: 11 })
+  set(2,1,'Mechanical C&W Deptt.', { bold: true, size: 20 })
 
   // ── ROW 3: Certificate title ─────────────────────────────────────────────
   ws.getRow(3).height = 32.25
   merge(3,1,3,14)
-  set(3,1,'2nd On Account Contract Certificate', { bold: true, size: 12 })
+  set(3,1,'2nd On Account Contract Certificate', { bold: true, size: 20 })
 
   // ── ROW 4: Division / Station / Date ────────────────────────────────────
   ws.getRow(4).height = 27.0
@@ -159,7 +163,7 @@ export async function POST(req: NextRequest) {
   const dateCe = ws.getCell(4,13)
   dateCe.value = new Date(`${year}-${mon}-01`)
   dateCe.numFmt = 'DD-MM-YYYY'
-  dateCe.font = { bold: true, size: 10, name: 'Calibri' }
+  dateCe.font = { bold: true, size: 20, name: 'Calibri' }
   dateCe.alignment = { horizontal: 'center', vertical: 'middle' }
 
   // ── ROW 5: Bill No ───────────────────────────────────────────────────────
@@ -175,7 +179,7 @@ export async function POST(req: NextRequest) {
   ws.getRow(6).height = 48.0
   merge(6,1,6,14)
   set(6,1,'Name and address of Contractor……M/s MAISUR PROJECTS PRIVATE LIMITED,  PLOT NO 6/C-973, SECTOR 6, GOMTI NAGAR EXTENTION, LUCKNOW, UTTAR PRADESH-226010',
-    { halign: 'left', size: 9 })
+    { halign: 'left', size: 20 })
 
   // ── ROW 7: Bank account / IFSC ───────────────────────────────────────────
   ws.getRow(7).height = 33.6
@@ -192,20 +196,20 @@ export async function POST(req: NextRequest) {
   ws.getRow(8).height = 78.6
   merge(8,1,8,14)
   set(8,1,'Name of Work:- Mechanized Cleaning of Primary Trains coaches including OBHS in AC & NAC Coaches with toiletries & Liquid Soap, OBHS in Vande Bharat coaches at C&W coaching depot CIA & ASR for a period of Four Years (1461 Days)',
-    { halign: 'left', size: 9 })
+    { halign: 'left', size: 20 })
 
   // ── ROW 9: Contract no ───────────────────────────────────────────────────
   ws.getRow(9).height = 40.2
   merge(9,1,9,2)
   set(9,1,'Contract no.', { bold: true, halign: 'left' })
   merge(9,3,9,14)
-  set(9,3,'GEMC-511687737406143, dated 20-02-2026', { halign: 'left', size: 9 })
+  set(9,3,'GEMC-511687737406143, dated 20-02-2026', { halign: 'left', size: 20 })
 
   // ── ROW 10: Agreement No ─────────────────────────────────────────────────
   ws.getRow(10).height = 46.5
   merge(10,1,10,14)
   set(10,1,'Agreement No:-→ ASR-PM GEMC-511687737406143, dated 12-06-2026',
-    { halign: 'left', size: 9 })
+    { halign: 'left', size: 20 })
 
   // ── ROW 11: For the Month ────────────────────────────────────────────────
   ws.getRow(11).height = 39.0
@@ -217,16 +221,16 @@ export async function POST(req: NextRequest) {
   ws.getRow(12).height = 46.5
   merge(12,1,12,9)
   set(12,1,'Reference to No and place of measurement book in which measurement have been taken',
-    { halign: 'left', size: 9 })
+    { halign: 'left', size: 20 })
   merge(12,10,12,14)
-  set(12,10,'M.B. No.                                            Pages No', { halign: 'left', size: 9 })
+  set(12,10,'M.B. No.                                            Pages No', { halign: 'left', size: 20 })
 
   // ── ROW 13: Work commenced / completed ───────────────────────────────────
   ws.getRow(13).height = 46.5
   merge(13,1,13,8)
-  set(13,1,`Work commenced on…………${monthFrom}`, { halign: 'left', size: 9 })
+  set(13,1,`Work commenced on…………${monthFrom}`, { halign: 'left', size: 20 })
   merge(13,9,13,13)
-  set(13,9,`Work completed on……………${monthTo}`, { halign: 'left', size: 9 })
+  set(13,9,`Work completed on……………${monthTo}`, { halign: 'left', size: 20 })
   set(13,14,'', {})
 
   // ── TABLE HEADER rows 14-17 ──────────────────────────────────────────────
@@ -238,62 +242,62 @@ export async function POST(req: NextRequest) {
   // A14:C14 — "On account payment..."
   merge(14,1,14,3)
   set(14,1,'On account payment for work covered by approximate or plan measurement',
-    { bold: true, size: 9, border: allB, fill: hFill })
+    { bold: true, size: 20, border: allB, fill: hFill })
 
   // A15:C15 — "Total"
   merge(15,1,15,3)
-  set(15,1,'Total', { bold: true, size: 9, border: allB, fill: hFill })
+  set(15,1,'Total', { bold: true, size: 20, border: allB, fill: hFill })
 
   // Row 16 A,B,C individual
-  set(16,1,'as per last certificate',  { bold: false, size: 8, border: allB, fill: hFill })
-  set(16,2,'since last certificate',   { bold: false, size: 8, border: allB, fill: hFill })
-  set(16,3,'upto date',                { bold: false, size: 8, border: allB, fill: hFill })
+  set(16,1,'as per last certificate',  { bold: false, size: 20, border: allB, fill: hFill })
+  set(16,2,'since last certificate',   { bold: false, size: 20, border: allB, fill: hFill })
+  set(16,3,'upto date',                { bold: false, size: 20, border: allB, fill: hFill })
 
   // D14:F16 — "Item of work"
   merge(14,4,16,6)
-  set(14,4,'Item of work', { bold: true, size: 9, border: allB, fill: hFill })
+  set(14,4,'Item of work', { bold: true, size: 20, border: allB, fill: hFill })
 
   // G14:G16 — "Unit"
   merge(14,7,16,7)
-  set(14,7,'Unit', { bold: true, size: 9, border: allB, fill: hFill })
+  set(14,7,'Unit', { bold: true, size: 20, border: allB, fill: hFill })
 
   // H14:I16 — "Deptt. Rate"
   merge(14,8,16,9)
-  set(14,8,'Deptt. Rate', { bold: true, size: 9, border: allB, fill: hFill })
+  set(14,8,'Deptt. Rate', { bold: true, size: 20, border: allB, fill: hFill })
 
   // J14:K15 — "Quantity executed"
   merge(14,10,15,11)
-  set(14,10,'Quantity executed', { bold: true, size: 9, border: allB, fill: hFill })
+  set(14,10,'Quantity executed', { bold: true, size: 20, border: allB, fill: hFill })
 
   // L14:M15 — "Payment on the basis of actual measurement"
   merge(14,12,15,13)
-  set(14,12,'Payment on the basis of actual measurement', { bold: true, size: 9, border: allB, fill: hFill })
+  set(14,12,'Payment on the basis of actual measurement', { bold: true, size: 20, border: allB, fill: hFill })
 
   // N14:N16 — "Remarks"
   merge(14,14,16,14)
   set(14,14,'Remarks(with reason for delay in adjusting payment shown in column 1)',
-    { bold: true, size: 8, border: allB, fill: hFill })
+    { bold: true, size: 20, border: allB, fill: hFill })
 
   // Row 16 J,K,L,M individual sub-headers
-  set(16,10,'since last certificate',        { bold: false, size: 8, border: allB, fill: hFill })
-  set(16,11,'upto date  as per measurement', { bold: false, size: 8, border: allB, fill: hFill })
-  set(16,12,'upto date  as per measurement', { bold: false, size: 8, border: allB, fill: hFill })
-  set(16,13,'since last certificate',        { bold: false, size: 8, border: allB, fill: hFill })
+  set(16,10,'since last certificate',        { bold: false, size: 20, border: allB, fill: hFill })
+  set(16,11,'upto date  as per measurement', { bold: false, size: 20, border: allB, fill: hFill })
+  set(16,12,'upto date  as per measurement', { bold: false, size: 20, border: allB, fill: hFill })
+  set(16,13,'since last certificate',        { bold: false, size: 20, border: allB, fill: hFill })
 
   // Row 17 — column numbers
-  set(17,1,'1',  { size: 9, border: allB, fill: hFill })
-  set(17,2,'2',  { size: 9, border: allB, fill: hFill })
-  set(17,3,'3',  { size: 9, border: allB, fill: hFill })
+  set(17,1,'1',  { size: 20, border: allB, fill: hFill })
+  set(17,2,'2',  { size: 20, border: allB, fill: hFill })
+  set(17,3,'3',  { size: 20, border: allB, fill: hFill })
   merge(17,4,17,6)
-  set(17,4,'4',  { size: 9, border: allB, fill: hFill })
-  set(17,7,'5',  { size: 9, border: allB, fill: hFill })
+  set(17,4,'4',  { size: 20, border: allB, fill: hFill })
+  set(17,7,'5',  { size: 20, border: allB, fill: hFill })
   merge(17,8,17,9)
-  set(17,8,'6',  { size: 9, border: allB, fill: hFill })
-  set(17,10,'7', { size: 9, border: allB, fill: hFill })
-  set(17,11,'8', { size: 9, border: allB, fill: hFill })
-  set(17,12,'9', { size: 9, border: allB, fill: hFill })
-  set(17,13,'10',{ size: 9, border: allB, fill: hFill })
-  set(17,14,'11',{ size: 9, border: allB, fill: hFill })
+  set(17,8,'6',  { size: 20, border: allB, fill: hFill })
+  set(17,10,'7', { size: 20, border: allB, fill: hFill })
+  set(17,11,'8', { size: 20, border: allB, fill: hFill })
+  set(17,12,'9', { size: 20, border: allB, fill: hFill })
+  set(17,13,'10',{ size: 20, border: allB, fill: hFill })
+  set(17,14,'11',{ size: 20, border: allB, fill: hFill })
 
   // ── DATA ROWS 18-26 ──────────────────────────────────────────────────────
   const ITEMS = [
@@ -314,7 +318,7 @@ export async function POST(req: NextRequest) {
   // N18:N26 single merged remarks cell
   merge(18,14,26,14)
   set(18,14,'Bills and documents submitted late by Contractor',
-    { size: 8, border: allB, halign: 'left' })
+    { size: 20, border: allB, halign: 'left' })
 
   // Track new cumulative for DB update after Excel is built
   const newUptoQty: number[]     = []
@@ -339,34 +343,34 @@ export async function POST(req: NextRequest) {
     ws.getRow(dr).height = 68.25
 
     // A — as per last certificate (previous cumulative qty)
-    set(dr,1, prevQty || '', { size: 9, border: allB, numFmt: prevQty ? '#,##0.00' : undefined })
+    set(dr,1, prevQty || '', { size: 20, border: allB, numFmt: prevQty ? '#,##0.00' : undefined })
     // B — since last certificate qty
-    set(dr,2, sinceQty || '', { size: 9, border: allB, numFmt: sinceQty ? '#,##0.00' : undefined })
+    set(dr,2, sinceQty || '', { size: 20, border: allB, numFmt: sinceQty ? '#,##0.00' : undefined })
     // C — upto date qty
-    set(dr,3, uptoQty || '', { size: 9, border: allB, numFmt: uptoQty ? '#,##0.00' : undefined })
+    set(dr,3, uptoQty || '', { size: 20, border: allB, numFmt: uptoQty ? '#,##0.00' : undefined })
 
     // D:F — item description
     merge(dr,4,dr,6)
-    set(dr,4,ITEMS[i].desc, { size: 9, halign: 'left', border: allB })
+    set(dr,4,ITEMS[i].desc, { size: 20, halign: 'left', border: allB })
 
     // G — unit
-    set(dr,7,ITEMS[i].unit, { size: 9, border: allB })
+    set(dr,7,ITEMS[i].unit, { size: 20, border: allB })
 
     // H:I — rate
     merge(dr,8,dr,9)
-    set(dr,8,rate, { size: 9, border: allB, numFmt: '#,##0.00' })
+    set(dr,8,rate, { size: 20, border: allB, numFmt: '#,##0.00' })
 
     // J — since last certificate qty (current month — OUR DATA)
-    set(dr,10, sinceQty, { bold: true, size: 10, border: allB, numFmt: '#,##0.00' })
+    set(dr,10, sinceQty, { bold: true, size: 20, border: allB, numFmt: '#,##0.00' })
 
     // K — upto date qty (cumulative)
-    set(dr,11, uptoQty, { size: 9, border: allB, numFmt: '#,##0.00' })
+    set(dr,11, uptoQty, { size: 20, border: allB, numFmt: '#,##0.00' })
 
     // L — upto date payment (cumulative)
-    set(dr,12, uptoPay, { size: 9, border: allB, numFmt: '#,##0.00' })
+    set(dr,12, uptoPay, { size: 20, border: allB, numFmt: '#,##0.00' })
 
     // M — since last certificate payment (current month)
-    set(dr,13, sincePay, { size: 9, border: allB, numFmt: '#,##0.00' })
+    set(dr,13, sincePay, { size: 20, border: allB, numFmt: '#,##0.00' })
   }
 
   // ── ROW 27: Total ────────────────────────────────────────────────────────
@@ -379,8 +383,8 @@ export async function POST(req: NextRequest) {
   set(27,8,'',  { border: allB })
   set(27,10,'', { border: allB })
   merge(27,11,27,12)
-  set(27,11,'Total', { bold: true, size: 10, border: allB })
-  set(27,13, totalSincePayment, { bold: true, size: 10, border: allB, numFmt: '#,##0.00' })
+  set(27,11,'Total', { bold: true, size: 20, border: allB })
+  set(27,13, totalSincePayment, { bold: true, size: 20, border: allB, numFmt: '#,##0.00' })
   set(27,14,'',  { border: allB })
 
   // ── ROW 28: blank spacer ─────────────────────────────────────────────────
@@ -412,11 +416,11 @@ export async function POST(req: NextRequest) {
     const sr = 29 + idx
     ws.getRow(sr).height = 36.75
     merge(sr,1,sr,9)
-    set(sr,1,label, { bold: idx === 0 || idx === 7, size: 10, halign: 'left', border: allB })
-    set(sr,10,'=   Rs.', { bold: true, size: 10, border: allB })
+    set(sr,1,label, { bold: idx === 0 || idx === 7, size: 20, halign: 'left', border: allB })
+    set(sr,10,'=   Rs.', { bold: true, size: 20, border: allB })
     merge(sr,11,sr,12)
     set(sr,11, val === '' ? '' : val as number,
-      { bold: idx === 0 || idx === 7, size: 10, border: allB, numFmt: '#,##0.00' })
+      { bold: idx === 0 || idx === 7, size: 20, border: allB, numFmt: '#,##0.00' })
     set(sr,13,'', { border: allB })
     set(sr,14,'', { border: allB })
   })
@@ -426,7 +430,7 @@ export async function POST(req: NextRequest) {
   merge(37,1,37,14)
   set(37,1,
     'Certified that  M/s MAISUR PROJECTS PRIVATE LIMITED,  PLOT NO 6/C-973, SECTOR 6, GOMTI NAGAR EXTENTION, LUCKNOW, UTTAR PRADESH-226010 has carried out work mentioned in the abstract and completed it as prescribed. The quantities entered above for payment have been carefully checked and are correct. The work done since last certificate and up to date is as noted above. The measurement have been taken with reference to the actual approved design and the quantities have been computed correctly in the Measurement Book. It is certified that no payment has been made to the contractor for this work other than what is entered in the Payment Certificate (Form No-1338).',
-    { size: 8, halign: 'left', valign: 'top', border: allB })
+    { size: 20, halign: 'left', valign: 'top', border: allB })
 
   // ── Build buffer ─────────────────────────────────────────────────────────
   const buf = await wb.xlsx.writeBuffer()
