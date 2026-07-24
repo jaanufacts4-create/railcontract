@@ -19,8 +19,8 @@ function toHex(buf: ArrayBuffer): string {
     .map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
-function fromHex(hex: string): Uint8Array {
-  return Uint8Array.from((hex.match(/.{2}/g) ?? []).map(b => parseInt(b, 16)))
+function fromHex(hex: string): Uint8Array<ArrayBuffer> {
+  return new Uint8Array((hex.match(/.{2}/g) ?? []).map(b => parseInt(b, 16)))
 }
 
 /** SHA-256 of password+salt — same result as Node crypto.createHash */
