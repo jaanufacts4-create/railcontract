@@ -53,9 +53,9 @@ export default function LOAPage() {
   return (
     <div style={{ maxWidth: 900 }}>
       <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', margin: 0 }}>LOA Progress Tracker</h1>
+        <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Quantity Consumed</h1>
         <p style={{ fontSize: 13, color: 'var(--text-3)', marginTop: 4 }}>
-          Track actual quantities used vs Letter of Award (LOA) limits
+          Actual quantities consumed vs Letter of Award (LOA) limits
         </p>
       </div>
 

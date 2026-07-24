@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { FileSpreadsheet, Download, CheckCircle, AlertCircle, Loader2 } from 'lucide-react'
+import { Download, CheckCircle, AlertCircle, Loader2 } from 'lucide-react'
 
 function fmt(n: number, dec = 0) {
   return Number(n).toLocaleString('en-IN', { maximumFractionDigits: dec })
@@ -53,7 +53,7 @@ export default function BillingPage() {
       const url  = URL.createObjectURL(blob)
       const a    = document.createElement('a')
       a.href     = url
-      a.download = `Billing_Certificate_${monthYear}.xlsx`
+      a.download = `Monthly_Petty_${monthYear}.xlsx`
       a.click()
       URL.revokeObjectURL(url)
     }
@@ -66,9 +66,9 @@ export default function BillingPage() {
   return (
     <div style={{ maxWidth: 680 }}>
       <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Billing Certificate</h1>
+        <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Monthly Petty</h1>
         <p style={{ fontSize: 13, color: 'var(--text-3)', marginTop: 4 }}>
-          Auto-generate APR26 billing certificate — J column filled from app data
+          Auto-generate billing certificate — quantities filled from MCC trips &amp; OBHS data
         </p>
       </div>
 
@@ -131,7 +131,7 @@ export default function BillingPage() {
       <button onClick={generate} disabled={generating} className="btn btn-primary"
         style={{ fontSize: 14, fontWeight: 700, padding: '12px 28px', borderRadius: 12 }}>
         {generating
-          ? <><Loader2 size={16} className="animate-spin" /> Generating…</>
+          ? <><Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> Generating…</>
           : <><Download size={16} /> Generate Billing Certificate</>
         }
       </button>
