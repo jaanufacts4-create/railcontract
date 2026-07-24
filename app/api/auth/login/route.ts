@@ -10,21 +10,20 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Username and password required' }, { status: 400 })
   }
 
-  // Fetch stored credentials from config (include both key and value columns)
+  // Look up user in users table
   const res = await db.execute({
-    sql: "SELECT key, value FROM config WHERE key IN ('admin_username','admin_password_hash')",
-    args: [],
+    sql: 'SELECT password_hash FROM users WHERE username = ?',
+    args: [username],
   })
 
-  const cfgMap: Record<string, string> = {}
-  for (const r of res.rows) cfgMap[r.key as string] = r.value as string
+  if (res.rows.length === 0) {
+    return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
+  }
 
-  const storedUser = cfgMap['admin_username']    ?? 'admin'
-  const storedHash = cfgMap['admin_password_hash'] ?? await hashPassword('Admin@1234')
+  const storedHash = res.rows[0].password_hash as string
+  const inputHash  = await hashPassword(password)
 
-  const inputHash = await hashPassword(password)
-
-  if (username !== storedUser || inputHash !== storedHash) {
+  if (inputHash !== storedHash) {
     return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
   }
 

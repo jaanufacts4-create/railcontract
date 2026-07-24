@@ -193,10 +193,17 @@ async function migrateSecondary() {
       ('sec_rate_per_coach_exterior', '144.28'),
       ('sec_min_wages',               '760');
 
-    -- Admin credentials (default: admin / Admin@1234)
-    INSERT OR IGNORE INTO config (key, value) VALUES
-      ('admin_username',      'admin'),
-      ('admin_password_hash', 'c5179c7a6f666319b5fb4bea7e9589eb74100c0d7dbe85d4b2a0b63db5660f44');
+    -- Users table (multi-user support)
+    CREATE TABLE IF NOT EXISTS users (
+      username     TEXT PRIMARY KEY,
+      password_hash TEXT NOT NULL,
+      role         TEXT NOT NULL DEFAULT 'user',
+      created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    -- Seed default super admin (admin / Admin@1234)
+    INSERT OR IGNORE INTO users (username, password_hash, role) VALUES
+      ('admin', 'c5179c7a6f666319b5fb4bea7e9589eb74100c0d7dbe85d4b2a0b63db5660f44', 'admin');
 
     -- Secondary train master
     CREATE TABLE IF NOT EXISTS sec_trains (
