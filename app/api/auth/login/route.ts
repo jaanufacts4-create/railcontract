@@ -10,9 +10,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Username and password required' }, { status: 400 })
   }
 
-  // Fetch stored credentials from config
+  // Fetch stored credentials from config (include both key and value columns)
   const res = await db.execute({
-    sql: "SELECT value FROM config WHERE key IN ('admin_username','admin_password_hash') ORDER BY key",
+    sql: "SELECT key, value FROM config WHERE key IN ('admin_username','admin_password_hash')",
     args: [],
   })
 
@@ -20,13 +20,15 @@ export async function POST(req: Request) {
   for (const r of res.rows) cfgMap[r.key as string] = r.value as string
 
   const storedUser = cfgMap['admin_username']    ?? 'admin'
-  const storedHash = cfgMap['admin_password_hash'] ?? hashPassword('Admin@1234')
+  const storedHash = cfgMap['admin_password_hash'] ?? await hashPassword('Admin@1234')
 
-  if (username !== storedUser || hashPassword(password) !== storedHash) {
+  const inputHash = await hashPassword(password)
+
+  if (username !== storedUser || inputHash !== storedHash) {
     return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
   }
 
-  const token = signToken(username)
+  const token = await signToken(username)
   const response = NextResponse.json({ ok: true })
   response.headers.set('Set-Cookie', setCookieHeader(token))
   return response

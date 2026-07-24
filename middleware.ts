@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyToken, COOKIE_NAME } from '@/lib/auth'
 
-const PUBLIC_PATHS = ['/login', '/api/auth/login']
+const PUBLIC_PATHS = ['/login', '/api/auth/login', '/api/auth/logout']
 
-export function middleware(req: NextRequest) {
+export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
 
   // Allow public paths and static assets
@@ -16,7 +16,7 @@ export function middleware(req: NextRequest) {
   }
 
   const token = req.cookies.get(COOKIE_NAME)?.value
-  if (!token || !verifyToken(token)) {
+  if (!token || !(await verifyToken(token))) {
     const loginUrl = new URL('/login', req.url)
     loginUrl.searchParams.set('from', pathname)
     return NextResponse.redirect(loginUrl)

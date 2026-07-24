@@ -1,32 +1,58 @@
-import { createHmac, createHash, randomBytes } from 'crypto'
+// Web Crypto API — works in both Edge runtime (middleware) and Node.js 18+
 
-const SECRET = process.env.AUTH_SECRET ?? 'railcontract-secret-key-change-in-prod'
-const COOKIE_NAME = 'rcb_session'
-const MAX_AGE = 60 * 60 * 24 * 7 // 7 days
+const SECRET   = process.env.AUTH_SECRET ?? 'railcontract-secret-key-change-in-prod'
+const MAX_AGE  = 60 * 60 * 24 * 7          // 7 days in seconds
+export const COOKIE_NAME = 'rcb_session'
 
-export function hashPassword(password: string): string {
-  return createHash('sha256').update(password + 'rcb_salt_2024').digest('hex')
+const enc = new TextEncoder()
+
+async function getKey(usage: KeyUsage[]) {
+  return crypto.subtle.importKey(
+    'raw', enc.encode(SECRET),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false, usage,
+  )
 }
 
-export function signToken(username: string): string {
+function toHex(buf: ArrayBuffer): string {
+  return Array.from(new Uint8Array(buf))
+    .map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+function fromHex(hex: string): Uint8Array {
+  return Uint8Array.from((hex.match(/.{2}/g) ?? []).map(b => parseInt(b, 16)))
+}
+
+/** SHA-256 of password+salt — same result as Node crypto.createHash */
+export async function hashPassword(password: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', enc.encode(password + 'rcb_salt_2024'))
+  return toHex(buf)
+}
+
+/** Create a signed session token */
+export async function signToken(username: string): Promise<string> {
   const payload = `${username}:${Date.now()}`
-  const sig = createHmac('sha256', SECRET).update(payload).digest('hex')
-  return Buffer.from(`${payload}:${sig}`).toString('base64')
+  const key     = await getKey(['sign'])
+  const sig     = toHex(await crypto.subtle.sign('HMAC', key, enc.encode(payload)))
+  return btoa(`${payload}:${sig}`)
 }
 
-export function verifyToken(token: string): string | null {
+/** Verify token; returns username or null */
+export async function verifyToken(token: string): Promise<string | null> {
   try {
-    const decoded = Buffer.from(token, 'base64').toString('utf8')
-    const parts = decoded.split(':')
-    if (parts.length < 3) return null
-    const sig = parts.pop()!
-    const payload = parts.join(':')
-    const expected = createHmac('sha256', SECRET).update(payload).digest('hex')
-    if (sig !== expected) return null
-    // Check expiry (7 days)
-    const ts = parseInt(parts[1])
-    if (Date.now() - ts > MAX_AGE * 1000) return null
-    return parts[0] // username
+    const decoded    = atob(token)
+    const lastColon  = decoded.lastIndexOf(':')
+    const sigHex     = decoded.slice(lastColon + 1)
+    const payload    = decoded.slice(0, lastColon)
+
+    const key   = await getKey(['verify'])
+    const valid = await crypto.subtle.verify('HMAC', key, fromHex(sigHex), enc.encode(payload))
+    if (!valid) return null
+
+    const parts = payload.split(':')
+    const ts    = parseInt(parts[1])
+    if (isNaN(ts) || Date.now() - ts > MAX_AGE * 1000) return null
+    return parts[0]
   } catch {
     return null
   }
@@ -39,5 +65,3 @@ export function setCookieHeader(token: string): string {
 export function clearCookieHeader(): string {
   return `${COOKIE_NAME}=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax`
 }
-
-export { COOKIE_NAME }
