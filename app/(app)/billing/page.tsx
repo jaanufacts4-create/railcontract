@@ -112,8 +112,8 @@ export default function BillingPage() {
               const src = i < 4 ? 'MCC Trips' : 'OBHS Upload'
               return (
                 <div key={key} style={{ display: 'flex', alignItems: 'center', padding: '11px 20px', borderBottom: '1px solid var(--border)', gap: 12 }}>
-                  <div style={{ width: 36, height: 24, borderRadius: 6, background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'var(--primary)', flexShrink: 0 }}>
-                    {key}
+                  <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'var(--primary)', flexShrink: 0 }}>
+                    {i + 1}
                   </div>
                   <div style={{ flex: 1, fontSize: 13, color: 'var(--text)' }}>{label}</div>
                   <div style={{ fontSize: 11, color: 'var(--text-4)', background: 'var(--surface-2)', padding: '2px 8px', borderRadius: 5 }}>{src}</div>

@@ -11,20 +11,33 @@ function fmt(n: number, dec = 0) {
   return Number(n).toLocaleString('en-IN', { maximumFractionDigits: dec, minimumFractionDigits: dec })
 }
 
-function ProgressBar({ pct }: { pct: number }) {
-  const color = pct >= 90 ? '#EF4444' : pct >= 70 ? '#F59E0B' : '#22C55E'
-  return (
-    <div style={{ height: 6, background: 'var(--border)', borderRadius: 4, overflow: 'hidden', width: '100%' }}>
-      <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 4, transition: 'width .4s' }} />
-    </div>
-  )
+const TH: React.CSSProperties = {
+  padding: '10px 12px',
+  fontSize: 11,
+  fontWeight: 700,
+  color: 'var(--text-3)',
+  textTransform: 'uppercase' as const,
+  letterSpacing: '.05em',
+  background: 'var(--surface-2)',
+  borderBottom: '2px solid var(--border-md)',
+  whiteSpace: 'nowrap' as const,
+  textAlign: 'center' as const,
+}
+
+const TD: React.CSSProperties = {
+  padding: '10px 12px',
+  fontSize: 13,
+  color: 'var(--text)',
+  borderBottom: '1px solid var(--border)',
+  verticalAlign: 'middle' as const,
+  textAlign: 'center' as const,
 }
 
 export default function LOAPage() {
-  const [items,    setItems]    = useState<LOAItem[]>([])
-  const [loading,  setLoading]  = useState(true)
-  const [editing,  setEditing]  = useState<number | null>(null)
-  const [editVal,  setEditVal]  = useState('')
+  const [items,   setItems]   = useState<LOAItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [editing, setEditing] = useState<number | null>(null)
+  const [editVal, setEditVal] = useState('')
 
   async function load() {
     setLoading(true)
@@ -47,12 +60,13 @@ export default function LOAPage() {
     load()
   }
 
-  const totalLOA  = items.reduce((s, i) => s + i.loa_qty  * i.rate_gst, 0)
-  const totalUsed = items.reduce((s, i) => s + i.used     * i.rate_gst, 0)
+  const totalLOA  = items.reduce((s, i) => s + i.loa_qty * i.rate_gst, 0)
+  const totalUsed = items.reduce((s, i) => s + i.used    * i.rate_gst, 0)
+  const totalBal  = totalLOA - totalUsed
 
   return (
-    <div style={{ maxWidth: 900 }}>
-      <div style={{ marginBottom: 24 }}>
+    <div style={{ maxWidth: 1100 }}>
+      <div style={{ marginBottom: 20 }}>
         <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Quantity Consumed</h1>
         <p style={{ fontSize: 13, color: 'var(--text-3)', marginTop: 4 }}>
           Actual quantities consumed vs Letter of Award (LOA) limits
@@ -60,83 +74,163 @@ export default function LOAPage() {
       </div>
 
       {/* Summary cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
         {[
-          { label: 'Total LOA Value', value: `₹${fmt(totalLOA)}`, sub: 'Awarded contract amount' },
-          { label: 'Value Used',      value: `₹${fmt(totalUsed)}`, sub: 'Based on actual qty' },
-          { label: 'Balance',         value: `₹${fmt(totalLOA - totalUsed)}`, sub: `${fmt(totalLOA > 0 ? ((totalLOA - totalUsed) / totalLOA * 100) : 0, 1)}% remaining` },
+          { label: 'Total LOA Value',  value: `₹${fmt(totalLOA)}`,  sub: 'Awarded contract amount' },
+          { label: 'Value Used',       value: `₹${fmt(totalUsed)}`, sub: 'Based on actual qty' },
+          { label: 'Balance',          value: `₹${fmt(totalBal)}`,  sub: `${fmt(totalLOA > 0 ? ((totalBal / totalLOA) * 100) : 0, 1)}% remaining` },
         ].map(c => (
-          <div key={c.label} className="card" style={{ padding: '16px 20px' }}>
-            <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.05em', margin: '0 0 6px' }}>{c.label}</p>
-            <p style={{ fontSize: 20, fontWeight: 800, color: 'var(--text)', margin: '0 0 3px', letterSpacing: '-.02em' }}>{c.value}</p>
+          <div key={c.label} className="card" style={{ padding: '14px 18px' }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.05em', margin: '0 0 4px' }}>{c.label}</p>
+            <p style={{ fontSize: 20, fontWeight: 800, color: 'var(--text)', margin: '0 0 2px', letterSpacing: '-.02em' }}>{c.value}</p>
             <p style={{ fontSize: 11, color: 'var(--text-4)', margin: 0 }}>{c.sub}</p>
           </div>
         ))}
       </div>
 
-      {/* Items table */}
+      {/* Excel-style table */}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8 }}>
           <TrendingUp size={15} style={{ color: 'var(--primary)' }} />
           <h2 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Item-wise Progress</h2>
-          <span style={{ fontSize: 12, color: 'var(--text-4)', marginLeft: 4 }}>(click edit icon to update LOA qty)</span>
+          <span style={{ fontSize: 11, color: 'var(--text-4)', marginLeft: 4 }}>Click ✎ to edit LOA qty</span>
         </div>
 
-        {loading ? (
-          <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-4)' }}>Loading…</div>
-        ) : (
-          <div>
-            {items.map(item => (
-              <div key={item.item_no} style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 10 }}>
-                  {/* Item number badge */}
-                  <div style={{ width: 28, height: 28, borderRadius: 8, background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 12, fontWeight: 700, color: 'var(--primary)' }}>
-                    {item.item_no}
-                  </div>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+            <colgroup>
+              <col style={{ width: 42 }} />
+              <col style={{ width: '28%' }} />
+              <col style={{ width: 70 }} />
+              <col style={{ width: 90 }} />
+              <col style={{ width: 110 }} />
+              <col style={{ width: 100 }} />
+              <col style={{ width: 100 }} />
+              <col style={{ width: 72 }} />
+              <col />
+            </colgroup>
+            <thead>
+              <tr>
+                <th style={TH}>Sr.</th>
+                <th style={{ ...TH, textAlign: 'left' }}>Item Description</th>
+                <th style={TH}>Unit</th>
+                <th style={TH}>Rate (₹)</th>
+                <th style={TH}>LOA Qty</th>
+                <th style={TH}>Used</th>
+                <th style={TH}>Balance</th>
+                <th style={TH}>% Used</th>
+                <th style={{ ...TH, textAlign: 'left' }}>Progress</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={9} style={{ ...TD, textAlign: 'center', padding: 32, color: 'var(--text-4)' }}>
+                    Loading…
+                  </td>
+                </tr>
+              ) : items.map(item => {
+                const pctColor = item.pct >= 90 ? '#EF4444' : item.pct >= 70 ? '#F59E0B' : '#22C55E'
+                return (
+                  <tr key={item.item_no}
+                    style={{ background: 'var(--surface)' }}
+                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--surface-2)'}
+                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'var(--surface)'}
+                  >
+                    {/* Sr. No */}
+                    <td style={{ ...TD, fontWeight: 700, color: 'var(--primary)', fontSize: 12 }}>
+                      {item.item_no}
+                    </td>
 
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', margin: '0 0 8px', lineHeight: 1.4 }}>{item.item_name}</p>
+                    {/* Item name */}
+                    <td style={{ ...TD, textAlign: 'left', fontWeight: 500, lineHeight: 1.4 }}>
+                      {item.item_name}
+                    </td>
 
-                    {/* Stats row */}
-                    <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginBottom: 8, fontSize: 12 }}>
-                      {/* LOA qty (editable) */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ color: 'var(--text-4)' }}>LOA:</span>
-                        {editing === item.item_no ? (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <input type="number" value={editVal} onChange={e => setEditVal(e.target.value)}
-                              style={{ width: 100, padding: '2px 8px', border: '1.5px solid var(--primary)', borderRadius: 6, fontSize: 12, background: 'var(--surface)', color: 'var(--text)', outline: 'none' }}
-                              autoFocus onKeyDown={e => { if (e.key === 'Enter') saveEdit(item.item_no); if (e.key === 'Escape') setEditing(null) }} />
-                            <span style={{ color: 'var(--text-4)', fontSize: 11 }}>{item.unit}</span>
-                            <button onClick={() => saveEdit(item.item_no)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--success)', padding: 2 }}><Check size={14} /></button>
-                            <button onClick={() => setEditing(null)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--danger)', padding: 2 }}><X size={14} /></button>
-                          </div>
-                        ) : (
-                          <span style={{ fontWeight: 700, color: 'var(--text)' }}>
-                            {fmt(item.loa_qty)} {item.unit}
-                            <button onClick={() => { setEditing(item.item_no); setEditVal(String(item.loa_qty)) }}
-                              style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-4)', padding: '0 4px', verticalAlign: 'middle' }}>
-                              <Edit2 size={11} />
-                            </button>
-                          </span>
-                        )}
-                      </div>
-                      <div><span style={{ color: 'var(--text-4)' }}>Used: </span><span style={{ fontWeight: 700, color: 'var(--text)' }}>{fmt(item.used, 2)} {item.unit}</span></div>
-                      <div><span style={{ color: 'var(--text-4)' }}>Balance: </span><span style={{ fontWeight: 700, color: item.balance < 0 ? 'var(--danger)' : 'var(--text)' }}>{fmt(item.balance, 2)} {item.unit}</span></div>
-                      <div><span style={{ color: 'var(--text-4)' }}>Rate: </span><span style={{ fontWeight: 600, color: 'var(--text-2)' }}>₹{fmt(item.rate_gst, 2)}</span></div>
-                    </div>
+                    {/* Unit */}
+                    <td style={{ ...TD, fontSize: 12, color: 'var(--text-3)' }}>
+                      {item.unit}
+                    </td>
+
+                    {/* Rate */}
+                    <td style={{ ...TD, fontFamily: 'monospace', fontSize: 12 }}>
+                      {fmt(item.rate_gst, 2)}
+                    </td>
+
+                    {/* LOA Qty — editable */}
+                    <td style={{ ...TD }}>
+                      {editing === item.item_no ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
+                          <input
+                            type="number" value={editVal}
+                            onChange={e => setEditVal(e.target.value)}
+                            style={{ width: 80, padding: '3px 6px', border: '1.5px solid var(--primary)', borderRadius: 5, fontSize: 12, background: 'var(--surface)', color: 'var(--text)', outline: 'none', textAlign: 'right' }}
+                            autoFocus
+                            onKeyDown={e => { if (e.key === 'Enter') saveEdit(item.item_no); if (e.key === 'Escape') setEditing(null) }}
+                          />
+                          <button onClick={() => saveEdit(item.item_no)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#22C55E', padding: 2, lineHeight: 1 }}><Check size={14} /></button>
+                          <button onClick={() => setEditing(null)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#EF4444', padding: 2, lineHeight: 1 }}><X size={14} /></button>
+                        </div>
+                      ) : (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontFamily: 'monospace', fontSize: 12 }}>
+                          {fmt(item.loa_qty, 2)}
+                          <button
+                            onClick={() => { setEditing(item.item_no); setEditVal(String(item.loa_qty)) }}
+                            style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-4)', padding: 0, lineHeight: 1 }}
+                            title="Edit LOA Qty"
+                          >
+                            <Edit2 size={11} />
+                          </button>
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Used */}
+                    <td style={{ ...TD, fontFamily: 'monospace', fontSize: 12, fontWeight: 600 }}>
+                      {fmt(item.used, 2)}
+                    </td>
+
+                    {/* Balance */}
+                    <td style={{ ...TD, fontFamily: 'monospace', fontSize: 12, fontWeight: 600, color: item.balance < 0 ? '#EF4444' : 'var(--text)' }}>
+                      {fmt(item.balance, 2)}
+                    </td>
+
+                    {/* % */}
+                    <td style={{ ...TD, fontWeight: 700, fontSize: 13, color: pctColor }}>
+                      {item.pct}%
+                    </td>
 
                     {/* Progress bar */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ flex: 1 }}><ProgressBar pct={item.pct} /></div>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', flexShrink: 0, minWidth: 40 }}>{item.pct}%</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+                    <td style={{ ...TD, textAlign: 'left' }}>
+                      <div style={{ height: 8, background: 'var(--border)', borderRadius: 4, overflow: 'hidden', width: '100%' }}>
+                        <div style={{ height: '100%', width: `${Math.min(item.pct, 100)}%`, background: pctColor, borderRadius: 4, transition: 'width .4s' }} />
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+
+              {/* Totals row */}
+              {!loading && items.length > 0 && (
+                <tr style={{ background: 'var(--surface-2)' }}>
+                  <td colSpan={4} style={{ ...TD, textAlign: 'right', fontWeight: 700, fontSize: 12, color: 'var(--text-3)', borderTop: '2px solid var(--border-md)' }}>
+                    Total Contract Value →
+                  </td>
+                  <td style={{ ...TD, fontFamily: 'monospace', fontSize: 12, fontWeight: 700, borderTop: '2px solid var(--border-md)' }}>
+                    ₹{fmt(totalLOA)}
+                  </td>
+                  <td style={{ ...TD, fontFamily: 'monospace', fontSize: 12, fontWeight: 700, borderTop: '2px solid var(--border-md)' }}>
+                    ₹{fmt(totalUsed)}
+                  </td>
+                  <td style={{ ...TD, fontFamily: 'monospace', fontSize: 12, fontWeight: 700, color: totalBal < 0 ? '#EF4444' : 'var(--text)', borderTop: '2px solid var(--border-md)' }}>
+                    ₹{fmt(totalBal)}
+                  </td>
+                  <td colSpan={2} style={{ ...TD, borderTop: '2px solid var(--border-md)' }} />
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   )
