@@ -17,14 +17,17 @@ export async function GET() {
   // Item 2: NAC coaches (all trains)
   // Item 3: Exterior coaches (all trips with cleaning_type = Exterior)
   // Item 4: VB (train 22488 AC coaches)
-  const { rows: mccRows } = await db.execute(`
-    SELECT
-      SUM(CASE WHEN train_no != ? AND cleaning_type = 'Interior' THEN ac_count ELSE 0 END) as ac_coaches,
-      SUM(CASE WHEN cleaning_type = 'Interior' THEN nac_count ELSE 0 END) as nac_coaches,
-      SUM(CASE WHEN cleaning_type = 'Exterior' THEN coach_count ELSE 0 END) as ext_coaches,
-      SUM(CASE WHEN train_no = ? AND cleaning_type = 'Interior' THEN ac_count ELSE 0 END) as vb_coaches
-    FROM trips
-  `, [VB_TRAIN, VB_TRAIN])
+  const { rows: mccRows } = await db.execute({
+    sql: `
+      SELECT
+        SUM(CASE WHEN train_no != ? AND cleaning_type = 'Interior' THEN ac_count ELSE 0 END) as ac_coaches,
+        SUM(CASE WHEN cleaning_type = 'Interior' THEN nac_count ELSE 0 END) as nac_coaches,
+        SUM(CASE WHEN cleaning_type = 'Exterior' THEN coach_count ELSE 0 END) as ext_coaches,
+        SUM(CASE WHEN train_no = ? AND cleaning_type = 'Interior' THEN ac_count ELSE 0 END) as vb_coaches
+      FROM trips
+    `,
+    args: [VB_TRAIN, VB_TRAIN],
+  })
 
   // OBHS actual totals (all time)
   const { rows: obhsRows } = await db.execute(`
