@@ -1,6 +1,6 @@
 'use client'
 import { usePathname, useRouter } from 'next/navigation'
-import { Bell, ChevronRight, User, LogOut } from 'lucide-react'
+import { ChevronRight, ChevronLeft, Home, User, LogOut } from 'lucide-react'
 
 const LABELS: Record<string, string> = {
   '/trips':        'Trips - MCC',
@@ -18,6 +18,13 @@ const LABELS: Record<string, string> = {
   '/sec/reports':   'Reports',
 }
 
+const iconBtn: React.CSSProperties = {
+  width: 34, height: 34, borderRadius: 9, border: 'none',
+  background: 'transparent', cursor: 'pointer',
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+  color: 'var(--text-3)', transition: 'background .12s, color .12s',
+}
+
 export default function TopBar() {
   const path   = usePathname()
   const router = useRouter()
@@ -28,6 +35,17 @@ export default function TopBar() {
     const label = LABELS[href] ?? seg.charAt(0).toUpperCase() + seg.slice(1)
     return { href, label }
   })
+
+  const isHome = path === '/trips'
+
+  function hover(e: React.MouseEvent<HTMLButtonElement>, on: boolean) {
+    e.currentTarget.style.background = on ? 'var(--surface-2)' : 'transparent'
+    e.currentTarget.style.color      = on ? 'var(--text)'      : 'var(--text-3)'
+  }
+  function hoverDanger(e: React.MouseEvent<HTMLButtonElement>, on: boolean) {
+    e.currentTarget.style.background = on ? 'rgba(239,68,68,.1)' : 'transparent'
+    e.currentTarget.style.color      = on ? 'var(--danger)'      : 'var(--text-3)'
+  }
 
   async function handleLogout() {
     await fetch('/api/auth/logout', { method: 'POST' })
@@ -40,20 +58,46 @@ export default function TopBar() {
       height: 56, background: 'var(--surface)',
       borderBottom: '1px solid var(--border)',
       display: 'flex', alignItems: 'center',
-      padding: '0 24px', gap: 16,
+      padding: '0 16px', gap: 6,
       flexShrink: 0, position: 'sticky', top: 0, zIndex: 9,
     }}>
 
+      {/* Back button */}
+      <button
+        onClick={() => router.back()}
+        title="Go back"
+        style={iconBtn}
+        onMouseEnter={e => hover(e, true)}
+        onMouseLeave={e => hover(e, false)}
+      >
+        <ChevronLeft size={18} />
+      </button>
+
+      {/* Home button */}
+      <button
+        onClick={() => router.push('/trips')}
+        title="Home"
+        disabled={isHome}
+        style={{ ...iconBtn, opacity: isHome ? 0.35 : 1, cursor: isHome ? 'default' : 'pointer' }}
+        onMouseEnter={e => !isHome && hover(e, true)}
+        onMouseLeave={e => !isHome && hover(e, false)}
+      >
+        <Home size={16} />
+      </button>
+
+      {/* Divider */}
+      <div style={{ width: 1, height: 20, background: 'var(--border-md)', margin: '0 4px' }} />
+
       {/* Breadcrumb */}
-      <nav style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, minWidth: 0 }}>
-        <span style={{ fontSize: 12, color: 'var(--text-4)', fontWeight: 500 }}>Rail Contract Billing</span>
+      <nav style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, minWidth: 0, overflow: 'hidden' }}>
+        <span style={{ fontSize: 12, color: 'var(--text-4)', fontWeight: 500, whiteSpace: 'nowrap' }}>Rail Contract Billing</span>
         {crumbs.map((c, i) => (
-          <span key={c.href} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span key={c.href} style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
             <ChevronRight size={12} style={{ color: 'var(--text-4)', flexShrink: 0 }} />
             <span style={{
               fontSize: 12, fontWeight: i === crumbs.length - 1 ? 600 : 500,
               color: i === crumbs.length - 1 ? 'var(--text)' : 'var(--text-3)',
-              whiteSpace: 'nowrap',
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
             }}>
               {c.label}
             </span>
@@ -61,40 +105,21 @@ export default function TopBar() {
         ))}
       </nav>
 
-      {/* Actions */}
+      {/* Avatar + Logout */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-        {/* Avatar */}
         <div style={{
           width: 32, height: 32, borderRadius: 9,
           background: 'linear-gradient(135deg,#2563EB,#7C3AED)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          flexShrink: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
         }}>
           <User size={15} color="#fff" />
         </div>
 
-        {/* Divider */}
         <div style={{ width: 1, height: 20, background: 'var(--border-md)', margin: '0 4px' }} />
 
-        {/* Logout */}
-        <button
-          onClick={handleLogout}
-          title="Sign out"
-          style={{
-            width: 34, height: 34, borderRadius: 9, border: 'none',
-            background: 'transparent', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: 'var(--text-3)', transition: 'background .12s, color .12s',
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.background = 'rgba(239,68,68,.1)'
-            e.currentTarget.style.color = 'var(--danger)'
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.background = 'transparent'
-            e.currentTarget.style.color = 'var(--text-3)'
-          }}
-        >
+        <button onClick={handleLogout} title="Sign out" style={iconBtn}
+          onMouseEnter={e => hoverDanger(e, true)}
+          onMouseLeave={e => hoverDanger(e, false)}>
           <LogOut size={16} />
         </button>
       </div>
