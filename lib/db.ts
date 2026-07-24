@@ -11,6 +11,7 @@ export const db = createClient({ url, authToken })
 let _migrated        = false
 let _scheduleEnsured = false
 let _secMigrated     = false
+let _loaMigrated     = false
 export async function ensureDB() {
   if (!_migrated) {
     await migrate()
@@ -23,6 +24,10 @@ export async function ensureDB() {
   if (!_secMigrated) {
     await migrateSecondary()
     _secMigrated = true
+  }
+  if (!_loaMigrated) {
+    await migrateLOA()
+    _loaMigrated = true
   }
 }
 
@@ -205,6 +210,27 @@ async function migrateSecondary() {
     INSERT OR IGNORE INTO users (username, password_hash, role) VALUES
       ('admin', 'c5179c7a6f666319b5fb4bea7e9589eb74100c0d7dbe85d4b2a0b63db5660f44', 'admin');
 
+    -- OBHS monthly summary (extracted from uploaded Excel)
+    CREATE TABLE IF NOT EXISTS obhs_monthly (
+      month_year       TEXT PRIMARY KEY,  -- YYYY-MM
+      ac_obhs_hrs      REAL NOT NULL DEFAULT 0,
+      nac_obhs_hrs     REAL NOT NULL DEFAULT 0,
+      vb_obhs_hrs      REAL NOT NULL DEFAULT 0,
+      garibrath_obhs_hrs REAL NOT NULL DEFAULT 0,
+      ehk_hrs          REAL NOT NULL DEFAULT 0,
+      raw_json         TEXT,              -- full train-wise breakdown JSON
+      uploaded_at      TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    -- LOA quantities (from Awarded Qty sheet — editable)
+    CREATE TABLE IF NOT EXISTS loa_quantities (
+      item_no     INTEGER PRIMARY KEY,  -- 1-9
+      item_name   TEXT NOT NULL,
+      unit        TEXT NOT NULL,
+      rate_gst    REAL NOT NULL DEFAULT 0,
+      loa_qty     REAL NOT NULL DEFAULT 0
+    );
+
     -- Secondary train master
     CREATE TABLE IF NOT EXISTS sec_trains (
       id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -271,6 +297,32 @@ async function migrateSecondary() {
     await db.execute({
       sql:  'INSERT OR IGNORE INTO sec_trains (train_no, days, ac_count, nac_count, req_manpower) VALUES (?,?,?,?,?)',
       args: [train_no, days, ac, nac, req_mp],
+    })
+  }
+}
+
+/** ─── LOA Quantities & OBHS ──────────────────────────────────────────── */
+async function migrateLOA() {
+  // Tables already created in migrateSecondary — just seed LOA if empty
+  const { rows } = await db.execute('SELECT COUNT(*) as cnt FROM loa_quantities')
+  if (Number(rows[0].cnt) > 0) return
+
+  const LOA_ITEMS = [
+    [1, 'Mechanized coach cleaning of Primary Trains (AC)',                              'Coaches', 516.99,  52596],
+    [2, 'Mechanized coach cleaning of Primary Trains (NAC)',                             'Coaches', 485.01, 181164],
+    [3, 'Mechanized External coach cleaning of Primary Trains (AC & NAC)',               'Coaches', 165.66,  26298],
+    [4, 'Mechanized coach cleaning of VB coaches',                                       'Coaches',1104.99,  23376],
+    [5, 'OBHS in AC with Toiletries in coaches',                                         'Hours',    83.64, 688834],
+    [6, 'OBHS in NAC with Handwash in coaches',                                          'Hours',    81.33, 726816],
+    [7, 'OBHS in AC with Toiletries in VB coaches',                                      'Hours',    81.33, 119890],
+    [8, 'OBHS in AC with Toiletries in Garibrath Coaches',                               'Hours',    81.33, 399113],
+    [9, 'Supervision/ monitoring of OBHS staff in all rakes of trains',                  'Hours',    90.77, 390605],
+  ] as const
+
+  for (const [item_no, item_name, unit, rate_gst, loa_qty] of LOA_ITEMS) {
+    await db.execute({
+      sql:  'INSERT OR IGNORE INTO loa_quantities (item_no, item_name, unit, rate_gst, loa_qty) VALUES (?,?,?,?,?)',
+      args: [item_no, item_name, unit, rate_gst, loa_qty],
     })
   }
 }

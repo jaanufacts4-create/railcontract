@@ -7,6 +7,7 @@ import {
   ClipboardList, PlusCircle, Train, CalendarDays,
   Settings, ChevronLeft, ChevronRight, Building2, Layers,
   Sparkles, BarChart3, ChevronDown, ChevronUp,
+  Clock4, TrendingUp, FileSpreadsheet,
 } from 'lucide-react'
 
 const GROUPS = [
@@ -15,12 +16,15 @@ const GROUPS = [
     label: 'Primary MCC/OBHS Bill',
     sub:   'MPPL',
     links: [
-      { href: '/trips',        label: 'Trips - MCC',              icon: ClipboardList },
-      { href: '/trips/new',    label: 'New Trip',                 icon: PlusCircle    },
-      { href: '/train-master', label: 'Train Master',             icon: Train         },
-      { href: '/schedule',     label: 'Schedule of Trains (MCC)', icon: CalendarDays  },
-      { href: '/settings',     label: 'Settings',                 icon: Settings      },
-      { href: '/reports',      label: 'Reports',                  icon: BarChart3     },
+      { href: '/trips',        label: 'Trips - MCC',              icon: ClipboardList   },
+      { href: '/trips/new',    label: 'New Trip',                 icon: PlusCircle      },
+      { href: '/train-master', label: 'Train Master',             icon: Train           },
+      { href: '/schedule',     label: 'Schedule of Trains (MCC)', icon: CalendarDays    },
+      { href: '/obhs',         label: 'OBHS Hours',               icon: Clock4          },
+      { href: '/loa',          label: 'LOA Progress',             icon: TrendingUp      },
+      { href: '/billing',      label: 'Billing Certificate',      icon: FileSpreadsheet },
+      { href: '/settings',     label: 'Settings',                 icon: Settings        },
+      { href: '/reports',      label: 'Reports',                  icon: BarChart3       },
     ],
   },
   {
