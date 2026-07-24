@@ -37,56 +37,60 @@ function LoginForm() {
 
   return (
     <div style={{
-      minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'var(--bg)', padding: 20,
+      width: '100vw', height: '100vh',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'var(--bg)',
     }}>
-      <div style={{ width: '100%', maxWidth: 380 }}>
+      <div style={{ width: '100%', maxWidth: 460, padding: '0 24px' }}>
         {/* Logo */}
-        <div style={{ textAlign: 'center', marginBottom: 32 }}>
+        <div style={{ textAlign: 'center', marginBottom: 36 }}>
           <div style={{
-            width: 52, height: 52, borderRadius: 14,
+            width: 64, height: 64, borderRadius: 18,
             background: 'linear-gradient(135deg,#2563EB,#7C3AED)',
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 24, marginBottom: 14,
+            fontSize: 30, marginBottom: 16,
+            boxShadow: '0 8px 32px rgba(37,99,235,.35)',
           }}>🚆</div>
           <h1 style={{
-            fontSize: 22, fontWeight: 800, color: 'var(--text)',
+            fontSize: 28, fontWeight: 800, color: 'var(--text)',
             letterSpacing: '-.03em', margin: 0,
           }}>Rail Contract Billing</h1>
-          <p style={{ fontSize: 13, color: 'var(--text-3)', marginTop: 4 }}>Sign in to your account</p>
+          <p style={{ fontSize: 14, color: 'var(--text-3)', marginTop: 6 }}>Sign in to your account</p>
         </div>
 
         {/* Card */}
-        <div className="card" style={{ padding: 28 }}>
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div className="card" style={{ padding: 36 }}>
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             <div>
               <label style={{
-                fontSize: 11, fontWeight: 700, color: 'var(--text-3)',
-                textTransform: 'uppercase', letterSpacing: '.05em', display: 'block', marginBottom: 6,
+                fontSize: 12, fontWeight: 700, color: 'var(--text-3)',
+                textTransform: 'uppercase', letterSpacing: '.05em', display: 'block', marginBottom: 8,
               }}>Username</label>
               <input
                 type="text" autoComplete="username" autoFocus
                 className="input" placeholder="Enter username"
                 value={username} onChange={e => setUsername(e.target.value)}
                 required
+                style={{ fontSize: 15, padding: '11px 14px' }}
               />
             </div>
             <div>
               <label style={{
-                fontSize: 11, fontWeight: 700, color: 'var(--text-3)',
-                textTransform: 'uppercase', letterSpacing: '.05em', display: 'block', marginBottom: 6,
+                fontSize: 12, fontWeight: 700, color: 'var(--text-3)',
+                textTransform: 'uppercase', letterSpacing: '.05em', display: 'block', marginBottom: 8,
               }}>Password</label>
               <input
                 type="password" autoComplete="current-password"
                 className="input" placeholder="Enter password"
                 value={password} onChange={e => setPassword(e.target.value)}
                 required
+                style={{ fontSize: 15, padding: '11px 14px' }}
               />
             </div>
 
             {error && (
               <div style={{
-                padding: '10px 14px', borderRadius: 8,
+                padding: '12px 16px', borderRadius: 10,
                 background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)',
                 fontSize: 13, color: 'var(--danger)', fontWeight: 500,
               }}>
@@ -97,14 +101,14 @@ function LoginForm() {
             <button
               type="submit" disabled={loading}
               className="btn btn-primary"
-              style={{ width: '100%', padding: '11px', fontSize: 14, marginTop: 4 }}
+              style={{ width: '100%', padding: '13px', fontSize: 15, fontWeight: 700, marginTop: 4, borderRadius: 12 }}
             >
               {loading ? 'Signing in…' : 'Sign In'}
             </button>
           </form>
         </div>
 
-        <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-4)', marginTop: 20 }}>
+        <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-4)', marginTop: 24 }}>
           Rail Contract Billing · Secure Access
         </p>
       </div>
