@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { Save, ChevronLeft, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
@@ -21,8 +21,6 @@ const ANNEX_B_DEFS: { slot: number; label: string; rate: string }[] = [
 ]
 
 const CRITERIA_COUNT = 4
-
-import { use } from 'react'
 
 export default function EditSecTripPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
