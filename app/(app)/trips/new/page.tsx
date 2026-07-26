@@ -754,14 +754,14 @@ export default function NewTripPage() {
       )}
     </div>}
 
-    </div>{/* flex-1 min-w-0 */}
+    </div>
 
     {/* ── Today's schedule panel — always visible ── */}
     <div className="shrink-0 sticky top-4 w-56">
       <TodayPanel date={date} currentTrain={subTab === 'entry' ? trainNo.trim() || undefined : undefined} />
     </div>
-    </div>{/* flex gap-5 */}
-    </div>{/* pb-10 */}
+    </div>
+    </div>
   )
 }
 
