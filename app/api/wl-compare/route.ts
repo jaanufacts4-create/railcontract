@@ -61,27 +61,34 @@ export async function GET(req: Request) {
   }
 
   const lines = csv.split('\n').slice(1) // skip header row
-  const wlSet = new Set<string>()
+  const wlSet      = new Set<string>()
+  const specialSet = new Set<string>()   // spare stock, SPL trains, pilots, etc.
 
   for (const line of lines) {
     if (!line.trim()) continue
     const cols = parseCSVLine(line)
-    const rawDate = cols[0] ?? ''   // Column A
-    const trainCol = cols[3] ?? ''  // Column D
-    const typeCol  = cols[9] ?? ''  // Column J
+    const rawDate  = cols[0] ?? ''   // Column A
+    const trainCol = cols[3] ?? ''   // Column D
+    const typeCol  = cols[9] ?? ''   // Column J
 
     if (parseSheetDate(rawDate) !== date) continue
-    if (!isPrimary(typeCol)) continue
-    if (!trainCol.trim() || !isValidTrainNo(trainCol)) continue
+    if (!trainCol.trim()) continue
 
-    // Split combined entries like "54613+54611"
-    for (const t of trainCol.split('+')) {
-      const tn = t.trim()
-      if (tn) wlSet.add(tn)
+    if (isValidTrainNo(trainCol)) {
+      // Only count valid train numbers for Primary MCC comparison
+      if (!isPrimary(typeCol)) continue
+      for (const t of trainCol.split('+')) {
+        const tn = t.trim()
+        if (tn) wlSet.add(tn)
+      }
+    } else {
+      // Special/non-numeric entries — collect regardless of type for visibility
+      specialSet.add(trainCol.trim())
     }
   }
 
-  const wlTrains = [...wlSet].sort()
+  const wlTrains      = [...wlSet].sort()
+  const specialTrains = [...specialSet].sort()
 
   // ── Get scheduled trains for this date ───────────────────────────────────
   await ensureDB()
@@ -119,5 +126,6 @@ export async function GET(req: Request) {
     matched,
     inWLOnly,       // extra in WL placement (not in our schedule)
     inScheduleOnly, // in our schedule but missing from WL placement
+    specialTrains,  // spare stock, SPL, pilot, etc.
   })
 }

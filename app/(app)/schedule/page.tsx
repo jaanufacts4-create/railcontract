@@ -401,6 +401,7 @@ type WLResult = {
   date: string; dayOfWeek: string
   wlTrains: string[]; scheduledTrains: string[]
   matched: string[]; inWLOnly: string[]; inScheduleOnly: string[]
+  specialTrains: string[]
 }
 
 function WLCompareTab() {
@@ -490,6 +491,18 @@ function WLCompareTab() {
                 </div>
             }
           </div>
+
+          {/* Special / non-train entries */}
+          {result.specialTrains.length > 0 && (
+            <div className="card" style={{ padding: 16, borderLeft: '3px solid #8B5CF6' }}>
+              <p style={{ fontSize: 12, fontWeight: 700, color: '#6D28D9', margin: '0 0 10px' }}>
+                📋 Special Entries in WL Sheet ({result.specialTrains.length})
+              </p>
+              <div style={{ display: 'flex', flexWrap: 'wrap' }}>
+                {result.specialTrains.map(t => pill(t, '#5B21B6', 'rgba(139,92,246,.15)'))}
+              </div>
+            </div>
+          )}
 
           {/* Raw WL trains list for reference */}
           <details>
