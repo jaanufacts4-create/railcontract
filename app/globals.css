@@ -42,13 +42,13 @@
   --sb-w:          256px;
   --sb-w-col:      68px;
   --sb-bg:         #0F172A;
-  --sb-border:     rgba(255,255,255,.07);
-  --sb-text:       #94A3B8;
-  --sb-text-hover: #E2E8F0;
-  --sb-active-bg:  rgba(37,99,235,.18);
-  --sb-active:     #60A5FA;
-  --sb-label:      #475569;
-  --sb-lsub:       #334155;
+  --sb-border:     rgba(255,255,255,.12);
+  --sb-text:       #C4D4E8;
+  --sb-text-hover: #F1F5F9;
+  --sb-active-bg:  rgba(37,99,235,.22);
+  --sb-active:     #7BB8FF;
+  --sb-label:      #8499B4;
+  --sb-lsub:       #64748B;
 }
 
 /* Dark theme */

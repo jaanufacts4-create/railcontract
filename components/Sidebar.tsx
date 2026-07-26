@@ -58,7 +58,7 @@ export default function Sidebar() {
   const { theme, setTheme } = useTheme()
   const [collapsed, setCollapsed] = useState(false)
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(
-    () => Object.fromEntries(GROUPS.map(g => [g.id, true]))
+    () => Object.fromEntries(GROUPS.map(g => [g.id, false]))
   )
 
   useEffect(() => {
@@ -140,7 +140,7 @@ export default function Sidebar() {
                 >
                   <GroupIcon size={10} style={{ color: 'var(--sb-label)', flexShrink: 0 }} />
                   <span style={{
-                    fontSize: 10, fontWeight: 700, letterSpacing: '.07em',
+                    fontSize: 12, fontWeight: 700, letterSpacing: '.05em',
                     textTransform: 'uppercase', color: 'var(--sb-label)',
                     whiteSpace: 'nowrap', flex: 1, textAlign: 'left',
                   }}>
@@ -201,7 +201,7 @@ export default function Sidebar() {
                         <Icon size={16} strokeWidth={active ? 2.2 : 1.8} style={{ flexShrink: 0 }} />
                         {!collapsed && (
                           <span style={{
-                            fontSize: 13, fontWeight: active ? 600 : 500,
+                            fontSize: 14, fontWeight: active ? 700 : 500,
                             whiteSpace: 'nowrap', letterSpacing: '-.01em',
                           }}>
                             {label}
@@ -231,7 +231,7 @@ export default function Sidebar() {
           borderTop: '1px solid var(--sb-border)',
           flexShrink: 0,
         }}>
-          <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.07em', textTransform: 'uppercase', color: 'var(--sb-label)', marginBottom: 8 }}>
+          <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.05em', textTransform: 'uppercase', color: 'var(--sb-label)', marginBottom: 8 }}>
             Theme
           </p>
           <div style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
