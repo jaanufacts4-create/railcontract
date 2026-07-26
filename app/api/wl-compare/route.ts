@@ -160,7 +160,11 @@ export async function GET(req: Request) {
       const d: string[] = JSON.parse(r.days as string)
       return d.includes('Daily') || d.includes(dow)
     })
-    .map(r => ({ train_no: r.train_no as string }))
+    .map(r => ({
+      train_no:  r.train_no  as string,
+      ac_count:  r.ac_count  as number,
+      nac_count: r.nac_count as number,
+    }))
 
   const schedRawNos = scheduledTrains.map(t => t.train_no)
 
@@ -188,7 +192,7 @@ export async function GET(req: Request) {
     date,
     dayOfWeek: dow,
     wlTrains,
-    scheduledTrains: schedRawNos,
+    scheduledTrains,       // full objects with ac_count, nac_count
     matched,
     inWLOnly,
     inScheduleOnly,

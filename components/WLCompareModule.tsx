@@ -3,9 +3,11 @@ import { useState } from 'react'
 import { GitCompare, Loader2 } from 'lucide-react'
 
 type SheetWarning = { type: string; message: string; row?: string }
+type SchedTrain   = { train_no: string; ac_count: number; nac_count: number }
 type WLResult = {
   date: string; dayOfWeek: string
-  wlTrains: string[]; scheduledTrains: string[]
+  wlTrains: string[]
+  scheduledTrains: SchedTrain[]
   matched: string[]; inWLOnly: string[]; inScheduleOnly: string[]
   specialTrains: string[]
   warnings: SheetWarning[]
@@ -14,14 +16,14 @@ type WLResult = {
 export default function WLCompareModule({ initialDate, onDateChange }: { initialDate?: string; onDateChange?: (d: string) => void }) {
   const today = new Date().toISOString().slice(0, 10)
   const [date,    setDate]    = useState(initialDate ?? today)
+  const [loading, setLoading] = useState(false)
+  const [result,  setResult]  = useState<WLResult | null>(null)
+  const [error,   setError]   = useState('')
 
   function handleDateChange(d: string) {
     setDate(d)
     onDateChange?.(d)
   }
-  const [loading, setLoading] = useState(false)
-  const [result,  setResult]  = useState<WLResult | null>(null)
-  const [error,   setError]   = useState('')
 
   async function compare() {
     setLoading(true); setResult(null); setError('')
@@ -62,93 +64,106 @@ export default function WLCompareModule({ initialDate, onDateChange }: { initial
         <div className="card" style={{ padding: 16, color: 'var(--danger)', fontSize: 13 }}>⚠ {error}</div>
       )}
 
-      {result && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {result && (() => {
+        const matchedSet = new Set(result.matched)
+        const trains = result.scheduledTrains
 
-          {/* Summary chips */}
-          <div className="card" style={{ padding: 16 }}>
-            <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '0 0 10px', fontWeight: 600 }}>
-              {result.dayOfWeek} — WL Sheet: {result.wlTrains.length} trains &nbsp;|&nbsp; App Schedule: {result.scheduledTrains.length} trains
-            </p>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              <span style={{ fontSize: 11, color: 'var(--text-4)', alignSelf: 'center', marginRight: 4 }}>✅ Matched:</span>
-              {result.matched.length === 0
-                ? <span style={{ fontSize: 12, color: 'var(--text-4)' }}>—</span>
-                : result.matched.map(t => pill(t, '#166534', 'rgba(22,101,52,.12)'))}
-            </div>
-          </div>
+        const totalMatched  = result.matched.length
+        const totalMissing  = result.inScheduleOnly.length
+        const totalExtra    = result.inWLOnly.length
 
-          {/* In WL but not in schedule */}
-          <div className="card" style={{ padding: 16, borderLeft: '3px solid #F59E0B' }}>
-            <p style={{ fontSize: 12, fontWeight: 700, color: '#B45309', margin: '0 0 10px' }}>
-              ⚠ In WL Sheet but NOT in App Schedule ({result.inWLOnly.length})
-            </p>
-            {result.inWLOnly.length === 0
-              ? <span style={{ fontSize: 12, color: 'var(--text-4)' }}>None — all WL trains are scheduled ✓</span>
-              : <div style={{ display: 'flex', flexWrap: 'wrap' }}>
-                  {result.inWLOnly.map(t => pill(t, '#92400E', 'rgba(245,158,11,.15)'))}
-                </div>
-            }
-          </div>
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-          {/* In schedule but not in WL */}
-          <div className="card" style={{ padding: 16, borderLeft: '3px solid #EF4444' }}>
-            <p style={{ fontSize: 12, fontWeight: 700, color: '#B91C1C', margin: '0 0 10px' }}>
-              ❌ In App Schedule but MISSING from WL Sheet ({result.inScheduleOnly.length})
-            </p>
-            {result.inScheduleOnly.length === 0
-              ? <span style={{ fontSize: 12, color: 'var(--text-4)' }}>None — all scheduled trains present in WL ✓</span>
-              : <div style={{ display: 'flex', flexWrap: 'wrap' }}>
-                  {result.inScheduleOnly.map(t => pill(t, '#991B1B', 'rgba(239,68,68,.15)'))}
-                </div>
-            }
-          </div>
-
-          {/* Special / non-train entries */}
-          {result.specialTrains.length > 0 && (
-            <div className="card" style={{ padding: 16, borderLeft: '3px solid #8B5CF6' }}>
-              <p style={{ fontSize: 12, fontWeight: 700, color: '#6D28D9', margin: '0 0 10px' }}>
-                📋 Special Entries in WL Sheet ({result.specialTrains.length})
+            {/* Summary bar */}
+            <div className="card" style={{ padding: 16 }}>
+              <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '0 0 10px', fontWeight: 600 }}>
+                {result.dayOfWeek} — Schedule: {trains.length} trains
               </p>
-              <div style={{ display: 'flex', flexWrap: 'wrap' }}>
-                {result.specialTrains.map(t => pill(t, '#5B21B6', 'rgba(139,92,246,.15)'))}
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#166534' }}>✅ Matched: {totalMatched}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#B91C1C' }}>❌ Missing: {totalMissing}</span>
+                {totalExtra > 0 && <span style={{ fontSize: 12, fontWeight: 700, color: '#B45309' }}>⚠ Extra in WL: {totalExtra}</span>}
               </div>
             </div>
-          )}
 
-          {/* Sheet anomalies / warnings */}
-          {result.warnings && result.warnings.length > 0 && (
-            <div className="card" style={{ padding: 16, borderLeft: '3px solid #EF4444', background: 'rgba(239,68,68,.04)' }}>
-              <p style={{ fontSize: 12, fontWeight: 700, color: '#B91C1C', margin: '0 0 10px' }}>
-                🚨 Sheet Issues Detected ({result.warnings.length})
+            {/* Train list — same order as schedule (TodayPanel style) */}
+            <div className="card" style={{ padding: 16 }}>
+              <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '.04em' }}>
+                Scheduled Trains — WL Status
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {result.warnings.map((w, i) => (
-                  <div key={i} style={{
-                    display: 'flex', alignItems: 'flex-start', gap: 8,
-                    fontSize: 12, color: w.type === 'duplicate' ? '#92400E' : w.type === 'suspicious' ? '#854D0E' : '#991B1B',
-                    padding: '6px 10px', borderRadius: 8,
-                    background: w.type === 'duplicate' ? 'rgba(245,158,11,.10)' : w.type === 'suspicious' ? 'rgba(234,179,8,.10)' : 'rgba(239,68,68,.10)',
-                  }}>
-                    <span>{w.type === 'duplicate' ? '🔁' : w.type === 'suspicious' ? '🔎' : '⚠'}</span>
-                    <span>{w.message}</span>
-                  </div>
-                ))}
+                {trains.map(t => {
+                  const inWL = matchedSet.has(t.train_no)
+                  return (
+                    <div key={t.train_no} style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '7px 12px', borderRadius: 8,
+                      background: inWL ? 'rgba(22,101,52,.08)' : 'rgba(239,68,68,.06)',
+                      border: `1px solid ${inWL ? 'rgba(22,101,52,.18)' : 'rgba(239,68,68,.15)'}`,
+                    }}>
+                      <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--text)', minWidth: 70 }}>
+                        {t.train_no}
+                      </span>
+                      <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
+                        {t.ac_count  > 0 && <span style={{ marginRight: 6 }}>AC:{t.ac_count}</span>}
+                        {t.nac_count > 0 && <span>NAC:{t.nac_count}</span>}
+                      </span>
+                      <span style={{ fontSize: 16 }}>{inWL ? '✅' : '❌'}</span>
+                    </div>
+                  )
+                })}
               </div>
             </div>
-          )}
 
-          {/* Raw WL trains list for reference */}
-          <details>
-            <summary style={{ fontSize: 12, color: 'var(--text-3)', cursor: 'pointer', padding: '6px 0' }}>
-              View all WL Primary trains for this date ({result.wlTrains.length})
-            </summary>
-            <div className="card" style={{ padding: 12, marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-              {result.wlTrains.map(t => pill(t, 'var(--text-2)', 'var(--bg-3)'))}
-            </div>
-          </details>
-        </div>
-      )}
+            {/* Extra in WL only */}
+            {result.inWLOnly.length > 0 && (
+              <div className="card" style={{ padding: 16, borderLeft: '3px solid #F59E0B' }}>
+                <p style={{ fontSize: 12, fontWeight: 700, color: '#B45309', margin: '0 0 10px' }}>
+                  ⚠ In WL but NOT in Schedule ({result.inWLOnly.length})
+                </p>
+                <div style={{ display: 'flex', flexWrap: 'wrap' }}>
+                  {result.inWLOnly.map(t => pill(t, '#92400E', 'rgba(245,158,11,.15)'))}
+                </div>
+              </div>
+            )}
+
+            {/* Special entries */}
+            {result.specialTrains.length > 0 && (
+              <div className="card" style={{ padding: 16, borderLeft: '3px solid #8B5CF6' }}>
+                <p style={{ fontSize: 12, fontWeight: 700, color: '#6D28D9', margin: '0 0 10px' }}>
+                  📋 Special Entries ({result.specialTrains.length})
+                </p>
+                <div style={{ display: 'flex', flexWrap: 'wrap' }}>
+                  {result.specialTrains.map(t => pill(t, '#5B21B6', 'rgba(139,92,246,.15)'))}
+                </div>
+              </div>
+            )}
+
+            {/* Warnings */}
+            {result.warnings && result.warnings.length > 0 && (
+              <div className="card" style={{ padding: 16, borderLeft: '3px solid #EF4444', background: 'rgba(239,68,68,.04)' }}>
+                <p style={{ fontSize: 12, fontWeight: 700, color: '#B91C1C', margin: '0 0 10px' }}>
+                  🚨 Sheet Issues ({result.warnings.length})
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {result.warnings.map((w, i) => (
+                    <div key={i} style={{
+                      display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12,
+                      color: w.type === 'duplicate' ? '#92400E' : w.type === 'suspicious' ? '#854D0E' : '#991B1B',
+                      padding: '6px 10px', borderRadius: 8,
+                      background: w.type === 'duplicate' ? 'rgba(245,158,11,.10)' : w.type === 'suspicious' ? 'rgba(234,179,8,.10)' : 'rgba(239,68,68,.10)',
+                    }}>
+                      <span>{w.type === 'duplicate' ? '🔁' : w.type === 'suspicious' ? '🔎' : '⚠'}</span>
+                      <span>{w.message}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )
+      })()}
     </div>
   )
 }
