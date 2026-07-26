@@ -2,8 +2,9 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { coachCategory, PENALTY_LABELS } from '@/lib/types'
-import TodayPanel from '@/components/TodayPanel'
-import WLPanel    from '@/components/WLPanel'
+import TodayPanel      from '@/components/TodayPanel'
+import WLCompareModule from '@/components/WLCompareModule'
+import { GitCompare, ClipboardList } from 'lucide-react'
 
 // Sub-criteria: [c1(1X2), c2, c3, c4, c5]
 // Normal  total = c1×2 + c2 + c3 + c4 + c5      (max 15, c5 default 0)
@@ -25,6 +26,7 @@ type Position = { position: number; coach_type: string }
 
 export default function NewTripPage() {
   const router = useRouter()
+  const [subTab, setSubTab] = useState<'entry' | 'wl'>('entry')
 
   const [date,         setDate]         = useState(() => new Date().toISOString().slice(0, 10))
   const [trainNo,      setTrainNo]      = useState('')
@@ -297,7 +299,32 @@ export default function NewTripPage() {
   }
 
   return (
-    <div className="flex gap-5 items-start pb-10">
+    <div className="pb-10">
+
+    {/* ── Sub-tab nav ── */}
+    <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '2px solid var(--border)' }}>
+      {([
+        { id: 'entry', label: 'Trip Entry',             icon: <ClipboardList size={14} /> },
+        { id: 'wl',    label: 'WL Placement Compare',   icon: <GitCompare size={14} /> },
+      ] as const).map(t => (
+        <button key={t.id} onClick={() => setSubTab(t.id)} style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          padding: '8px 16px', fontSize: 13, fontWeight: 600,
+          background: 'none', border: 'none', cursor: 'pointer',
+          borderBottom: subTab === t.id ? '2px solid var(--accent)' : '2px solid transparent',
+          color: subTab === t.id ? 'var(--accent)' : 'var(--text-3)',
+          marginBottom: -2,
+        }}>
+          {t.icon}{t.label}
+        </button>
+      ))}
+    </div>
+
+    {/* ── WL Placement Compare ── */}
+    {subTab === 'wl' && <WLCompareModule initialDate={date} />}
+
+    {/* ── Trip Entry ── */}
+    {subTab === 'entry' && <div className="flex gap-5 items-start">
     {/* ── Main form ── */}
     <div className="flex-1 min-w-0 space-y-5">
       <h1 className="text-xl font-bold">New Trip Entry</h1>
@@ -728,8 +755,8 @@ export default function NewTripPage() {
     {/* ── Today's schedule panel ── */}
     <div className="shrink-0 sticky top-4 w-56">
       <TodayPanel date={date} currentTrain={trainNo.trim() || undefined} />
-      <WLPanel date={date} />
     </div>
+    </div>}
     </div>
   )
 }
