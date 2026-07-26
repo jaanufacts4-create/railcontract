@@ -63,27 +63,78 @@ export async function GET(req: Request) {
   const lines = csv.split('\n').slice(1) // skip header row
   const wlSet      = new Set<string>()
   const specialSet = new Set<string>()   // spare stock, SPL trains, pilots, etc.
+  const trainCount = new Map<string, number>()  // for duplicate detection
 
+  type SheetWarning = { type: string; message: string; row?: string }
+  const warnings: SheetWarning[] = []
+
+  let rowNum = 2  // starts at 2 (row 1 = header)
   for (const line of lines) {
+    rowNum++
     if (!line.trim()) continue
-    const cols = parseCSVLine(line)
-    const rawDate  = cols[0] ?? ''   // Column A
-    const trainCol = cols[3] ?? ''   // Column D
-    const typeCol  = cols[9] ?? ''   // Column J
+    const cols      = parseCSVLine(line)
+    const rawDate   = cols[0] ?? ''   // Column A
+    const trainCol  = (cols[3] ?? '').trim()  // Column D
+    const typeCol   = (cols[9] ?? '').trim()  // Column J
 
-    if (parseSheetDate(rawDate) !== date) continue
-    if (!trainCol.trim()) continue
+    const parsedDate = parseSheetDate(rawDate)
+    if (!parsedDate) continue           // skip rows with unparseable date
+    if (parsedDate !== date) continue   // different date
+
+    // ── Warn: Column D empty but row belongs to this date ────────────────
+    if (!trainCol) {
+      if (isPrimary(typeCol)) {
+        warnings.push({
+          type: 'empty_train',
+          message: `Row ${rowNum}: Primary entry but Train No. (Col D) is empty`,
+        })
+      }
+      continue
+    }
+
+    // ── Warn: Column J (Type) empty ───────────────────────────────────────
+    if (!typeCol) {
+      warnings.push({
+        type: 'empty_type',
+        message: `Row ${rowNum}: Train "${trainCol}" has no Type in Column J`,
+        row: trainCol,
+      })
+    }
 
     if (isValidTrainNo(trainCol)) {
-      // Only count valid train numbers for Primary MCC comparison
       if (!isPrimary(typeCol)) continue
+
+      // Split combined entries like "54613+54611"
       for (const t of trainCol.split('+')) {
         const tn = t.trim()
-        if (tn) wlSet.add(tn)
+        if (!tn) continue
+
+        // ── Warn: unusually short train number (possible typo) ────────────
+        if (/^\d+$/.test(tn) && tn.length < 4) {
+          warnings.push({
+            type: 'suspicious',
+            message: `Row ${rowNum}: "${tn}" looks like an incomplete train number (only ${tn.length} digit${tn.length > 1 ? 's' : ''})`,
+            row: tn,
+          })
+        }
+
+        wlSet.add(tn)
+        trainCount.set(tn, (trainCount.get(tn) ?? 0) + 1)
       }
     } else {
       // Special/non-numeric entries — collect regardless of type for visibility
-      specialSet.add(trainCol.trim())
+      specialSet.add(trainCol)
+    }
+  }
+
+  // ── Warn: duplicates (same train Primary more than once) ─────────────────
+  for (const [tn, count] of trainCount) {
+    if (count > 1) {
+      warnings.push({
+        type: 'duplicate',
+        message: `Train "${tn}" appears ${count} times as Primary on this date`,
+        row: tn,
+      })
     }
   }
 
@@ -127,5 +178,6 @@ export async function GET(req: Request) {
     inWLOnly,       // extra in WL placement (not in our schedule)
     inScheduleOnly, // in our schedule but missing from WL placement
     specialTrains,  // spare stock, SPL, pilot, etc.
+    warnings,       // sheet anomalies: empty rows, duplicates, suspicious entries
   })
 }

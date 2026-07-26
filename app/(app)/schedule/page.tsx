@@ -397,11 +397,13 @@ function TrainMasterTab() {
 // ══════════════════════════════════════════════════════════════════════════════
 // Tab 3 — WL Compare
 // ══════════════════════════════════════════════════════════════════════════════
+type SheetWarning = { type: string; message: string; row?: string }
 type WLResult = {
   date: string; dayOfWeek: string
   wlTrains: string[]; scheduledTrains: string[]
   matched: string[]; inWLOnly: string[]; inScheduleOnly: string[]
   specialTrains: string[]
+  warnings: SheetWarning[]
 }
 
 function WLCompareTab() {
@@ -500,6 +502,28 @@ function WLCompareTab() {
               </p>
               <div style={{ display: 'flex', flexWrap: 'wrap' }}>
                 {result.specialTrains.map(t => pill(t, '#5B21B6', 'rgba(139,92,246,.15)'))}
+              </div>
+            </div>
+          )}
+
+          {/* Sheet anomalies / warnings */}
+          {result.warnings && result.warnings.length > 0 && (
+            <div className="card" style={{ padding: 16, borderLeft: '3px solid #EF4444', background: 'rgba(239,68,68,.04)' }}>
+              <p style={{ fontSize: 12, fontWeight: 700, color: '#B91C1C', margin: '0 0 10px' }}>
+                🚨 Sheet Issues Detected ({result.warnings.length})
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {result.warnings.map((w, i) => (
+                  <div key={i} style={{
+                    display: 'flex', alignItems: 'flex-start', gap: 8,
+                    fontSize: 12, color: w.type === 'duplicate' ? '#92400E' : w.type === 'suspicious' ? '#854D0E' : '#991B1B',
+                    padding: '6px 10px', borderRadius: 8,
+                    background: w.type === 'duplicate' ? 'rgba(245,158,11,.10)' : w.type === 'suspicious' ? 'rgba(234,179,8,.10)' : 'rgba(239,68,68,.10)',
+                  }}>
+                    <span>{w.type === 'duplicate' ? '🔁' : w.type === 'suspicious' ? '🔎' : '⚠'}</span>
+                    <span>{w.message}</span>
+                  </div>
+                ))}
               </div>
             </div>
           )}
