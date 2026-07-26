@@ -307,7 +307,7 @@ body {
   background: var(--surface-2);
 }
 .proforma-cell {
-  padding: 4px 8px;
+  padding: 4px 3px;
   border: 1px solid var(--border);
   text-align: center;
   font-size: 12px;

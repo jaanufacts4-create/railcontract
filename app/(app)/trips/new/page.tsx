@@ -340,7 +340,7 @@ export default function NewTripPage() {
                 <tr>
                   <th className="proforma-label bg-yellow-100">Coach No.</th>
                   {positions.map(p => (
-                    <th key={p.position} className="proforma-cell bg-yellow-100 font-bold text-gray-700 min-w-[44px]">
+                    <th key={p.position} className="proforma-cell bg-yellow-100 font-bold text-gray-700 min-w-[36px]">
                       {p.position}
                     </th>
                   ))}
@@ -353,7 +353,7 @@ export default function NewTripPage() {
                     const bg = cat==='AC' ? 'bg-blue-100' : cat==='NAC' ? 'bg-green-100' : cat==='INT' ? 'bg-purple-100' : 'bg-gray-100'
                     const tc = cat==='AC' ? 'text-blue-700' : cat==='NAC' ? 'text-green-700' : cat==='INT' ? 'text-purple-700' : 'text-gray-500'
                     return (
-                      <td key={p.position} className={`proforma-cell ${bg}`} style={{ minWidth: 72 }}>
+                      <td key={p.position} className={`proforma-cell ${bg}`} style={{ minWidth: 56 }}>
                         <select value={eff} onChange={e => handleTypeChange(p.position, e.target.value)}
                           className={`text-[9px] border-0 bg-transparent w-full cursor-pointer focus:outline-none font-semibold ${tc}`}>
                           {COACH_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
@@ -380,7 +380,7 @@ export default function NewTripPage() {
                             <input type="number" min={0} max={3}
                               value={val === 0 && cIdx === 4 ? '' : val}
                               onChange={e => setC(p.position, cIdx, Number(e.target.value) || 0)}
-                              className="w-9 text-center text-xs border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-blue-400 rounded" />
+                              className="w-8 text-center text-xs border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-blue-400 rounded" />
                           ) : (
                             <span className="text-gray-300">—</span>
                           )}
@@ -441,7 +441,7 @@ export default function NewTripPage() {
                 <tr>
                   <th className="proforma-label bg-purple-100">Coach No.</th>
                   {intPositions.map(p => (
-                    <th key={p.position} className="proforma-cell bg-purple-100 font-bold min-w-[52px] text-purple-800">
+                    <th key={p.position} className="proforma-cell bg-purple-100 font-bold min-w-[40px] text-purple-800">
                       {p.position}
                       <div className="text-[8px] font-normal text-purple-400">
                         ({intPrevType[p.position] ?? '—'})
@@ -462,7 +462,7 @@ export default function NewTripPage() {
                           <input type="number" min={0} max={3}
                             value={val}
                             onChange={e => setIC(p.position, cIdx, Number(e.target.value) || 0)}
-                            className="w-9 text-center text-xs border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-purple-400 rounded" />
+                            className="w-8 text-center text-xs border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-purple-400 rounded" />
                         </td>
                       )
                     })}
@@ -477,7 +477,7 @@ export default function NewTripPage() {
                       <input type="number" min={0} max={3}
                         value={intExtScores[p.position] ?? 3}
                         onChange={e => setIntExtScores(s => ({ ...s, [p.position]: Math.min(3, Number(e.target.value) || 0) }))}
-                        className="w-9 text-center text-xs border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-orange-400 rounded" />
+                        className="w-8 text-center text-xs border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-orange-400 rounded" />
                     </td>
                   ))}
                 </tr>
@@ -519,7 +519,7 @@ export default function NewTripPage() {
                 <tr>
                   <th className="proforma-label bg-orange-100">Coach #</th>
                   {attendable.map(p => (
-                    <th key={p.position} className="proforma-cell bg-orange-100 font-bold min-w-[44px]">
+                    <th key={p.position} className="proforma-cell bg-orange-100 font-bold min-w-[36px]">
                       {p.position}
                     </th>
                   ))}
@@ -533,7 +533,7 @@ export default function NewTripPage() {
                       <input type="number" min={0} max={3}
                         value={extScores[p.position] ?? 3}
                         onChange={e => setExtScores(s => ({ ...s, [p.position]: Number(e.target.value) || 0 }))}
-                        className="w-9 text-center text-xs border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-orange-400 rounded" />
+                        className="w-8 text-center text-xs border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-orange-400 rounded" />
                     </td>
                   ))}
                 </tr>
