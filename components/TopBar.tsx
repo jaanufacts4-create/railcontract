@@ -7,7 +7,7 @@ const LABELS: Record<string, string> = {
   '/trips':        'Trips - MCC',
   '/trips/new':    'New Trip',
   '/summary':      'Monthly Summary',
-  '/train-master': 'Train Master',
+  '/train-master': 'Train Master',  // legacy — now inside /schedule
   '/schedule':     'Schedule of Trains (MCC)',
   '/obhs':         'OBHS Hours',
   '/loa':          'Quantity Consumed',

@@ -18,7 +18,6 @@ const GROUPS = [
     links: [
       { href: '/trips',        label: 'Trips - MCC',              icon: ClipboardList   },
       { href: '/trips/new',    label: 'New Trip',                 icon: PlusCircle      },
-      { href: '/train-master', label: 'Train Master',             icon: Train           },
       { href: '/schedule',     label: 'Schedule of Trains (MCC)', icon: CalendarDays    },
       { href: '/obhs',         label: 'OBHS Hours',               icon: Clock4          },
       { href: '/loa',          label: 'Quantity Consumed',         icon: TrendingUp      },
