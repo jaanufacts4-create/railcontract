@@ -322,7 +322,7 @@ export default function NewTripPage() {
 
       {/* ── Pull ── */}
       <div className="flex items-center gap-3">
-        <button onClick={pull}
+        <button onClick={() => pull()}
           className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium text-sm">
           ⬇ Pull Data
         </button>
