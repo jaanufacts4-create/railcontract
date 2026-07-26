@@ -199,12 +199,28 @@ function TrainMasterTab() {
   const [newTrain,  setNewTrain]  = useState('')
   const [saving,    setSaving]    = useState(false)
   const [msg,       setMsg]       = useState('')
+  const [seeding,   setSeeding]   = useState(false)
 
   useEffect(() => { loadTrains() }, [])
 
   async function loadTrains() {
     const data = await fetch('/api/train-master').then(r => r.json())
     setTrains(data)
+  }
+
+  async function seedFromSchedule() {
+    if (!confirm('Auto-fill Train Master from Schedule of Trains?\n\nExisting trains will NOT be overwritten. Only missing trains will be added with LWACCN (AC) and GSLRD (NAC) coaches.')) return
+    setSeeding(true)
+    const res  = await fetch('/api/train-master/seed', { method: 'POST' })
+    const data = await res.json()
+    setSeeding(false)
+    if (data.seeded === 0) {
+      setMsg(`All ${data.skipped} trains already exist in Train Master.`)
+    } else {
+      setMsg(`✓ Added ${data.seeded} train${data.seeded > 1 ? 's' : ''} (${data.skipped} already existed).`)
+    }
+    setTimeout(() => setMsg(''), 5000)
+    loadTrains()
   }
 
   async function selectTrain(t: string) {
@@ -246,6 +262,15 @@ function TrainMasterTab() {
   const nacCount = positions.filter(p => ['GSLRD','LWSCN','LWS'].includes(p.coach_type)).length
 
   return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {/* Auto-fill button */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <button onClick={seedFromSchedule} disabled={seeding} className="btn btn-secondary" style={{ fontSize: 12 }}>
+          {seeding ? '⏳ Filling…' : '⚡ Auto-fill from Schedule of Trains'}
+        </button>
+        {msg && <span style={{ fontSize: 12, color: 'var(--success)', fontWeight: 600 }}>{msg}</span>}
+      </div>
+
     <div style={{ display: 'flex', gap: 20, height: '100%', minHeight: 0 }}>
       {/* Left — train list */}
       <div style={{ width: 190, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -363,6 +388,7 @@ function TrainMasterTab() {
           </div>
         </div>
       )}
+    </div>
     </div>
   )
 }
