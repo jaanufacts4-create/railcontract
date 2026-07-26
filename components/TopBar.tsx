@@ -3,6 +3,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { ChevronRight, ChevronLeft, Home, User, LogOut } from 'lucide-react'
 
 const LABELS: Record<string, string> = {
+  '/dashboard':    'Dashboard',
   '/trips':        'Trips - MCC',
   '/trips/new':    'New Trip',
   '/summary':      'Monthly Summary',
@@ -39,7 +40,7 @@ export default function TopBar() {
     return { href, label }
   })
 
-  const isHome = path === '/trips'
+  const isHome = path === '/dashboard'
 
   function hover(e: React.MouseEvent<HTMLButtonElement>, on: boolean) {
     e.currentTarget.style.background = on ? 'var(--surface-2)' : 'transparent'
@@ -78,7 +79,7 @@ export default function TopBar() {
 
       {/* Home button */}
       <button
-        onClick={() => router.push('/trips')}
+        onClick={() => router.push('/dashboard')}
         title="Home"
         disabled={isHome}
         style={{ ...iconBtn, opacity: isHome ? 0.35 : 1, cursor: isHome ? 'default' : 'pointer' }}

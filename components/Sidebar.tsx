@@ -7,7 +7,7 @@ import {
   ClipboardList, PlusCircle, Train, CalendarDays,
   Settings, ChevronLeft, ChevronRight, Building2, Layers,
   Sparkles, BarChart3, ChevronDown, ChevronUp,
-  Clock4, TrendingUp, FileSpreadsheet,
+  Clock4, TrendingUp, FileSpreadsheet, LayoutDashboard,
 } from 'lucide-react'
 
 const GROUPS = [
@@ -16,6 +16,7 @@ const GROUPS = [
     label: 'Primary MCC/OBHS Bill',
     sub:   'MPPL',
     links: [
+      { href: '/dashboard',    label: 'Dashboard',                icon: LayoutDashboard },
       { href: '/trips',        label: 'Trips - MCC',              icon: ClipboardList   },
       { href: '/trips/new',    label: 'New Trip',                 icon: PlusCircle      },
       { href: '/train-master', label: 'Train Master',             icon: Train           },

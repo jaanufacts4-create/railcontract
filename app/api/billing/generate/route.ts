@@ -454,13 +454,24 @@ export async function POST(req: NextRequest) {
   // ── Build buffer ─────────────────────────────────────────────────────────
   const buf = await wb.xlsx.writeBuffer()
 
-  // ── Update cumulative AFTER buffer is ready (so a write error doesn't corrupt DB) ──
+  // ── Update cumulative + save monthly bill summary ────────────────────────
   for (let i = 0; i < 9; i++) {
     await db.execute({
       sql:  'UPDATE billing_cumulative SET upto_qty=?, upto_payment=? WHERE item_no=?',
       args: [newUptoQty[i], newUptoPay[i], i + 1],
     })
   }
+
+  // Save/update monthly bill (preserves existing penalty if already set)
+  await db.execute({
+    sql: `INSERT INTO monthly_bills (month_year, gross_amount, net_amount, generated_at)
+          VALUES (?, ?, ?, datetime('now'))
+          ON CONFLICT(month_year) DO UPDATE SET
+            gross_amount  = excluded.gross_amount,
+            net_amount    = CASE WHEN net_amount = 0 THEN excluded.net_amount ELSE net_amount - (gross_amount - excluded.gross_amount) END,
+            generated_at  = excluded.generated_at`,
+    args: [month_year, totalSincePayment, net],
+  })
 
   return new NextResponse(buf as ArrayBuffer, {
     headers: {

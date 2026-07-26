@@ -34,6 +34,7 @@ export async function ensureDB() {
     await migrateBillingCumulative()
     _billingMigrated = true
   }
+  await migrateMonthlyBills()
 }
 
 /** Idempotent — creates train_schedule table + seeds data if empty. Runs once per process. */
@@ -330,6 +331,20 @@ async function migrateLOA() {
       args: [item_no, item_name, unit, rate_gst, loa_qty],
     })
   }
+}
+
+/** ─── Monthly bills summary ─────────────────────────────────────────────── */
+async function migrateMonthlyBills() {
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS monthly_bills (
+      month_year        TEXT PRIMARY KEY,
+      gross_amount      REAL NOT NULL DEFAULT 0,
+      penalty           REAL NOT NULL DEFAULT 0,
+      penalty_breakdown TEXT,
+      net_amount        REAL NOT NULL DEFAULT 0,
+      generated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `)
 }
 
 /** ─── Billing cumulative (running upto-date totals) ─────────────────────── */
