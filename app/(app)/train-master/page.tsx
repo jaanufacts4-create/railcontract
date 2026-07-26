@@ -3,15 +3,23 @@ import { useEffect, useState } from 'react'
 import { Plus, Minus, Save, Trash2, Train } from 'lucide-react'
 
 const MAX_POS = 24
-const COACH_TYPES = ['LWFCZAC','LWACCN','LWCBAC','GSLRD','LWSCN','LWS','LWLRRM','LWGRD','—']
+const COACH_TYPES = ['AC', 'NAC', 'VB', 'GEN']
 
 const TYPE_META: Record<string, { label: string; color: string; bg: string }> = {
+  // Simple types
+  AC:  { label: 'AC',  color: '#2563EB', bg: 'rgba(37,99,235,.10)' },
+  NAC: { label: 'NAC', color: '#22C55E', bg: 'rgba(34,197,94,.10)' },
+  VB:  { label: 'VB',  color: '#7C3AED', bg: 'rgba(124,58,237,.10)' },
+  GEN: { label: 'GEN', color: '#94A3B8', bg: 'rgba(148,163,184,.10)' },
+  // Legacy codes — display only (existing data)
   LWFCZAC: { label: 'AC',  color: '#2563EB', bg: 'rgba(37,99,235,.10)' },
   LWACCN:  { label: 'AC',  color: '#2563EB', bg: 'rgba(37,99,235,.10)' },
   LWCBAC:  { label: 'AC',  color: '#2563EB', bg: 'rgba(37,99,235,.10)' },
+  LWACZAC: { label: 'AC',  color: '#2563EB', bg: 'rgba(37,99,235,.10)' },
   GSLRD:   { label: 'NAC', color: '#22C55E', bg: 'rgba(34,197,94,.10)' },
   LWSCN:   { label: 'NAC', color: '#22C55E', bg: 'rgba(34,197,94,.10)' },
   LWS:     { label: 'NAC', color: '#22C55E', bg: 'rgba(34,197,94,.10)' },
+  LWSCZAC: { label: 'NAC', color: '#22C55E', bg: 'rgba(34,197,94,.10)' },
   LWLRRM:  { label: 'GEN', color: '#94A3B8', bg: 'rgba(148,163,184,.10)' },
   LWGRD:   { label: 'GEN', color: '#94A3B8', bg: 'rgba(148,163,184,.10)' },
 }
@@ -43,7 +51,7 @@ export default function TrainMasterPage() {
     const t = newTrain.trim()
     if (!t) return
     setSelected(t)
-    setPositions(Array.from({ length: 10 }, (_, i) => ({ position: i + 1, coach_type: 'GSLRD' })))
+    setPositions(Array.from({ length: 10 }, (_, i) => ({ position: i + 1, coach_type: 'NAC' })))
     setNewTrain('')
   }
 
@@ -54,7 +62,7 @@ export default function TrainMasterPage() {
   function addCoach() {
     const next = positions.length + 1
     if (next > MAX_POS) return
-    setPositions(ps => [...ps, { position: next, coach_type: 'GSLRD' }])
+    setPositions(ps => [...ps, { position: next, coach_type: 'NAC' }])
   }
 
   function removeCoach() {
@@ -80,8 +88,11 @@ export default function TrainMasterPage() {
     setSelected(''); setPositions([]); loadTrains()
   }
 
-  const acCount  = positions.filter(p => ['LWFCZAC','LWACCN','LWCBAC'].includes(p.coach_type)).length
-  const nacCount = positions.filter(p => ['GSLRD','LWSCN','LWS'].includes(p.coach_type)).length
+  const AC_TYPES  = ['AC','VB','LWFCZAC','LWACCN','LWCBAC','LWACZAC']
+  const NAC_TYPES = ['NAC','GSLRD','LWSCN','LWS','LWSCZAC']
+  const acCount  = positions.filter(p => AC_TYPES.includes(p.coach_type)).length
+  const nacCount = positions.filter(p => NAC_TYPES.includes(p.coach_type)).length
+  const vbCount  = positions.filter(p => p.coach_type === 'VB').length
 
   return (
     <div style={{ display: 'flex', gap: 24, height: '100%', minHeight: 0 }}>
@@ -138,7 +149,7 @@ export default function TrainMasterPage() {
                 Train {selected}
               </h1>
               <p style={{ fontSize: 12, color: 'var(--text-4)', margin: '3px 0 0' }}>
-                {positions.length} coaches · {acCount} AC · {nacCount} NAC
+                {positions.length} coaches · {acCount} AC · {nacCount} NAC{vbCount > 0 ? ` · ${vbCount} VB` : ''}
               </p>
             </div>
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>

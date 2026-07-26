@@ -2,23 +2,33 @@
 export type CoachCategory = 'AC' | 'NAC' | 'GEN' // GEN = generator/brake van, not attended
 
 export const COACH_TYPE_MAP: Record<string, CoachCategory> = {
-  // AC interior
+  // ── Simple types (primary system) ─────────────────────────────────────────
+  AC:  'AC',   // Regular AC coaches
+  NAC: 'NAC',  // Regular NAC coaches
+  VB:  'AC',   // Vande Bharat — billed as AC, counted separately in VB summary
+  GEN: 'GEN',  // Generator / brake van — not attended
+
+  // ── Legacy codes (backward compat for existing train master data) ──────────
   LWFCZAC: 'AC',
   LWACCN:  'AC',
   LWCBAC:  'AC',
   LWACZAC: 'AC',
-  // NAC interior
   GSLRD:   'NAC',
   LWSCN:   'NAC',
   LWS:     'NAC',
   LWSCZAC: 'NAC',
-  // Generator / brake vans — not attended
   LWLRRM:  'GEN',
   LWGRD:   'GEN',
 }
 
+/** Returns AC/NAC/GEN category for billing. VB maps to AC. */
 export function coachCategory(type: string): CoachCategory {
   return COACH_TYPE_MAP[type.toUpperCase()] ?? 'NAC'
+}
+
+/** True if this coach type is Vande Bharat (counted separately in VB summary) */
+export function isVB(type: string): boolean {
+  return type.toUpperCase() === 'VB'
 }
 
 // ─── DB row shapes ─────────────────────────────────────────────────────────────

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import ExcelJS from 'exceljs'
 import { db, ensureDB } from '@/lib/db'
-import { coachCategory } from '@/lib/types'
+import { coachCategory, isVB } from '@/lib/types'
 import { calcSlabs, rateWithoutGST } from '@/lib/calculations'
 
 // Column index helpers (1-based for ExcelJS)
@@ -379,9 +379,9 @@ export async function GET(req: Request) {
       }
 
       // Collect into dayAggMap for summary sheets
-      // Count only scored (attended) VB coaches, not all positions in train master
+      // Count only scored (attended) VB coaches (type === 'VB')
       const vbNorm = Object.keys(scoreMap)
-        .filter(pos => (typeMap[Number(pos)] ?? '').toUpperCase() === 'LWACZAC').length
+        .filter(pos => isVB(typeMap[Number(pos)] ?? '')).length
       const nagg = getAgg(date)
       nagg.normAC     += acScores.length
       nagg.normNAC    += nacScores.length
@@ -654,7 +654,7 @@ export async function GET(req: Request) {
       for (let col = COL.AT; col <= COL.BH; col++) ws2.mergeCells(r1, col, r3, col)
 
       // Collect into dayAggMap for summary sheets
-      const vbInt = allInt.filter(c => c.ct.toUpperCase() === 'LWACZAC').length
+      const vbInt = allInt.filter(c => isVB(c.ct)).length
       const iagg = getAgg(date)
       iagg.intAC     += acInt.length
       iagg.intNAC    += nacInt.length
