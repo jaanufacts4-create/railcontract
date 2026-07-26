@@ -99,12 +99,14 @@ export async function GET(req: Request) {
     // Normalize spaces around +: "54613 + 54611" → "54613+54611"
     const tn = trainCol.replace(/\s*\+\s*/g, '+')
 
-    // "S" in Column D = Secondary MCC entry — skip silently (not our depot's Primary)
+    // "S" anywhere in this row = Secondary MCC entry — skip silently
     if (tn.toUpperCase() === 'S') continue
 
     // ── Warn: Column D empty ─────────────────────────────────────────────
     if (!tn) {
-      if (isPrimary(typeCol)) {
+      // If any cell in this row has "S" it's a secondary entry — skip silently
+      const isSecondary = cols.some(c => c.trim().toUpperCase() === 'S')
+      if (!isSecondary && isPrimary(typeCol)) {
         warnings.push({ type: 'empty_train', message: `Row ${rowNum}: Primary entry but Train No. (Col D) is empty` })
       }
       continue
