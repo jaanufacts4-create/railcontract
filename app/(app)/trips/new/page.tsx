@@ -1,5 +1,5 @@
 'use client'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { coachCategory, PENALTY_LABELS } from '@/lib/types'
 import TodayPanel from '@/components/TodayPanel'
@@ -48,6 +48,29 @@ export default function NewTripPage() {
   const [penalties,    setPenalties]    = useState<Penalties>({})
   const [loading,      setLoading]      = useState(false)
   const [msg,          setMsg]          = useState('')
+
+  // ── Train autocomplete ──────────────────────────────────────────────────────
+  const [allTrains,       setAllTrains]       = useState<string[]>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const trainInputRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    fetch('/api/train-master').then(r => r.json()).then((list: string[]) => setAllTrains(list)).catch(() => {})
+  }, [])
+
+  // Hide dropdown when clicking outside
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (trainInputRef.current && !trainInputRef.current.contains(e.target as Node))
+        setShowSuggestions(false)
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [])
+
+  const suggestions = trainNo.length >= 2
+    ? allTrains.filter(t => t.startsWith(trainNo) && t !== trainNo).slice(0, 8)
+    : []
 
   type SchedWarn = {
     notInSchedule?: boolean
@@ -122,8 +145,8 @@ export default function NewTripPage() {
   // ── PULL ────────────────────────────────────────────────────────────────────
   const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
 
-  async function pull() {
-    const t = trainNo.trim()
+  async function pull(overrideTrainNo?: string) {
+    const t = (overrideTrainNo ?? trainNo).trim()
     if (!t) return setMsg('Please enter a train number first.')
     const data = await fetch(`/api/train-master?train_no=${t}`).then(r => r.json())
     if (!data.positions?.length) {
@@ -249,10 +272,37 @@ export default function NewTripPage() {
           <input type="date" className="input" value={date} onChange={e => setDate(e.target.value)} />
         </Field>
         <Field label="Train No.">
-          <input className="input" value={trainNo}
-            onChange={e => setTrainNo(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && pull()}
-            placeholder="e.g. 14674" />
+          <div ref={trainInputRef} style={{ position: 'relative' }}>
+            <input className="input" value={trainNo}
+              onChange={e => { setTrainNo(e.target.value); setShowSuggestions(true) }}
+              onKeyDown={e => { if (e.key === 'Enter') { setShowSuggestions(false); pull(trainNo) } }}
+              onFocus={() => setShowSuggestions(true)}
+              placeholder="e.g. 14674"
+              autoComplete="off" />
+            {showSuggestions && suggestions.length > 0 && (
+              <div style={{
+                position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
+                background: 'var(--surface)', border: '1.5px solid var(--border-md)',
+                borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+                marginTop: 2, overflow: 'hidden',
+              }}>
+                {suggestions.map(t => (
+                  <div key={t}
+                    onMouseDown={() => { setTrainNo(t); setShowSuggestions(false); pull(t) }}
+                    style={{
+                      padding: '7px 12px', fontSize: 13, fontWeight: 600,
+                      cursor: 'pointer', color: 'var(--text)',
+                      borderBottom: '1px solid var(--border)',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                  >
+                    🚂 {t}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </Field>
         <Field label="WL No.">
           <input className="input" value={wlNo} onChange={e => setWlNo(e.target.value)} placeholder="e.g. 4" />
