@@ -16,10 +16,27 @@ function fmtDate(d: string) { const [y,m,day] = d.split('-'); return `${day}-${m
 const pctColor = (p: number) => p === 100 ? '#22C55E' : p >= 86 ? '#84CC16' : p >= 76 ? '#F59E0B' : '#EF4444'
 
 export default function SecTripsPage() {
-  const [monthYear, setMonthYear] = useState(() => new Date().toISOString().slice(0, 7))
-  const [trips,     setTrips]     = useState<TripRow[]>([])
-  const [loading,   setLoading]   = useState(false)
-  const [filter,    setFilter]    = useState('')
+  const [monthYear,  setMonthYear]  = useState(() => new Date().toISOString().slice(0, 7))
+  const [trips,      setTrips]      = useState<TripRow[]>([])
+  const [loading,    setLoading]    = useState(false)
+  const [filter,     setFilter]     = useState('')
+  const [schedules,  setSchedules]  = useState<Array<{ train_no: string; days: string[] }>>([])
+
+  useEffect(() => {
+    fetch('/api/sec/schedule').then(r => r.json()).then(setSchedules).catch(() => {})
+  }, [])
+
+  const DAY_NAMES_SEC = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+  function getSecFlags(t: TripRow) {
+    if (t.cleaning_type !== 'Interior') return []  // only check once per rake
+    const sched = schedules.find(s => s.train_no === t.train_no)
+    if (!sched) return schedules.length > 0 ? ['Not in schedule'] : []
+    const [dy, dm, dd] = t.date.split('-').map(Number)
+    const tripDay = DAY_NAMES_SEC[new Date(Date.UTC(dy, dm - 1, dd)).getUTCDay()]
+    if (!sched.days.includes('Daily') && !sched.days.includes(tripDay))
+      return [`Day mismatch — ${tripDay} not scheduled (${sched.days.join(', ')})`]
+    return []
+  }
 
   async function load() {
     setLoading(true)
@@ -101,6 +118,7 @@ export default function SecTripsPage() {
                   <th>Penalty A</th>
                   <th>Penalty B</th>
                   <th>Total</th>
+                  <th style={{ width: 40 }}>Flag</th>
                   <th></th>
                 </tr>
               </thead>
@@ -141,6 +159,14 @@ export default function SecTripsPage() {
                     <td>{t.annexBTotal > 0 ? <span className="badge badge-yellow" style={{ fontSize: 11 }}>{fmt(t.annexBTotal)}</span> : '—'}</td>
                     <td style={{ fontWeight: 700, color: t.totalPenalty > 0 ? 'var(--danger)' : 'var(--text-3)' }}>
                       {t.totalPenalty > 0 ? fmt(t.totalPenalty) : '—'}
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      {(() => {
+                        const flags = getSecFlags(t)
+                        return flags.length > 0
+                          ? <span title={flags.join('\n')} style={{ cursor: 'help', fontSize: 14 }}>⚠️</span>
+                          : null
+                      })()}
                     </td>
                     <td>
                       <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>

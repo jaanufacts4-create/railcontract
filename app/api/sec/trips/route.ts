@@ -66,6 +66,18 @@ export async function POST(req: Request) {
 
   const month_year = date.slice(0, 7)
 
+  // Duplicate check — same date + train + cleaning type
+  const dup = await db.execute({
+    sql:  'SELECT id FROM sec_trips WHERE date=? AND train_no=? AND cleaning_type=?',
+    args: [date, train_no, cleaning_type],
+  })
+  if (dup.rows.length > 0) {
+    return NextResponse.json(
+      { error: `Entry for Train ${train_no} (${cleaning_type}) on ${date} already exists.` },
+      { status: 409 },
+    )
+  }
+
   const { lastInsertRowid } = await db.execute({
     sql:  `INSERT INTO sec_trips
              (date, train_no, cleaning_type, coach_count, req_manpower, avail_manpower, washing_line, is_acwp, month_year)

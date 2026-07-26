@@ -34,11 +34,33 @@ export default function TripsPage() {
   const [filterDate,  setFilterDate]  = useState('')
   const [filterTrain, setFilterTrain] = useState('')
   const [loading,     setLoading]     = useState(false)
+  const [schedules,   setSchedules]   = useState<Array<{ train_no: string; days: string[]; ac_count: number; nac_count: number }>>([])
 
   useEffect(() => {
     setLoading(true)
     fetch(`/api/trips?month_year=${monthYear}`).then(r => r.json()).then(d => { setTrips(d); setLoading(false) })
   }, [monthYear])
+
+  useEffect(() => {
+    fetch('/api/schedule').then(r => r.json()).then(setSchedules).catch(() => {})
+  }, [])
+
+  const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+
+  function getTripFlags(t: Trip) {
+    const sched = schedules.find(s => s.train_no === t.train_no)
+    if (!sched) return schedules.length > 0 ? ['Not in schedule'] : []
+    const [dy, dm, dd] = t.date.split('-').map(Number)
+    const tripDay = DAY_NAMES[new Date(Date.UTC(dy, dm - 1, dd)).getUTCDay()]
+    const flags: string[] = []
+    if (!sched.days.includes('Daily') && !sched.days.includes(tripDay))
+      flags.push(`Day mismatch — ${tripDay} not scheduled (${sched.days.join(', ')})`)
+    if (sched.ac_count !== t.ac_count)
+      flags.push(`AC mismatch — schedule: ${sched.ac_count}, actual: ${t.ac_count}`)
+    if (sched.nac_count !== t.nac_count)
+      flags.push(`NAC mismatch — schedule: ${sched.nac_count}, actual: ${t.nac_count}`)
+    return flags
+  }
 
   async function del(id: number) {
     if (!confirm('Delete this trip?')) return
@@ -155,6 +177,7 @@ export default function TripsPage() {
                   <th style={{ color: '#3B82F6' }}>AC</th>
                   <th style={{ color: '#22C55E' }}>NAC</th>
                   <th style={{ color: '#F59E0B' }}>Ext</th>
+                  <th style={{ width: 40 }}>Flag</th>
                   <th style={{ width: 100 }}></th>
                 </tr>
               </thead>
@@ -191,6 +214,19 @@ export default function TripsPage() {
                       {t.ext_count > 0
                         ? <span className="badge badge-yellow">{t.ext_count}</span>
                         : <span style={{ color: 'var(--text-4)' }}>—</span>}
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      {(() => {
+                        const flags = getTripFlags(t)
+                        return flags.length > 0 ? (
+                          <span title={flags.join('\n')} style={{
+                            cursor: 'help', fontSize: 14,
+                            display: 'inline-flex', alignItems: 'center',
+                          }}>
+                            ⚠️
+                          </span>
+                        ) : null
+                      })()}
                     </td>
                     <td>
                       <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>

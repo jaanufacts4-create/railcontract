@@ -49,6 +49,14 @@ export default function NewTripPage() {
   const [loading,      setLoading]      = useState(false)
   const [msg,          setMsg]          = useState('')
 
+  type SchedWarn = {
+    notInSchedule?: boolean
+    dayMismatch?: boolean; tripDay?: string; scheduledDays?: string[]
+    acMismatch?: boolean; nacMismatch?: boolean
+    schedAC?: number; schedNAC?: number; actualAC?: number; actualNAC?: number
+  }
+  const [schedWarn, setSchedWarn] = useState<SchedWarn | null>(null)
+
   // ── Effective type per position ─────────────────────────────────────────────
   function effType(pos: number, original: string): string {
     return compOverride[pos] ?? original
@@ -112,6 +120,8 @@ export default function NewTripPage() {
   }
 
   // ── PULL ────────────────────────────────────────────────────────────────────
+  const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+
   async function pull() {
     const t = trainNo.trim()
     if (!t) return setMsg('Please enter a train number first.')
@@ -137,6 +147,36 @@ export default function NewTripPage() {
     setCriteria(c)
     setExtScores(e)
     setMsg(`Train ${t}: ${pos.length} coaches loaded. Use the type dropdown to mark coaches as INT for intensive cleaning.`)
+
+    // ── Schedule mismatch check ─────────────────────────────────────────────
+    try {
+      const schedAll: Array<{ train_no: string; days: string[]; ac_count: number; nac_count: number }> =
+        await fetch('/api/schedule').then(r => r.json())
+      const sched = schedAll.find(s => s.train_no === t)
+
+      if (!sched) {
+        setSchedWarn({ notInSchedule: true })
+      } else {
+        const [dy, dm, dd] = date.split('-').map(Number)
+        const tripDay = DAY_NAMES[new Date(Date.UTC(dy, dm - 1, dd)).getUTCDay()]
+        const dayOk    = sched.days.includes('Daily') || sched.days.includes(tripDay)
+        const actualAC  = pos.filter(p => coachCategory(p.coach_type) === 'AC').length
+        const actualNAC = pos.filter(p => coachCategory(p.coach_type) === 'NAC').length
+        const acMismatch  = sched.ac_count !== actualAC
+        const nacMismatch = sched.nac_count !== actualNAC
+
+        if (!dayOk || acMismatch || nacMismatch) {
+          setSchedWarn({
+            dayMismatch: !dayOk, tripDay, scheduledDays: sched.days,
+            acMismatch, nacMismatch,
+            schedAC: sched.ac_count, schedNAC: sched.nac_count,
+            actualAC, actualNAC,
+          })
+        } else {
+          setSchedWarn(null)
+        }
+      }
+    } catch { setSchedWarn(null) }
   }
 
   function setC(position: number, cIdx: number, val: number) {
@@ -238,6 +278,43 @@ export default function NewTripPage() {
         </button>
         {msg && <span className="text-sm text-gray-500 italic">{msg}</span>}
       </div>
+
+      {/* ── Schedule Mismatch Warning ── */}
+      {schedWarn && (
+        <div style={{
+          padding: '12px 16px', borderRadius: 10,
+          background: '#FEFCE8', border: '1.5px solid #FDE047',
+          display: 'flex', flexDirection: 'column', gap: 5,
+        }}>
+          <p style={{ fontSize: 13, fontWeight: 700, color: '#92400E', margin: 0 }}>
+            ⚠ Schedule Mismatch Detected
+          </p>
+          {schedWarn.notInSchedule && (
+            <p style={{ fontSize: 12, color: '#92400E', margin: 0 }}>
+              Train {trainNo} is not found in Schedule of Trains.
+            </p>
+          )}
+          {schedWarn.dayMismatch && (
+            <p style={{ fontSize: 12, color: '#92400E', margin: 0 }}>
+              <b>{schedWarn.tripDay}</b> is not a scheduled day for this train.
+              Scheduled: <b>{schedWarn.scheduledDays?.join(', ')}</b>
+            </p>
+          )}
+          {schedWarn.acMismatch && (
+            <p style={{ fontSize: 12, color: '#92400E', margin: 0 }}>
+              AC count mismatch — Schedule says <b>{schedWarn.schedAC}</b>, Train Master has <b>{schedWarn.actualAC}</b>
+            </p>
+          )}
+          {schedWarn.nacMismatch && (
+            <p style={{ fontSize: 12, color: '#92400E', margin: 0 }}>
+              NAC count mismatch — Schedule says <b>{schedWarn.schedNAC}</b>, Train Master has <b>{schedWarn.actualNAC}</b>
+            </p>
+          )}
+          <p style={{ fontSize: 10, color: '#A16207', margin: 0 }}>
+            This is a warning only — you can still submit the entry.
+          </p>
+        </div>
+      )}
 
       {/* ── Normal Proforma Grid ── */}
       {positions.length > 0 && (

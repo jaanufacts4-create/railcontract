@@ -30,6 +30,7 @@ export default function NewSecTripPage() {
   const [ratePerCoach,         setRatePerCoach]         = useState(322.49)
   const [ratePerCoachExterior, setRatePerCoachExterior] = useState(144.28)
   const [saving,               setSaving]               = useState(false)
+  const [dayWarn,              setDayWarn]              = useState<string | null>(null)
 
   // Trip details
   const [date,        setDate]        = useState(today)
@@ -58,6 +59,17 @@ export default function NewSecTripPage() {
     })
   }, [])
 
+  const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+
+  function checkDayWarn(tn: string, d: string, trainList: SecTrain[]) {
+    const t = trainList.find(x => x.train_no === tn)
+    if (!t || !tn) { setDayWarn(null); return }
+    const [dy, dm, dd] = d.split('-').map(Number)
+    const tripDay = DAY_NAMES[new Date(Date.UTC(dy, dm - 1, dd)).getUTCDay()]
+    const ok = t.days.includes('Daily') || t.days.includes(tripDay)
+    setDayWarn(ok ? null : `⚠ Train ${tn} is not scheduled on ${tripDay}. Scheduled: ${t.days.join(', ')}`)
+  }
+
   function selectTrain(tn: string) {
     setTrainNo(tn)
     const t = trains.find(x => x.train_no === tn)
@@ -67,6 +79,7 @@ export default function NewSecTripPage() {
       setCoachCount(total)
       setReqMp(Math.round(total * 0.38))
       initArrays(total)
+      checkDayWarn(tn, date, trains)
     }
   }
 
@@ -74,6 +87,12 @@ export default function NewSecTripPage() {
     setIntCriteria(Array.from({ length: CRITERIA_COUNT }, () => Array(n).fill(3)))
     setExtRatings(Array(n).fill(3))
   }
+
+  // Re-check day warning whenever date or trainNo changes
+  useEffect(() => {
+    if (trainNo && trains.length > 0) checkDayWarn(trainNo, date, trains)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [date, trainNo, trains])
 
   // Auto-calculate req manpower when coachCount changes manually
   useEffect(() => {
@@ -125,8 +144,8 @@ export default function NewSecTripPage() {
 
     const annexBObj = Object.fromEntries(Object.entries(annexB).map(([k, v]) => [k, Number(v) || 0]))
 
-    // Interior trip: send coach_criteria (4 arrays)
-    await fetch('/api/sec/trips', {
+    // Interior trip
+    const res1 = await fetch('/api/sec/trips', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         date, train_no: trainNo, cleaning_type: 'Interior',
@@ -137,9 +156,15 @@ export default function NewSecTripPage() {
         annex_b: annexBObj,
       }),
     })
+    if (res1.status === 409) {
+      const body = await res1.json().catch(() => ({}))
+      alert(body.error ?? 'Duplicate entry exists.')
+      setSaving(false)
+      return
+    }
 
-    // Exterior trip: send coach_ratings (single per coach, max 3)
-    await fetch('/api/sec/trips', {
+    // Exterior trip
+    const res2 = await fetch('/api/sec/trips', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         date, train_no: trainNo, cleaning_type: 'Exterior',
@@ -150,6 +175,12 @@ export default function NewSecTripPage() {
         annex_b: {},
       }),
     })
+    if (res2.status === 409) {
+      const body = await res2.json().catch(() => ({}))
+      alert(body.error ?? 'Duplicate entry exists.')
+      setSaving(false)
+      return
+    }
 
     setSaving(false)
     router.push('/sec/trips')
@@ -234,6 +265,23 @@ export default function NewSecTripPage() {
           </div>
         </div>
       </div>
+
+      {/* ── Day Mismatch Warning ── */}
+      {dayWarn && (
+        <div style={{
+          padding: '12px 16px', borderRadius: 10,
+          background: '#FEFCE8', border: '1.5px solid #FDE047',
+          display: 'flex', flexDirection: 'column', gap: 4,
+        }}>
+          <p style={{ fontSize: 13, fontWeight: 700, color: '#92400E', margin: 0 }}>
+            ⚠ Schedule Mismatch
+          </p>
+          <p style={{ fontSize: 12, color: '#92400E', margin: 0 }}>{dayWarn}</p>
+          <p style={{ fontSize: 10, color: '#A16207', margin: 0 }}>
+            This is a warning only — you can still save the entry.
+          </p>
+        </div>
+      )}
 
       {/* Coach Proforma Grid */}
       {coachCount > 0 && (
