@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Download, Train, CheckCircle2, Clock, CalendarDays, BarChart3, ListFilter, TrendingUp, TrendingDown, IndianRupee, AlertCircle, Users, Zap, Edit2, Check, X } from 'lucide-react'
+import { Download, Train, CheckCircle2, Clock, CalendarDays, BarChart3, ListFilter, TrendingUp, TrendingDown, IndianRupee, AlertCircle, Users, Zap, Edit2, Check, X, Database, ChevronDown, ChevronUp, Loader2, FileSpreadsheet } from 'lucide-react'
 
 /* ─── Types ─────────────────────────────────────────── */
 type StatusRow   = { date: string; dow: string; train_no: string; ac: number; nac: number; done: boolean }
@@ -84,7 +84,11 @@ const SLAB_HEADERS = ['≥86%', '76–85%', '66–75%', '50–65%', '<50%']
 // ── LOA types ────────────────────────────────────────────────────────────────
 type LOAItem = { item_no: number; item_name: string; unit: string; rate_gst: number; loa_qty: number; used: number; balance: number; pct: number }
 
-type MainTab = 'status' | 'summary' | 'loa'
+// ── Billing types ─────────────────────────────────────────────────────────────
+const ITEM_LABELS_BILLING = ['AC Coach Cleaning','NAC Coach Cleaning','Exterior Cleaning','VB (22488) Coaches','OBHS AC Hours','OBHS NAC Hours','OBHS VB Hours','OBHS Garibrath Hours','Supervision (EHK) Hours']
+type CumItem = { item_no: number; item_name: string; unit: string; rate_gst: number; upto_qty: number; upto_payment: number }
+
+type MainTab = 'status' | 'summary' | 'loa' | 'billing'
 type StatusTab = 'detail' | 'daily' | 'trains'
 
 function ReportsContent() {
@@ -93,8 +97,57 @@ function ReportsContent() {
     const t = params.get('tab')
     if (t === 'summary') return 'summary'
     if (t === 'loa')     return 'loa'
+    if (t === 'billing') return 'billing'
     return 'status'
   })
+
+  /* Billing (Monthly Petty) state */
+  const [billingMonth,   setBillingMonth]   = useState(() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}` })
+  const [billingPreview, setBillingPreview] = useState<Record<string,number>|null>(null)
+  const [billingLoading, setBillingLoading] = useState(false)
+  const [billingGen,     setBillingGen]     = useState(false)
+  const [obhsMonths,     setObhsMonths]     = useState<string[]>([])
+  const [cumItems,       setCumItems]       = useState<CumItem[]>([])
+  const [cumOpen,        setCumOpen]        = useState(false)
+  const [cumEditing,     setCumEditing]     = useState<number|null>(null)
+  const [cumEditQty,     setCumEditQty]     = useState('')
+  const [cumEditPay,     setCumEditPay]     = useState('')
+  const [cumSaving,      setCumSaving]      = useState(false)
+
+  function fmtB(n: number, dec = 0) { return Number(n).toLocaleString('en-IN', { maximumFractionDigits: dec }) }
+
+  useEffect(() => {
+    fetch('/api/obhs').then(r => r.json()).then(d => setObhsMonths((d.records??[]).map((r:{month_year:string})=>r.month_year)))
+    loadCumulative()
+  }, [])
+
+  async function loadCumulative() {
+    const d = await fetch('/api/billing/cumulative').then(r => r.json())
+    setCumItems(d.items ?? [])
+  }
+
+  async function saveCumItem(item_no: number) {
+    setCumSaving(true)
+    await fetch('/api/billing/cumulative', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ items: [{ item_no, upto_qty: parseFloat(cumEditQty)||0, upto_payment: parseFloat(cumEditPay)||0 }] }) })
+    setCumEditing(null); await loadCumulative(); setCumSaving(false)
+  }
+
+  async function loadBillingPreview() {
+    setBillingLoading(true); setBillingPreview(null)
+    const data = await fetch(`/api/billing/preview?month_year=${billingMonth}`).then(r => r.json())
+    setBillingPreview(data); setBillingLoading(false)
+  }
+
+  async function generateBilling() {
+    setBillingGen(true)
+    const res = await fetch('/api/billing/generate', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ month_year: billingMonth }) })
+    if (res.ok) {
+      const blob = await res.blob(); const url = URL.createObjectURL(blob)
+      const a = document.createElement('a'); a.href = url; a.download = `Monthly_Petty_${billingMonth}.xlsx`; a.click(); URL.revokeObjectURL(url)
+      await loadCumulative()
+    }
+    setBillingGen(false)
+  }
 
   /* LOA state */
   const [loaItems,   setLoaItems]   = useState<LOAItem[]>([])
@@ -170,9 +223,10 @@ function ReportsContent() {
       {/* Main tab switcher */}
       <div style={{ display: 'flex', gap: 0, borderBottom: '1.5px solid var(--border)' }}>
         {([
-          { id: 'status',  label: 'Status Report',       icon: BarChart3    },
-          { id: 'summary', label: 'Final Summary Report', icon: IndianRupee  },
-          { id: 'loa',     label: 'Quantity Consumed',    icon: TrendingUp   },
+          { id: 'status',  label: 'Performa Status Report', icon: BarChart3       },
+          { id: 'summary', label: 'Final Summary Report',   icon: IndianRupee     },
+          { id: 'loa',     label: 'Quantity Consumed',      icon: TrendingUp      },
+          { id: 'billing', label: 'Monthly Petty',          icon: FileSpreadsheet },
         ] as { id: MainTab; label: string; icon: React.ElementType }[]).map(({ id, label, icon: Icon }) => (
           <button key={id} onClick={() => setMainTab(id)} style={{
             display: 'flex', alignItems: 'center', gap: 7,
@@ -617,6 +671,132 @@ function ReportsContent() {
                   </tbody>
                 </table>
               </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* ══════════════════════════════════════════════
+          TAB 4 — MONTHLY PETTY (BILLING)
+      ══════════════════════════════════════════════ */}
+      {mainTab === 'billing' && (() => {
+        const hasOBHS   = obhsMonths.includes(billingMonth)
+        const monthName = new Date(billingMonth + '-01').toLocaleString('default', { month: 'long', year: 'numeric' })
+        return (
+          <div style={{ maxWidth: 720, display: 'flex', flexDirection: 'column', gap: 18 }}>
+
+            {/* Previous Certificate Data */}
+            <div className="card" style={{ overflow: 'hidden' }}>
+              <button onClick={() => setCumOpen(o => !o)}
+                style={{ width: '100%', padding: '14px 20px', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left' }}>
+                <Database size={15} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+                <div style={{ flex: 1 }}>
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
+                    Previous Certificate Data <span style={{ fontWeight: 400, color: 'var(--text-4)', fontSize: 12 }}>(upto date from past bills)</span>
+                  </p>
+                  <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--text-4)' }}>Enter this once — auto-updates after each generated bill</p>
+                </div>
+                {cumOpen ? <ChevronUp size={16} style={{ color: 'var(--text-4)' }} /> : <ChevronDown size={16} style={{ color: 'var(--text-4)' }} />}
+              </button>
+              {cumOpen && (
+                <div style={{ borderTop: '1px solid var(--border)', overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: 'var(--surface-2)' }}>
+                        {['Sr.', 'Item', 'Upto Qty', 'Upto Payment (₹)', ''].map((h, i) => (
+                          <th key={i} style={{ padding: '8px 12px', fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textAlign: i >= 2 ? 'right' : 'left', textTransform: 'uppercase', letterSpacing: '.05em', borderBottom: '1px solid var(--border-md)', whiteSpace: 'nowrap' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cumItems.map(item => (
+                        <tr key={item.item_no} style={{ borderBottom: '1px solid var(--border)' }}>
+                          <td style={{ padding: '8px 12px', fontSize: 12, fontWeight: 700, color: 'var(--primary)' }}>{item.item_no}</td>
+                          <td style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text)', maxWidth: 240 }}>{item.item_name}</td>
+                          {cumEditing === item.item_no ? (
+                            <>
+                              <td style={{ padding: '6px 12px' }}><input type="number" value={cumEditQty} onChange={e => setCumEditQty(e.target.value)} style={{ width: 100, padding: '4px 8px', border: '1.5px solid var(--primary)', borderRadius: 6, fontSize: 12, background: 'var(--surface)', color: 'var(--text)', outline: 'none', textAlign: 'right' }} placeholder="0" /></td>
+                              <td style={{ padding: '6px 12px' }}><input type="number" value={cumEditPay} onChange={e => setCumEditPay(e.target.value)} style={{ width: 130, padding: '4px 8px', border: '1.5px solid var(--primary)', borderRadius: 6, fontSize: 12, background: 'var(--surface)', color: 'var(--text)', outline: 'none', textAlign: 'right' }} placeholder="0.00" /></td>
+                              <td style={{ padding: '6px 12px' }}>
+                                <div style={{ display: 'flex', gap: 4 }}>
+                                  <button onClick={() => saveCumItem(item.item_no)} disabled={cumSaving} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#22C55E', padding: 4 }}><Check size={14} /></button>
+                                  <button onClick={() => setCumEditing(null)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#EF4444', padding: 4 }}><X size={14} /></button>
+                                </div>
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              <td style={{ padding: '8px 12px', fontSize: 12, fontFamily: 'monospace', color: 'var(--text)', textAlign: 'right' }}>{fmtB(item.upto_qty, 2)}</td>
+                              <td style={{ padding: '8px 12px', fontSize: 12, fontFamily: 'monospace', color: 'var(--text)', textAlign: 'right' }}>{fmtB(item.upto_payment, 2)}</td>
+                              <td style={{ padding: '8px 12px' }}>
+                                <button onClick={() => { setCumEditing(item.item_no); setCumEditQty(String(item.upto_qty)); setCumEditPay(String(item.upto_payment)) }} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-4)', padding: 4 }}><Edit2 size={13} /></button>
+                              </td>
+                            </>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <p style={{ padding: '10px 16px', fontSize: 11, color: 'var(--text-4)', margin: 0, borderTop: '1px solid var(--border)', fontStyle: 'italic' }}>
+                    These values auto-update every time you generate a bill. Edit only to correct or set initial data.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Month selector */}
+            <div className="card" style={{ padding: 22 }}>
+              <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.05em', display: 'block', marginBottom: 8 }}>Select Month</label>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                <input type="month" className="input" value={billingMonth}
+                  onChange={e => { setBillingMonth(e.target.value); setBillingPreview(null) }}
+                  style={{ width: 180, fontSize: 13 }} />
+                <button onClick={loadBillingPreview} disabled={billingLoading} className="btn"
+                  style={{ background: 'var(--surface-2)', border: '1.5px solid var(--border-md)', color: 'var(--text)', fontSize: 13 }}>
+                  {billingLoading ? <><Loader2 size={14} /> Loading…</> : 'Preview Data'}
+                </button>
+              </div>
+              <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+                {hasOBHS
+                  ? <><CheckCircle2 size={14} style={{ color: 'var(--success)' }} /><span style={{ color: 'var(--success)', fontWeight: 600 }}>OBHS data uploaded for {monthName}</span></>
+                  : <><AlertCircle  size={14} style={{ color: 'var(--warning)' }} /><span style={{ color: 'var(--warning)', fontWeight: 600 }}>OBHS data not uploaded for {monthName} — J22:J26 will be 0</span></>
+                }
+              </div>
+            </div>
+
+            {/* Preview */}
+            {billingPreview && (
+              <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)' }}>
+                  <h2 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Preview — {monthName}</h2>
+                  <p style={{ fontSize: 12, color: 'var(--text-4)', margin: '4px 0 0' }}>Current month quantities (since last certificate)</p>
+                </div>
+                {ITEM_LABELS_BILLING.map((label, i) => {
+                  const key = `J${18 + i}` as keyof typeof billingPreview
+                  const val = billingPreview[key] ?? 0
+                  return (
+                    <div key={key} style={{ display: 'flex', alignItems: 'center', padding: '11px 20px', borderBottom: '1px solid var(--border)', gap: 12 }}>
+                      <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'var(--primary)', flexShrink: 0 }}>{i + 1}</div>
+                      <div style={{ flex: 1, fontSize: 13, color: 'var(--text)' }}>{label}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-4)', background: 'var(--surface-2)', padding: '2px 8px', borderRadius: 5 }}>{i < 4 ? 'MCC Trips' : 'OBHS Upload'}</div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', minWidth: 80, textAlign: 'right' }}>{fmtB(val, 2)}</div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Generate */}
+            <div>
+              <button onClick={generateBilling} disabled={billingGen} className="btn btn-primary"
+                style={{ fontSize: 14, fontWeight: 700, padding: '12px 28px', borderRadius: 12 }}>
+                {billingGen
+                  ? <><Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> Generating…</>
+                  : <><Download size={16} /> Generate Billing Certificate</>}
+              </button>
+              <p style={{ fontSize: 12, color: 'var(--text-4)', marginTop: 8 }}>
+                Downloads APR26 format Excel — all columns auto-filled. Cumulative updates automatically after each bill.
+              </p>
             </div>
           </div>
         )
