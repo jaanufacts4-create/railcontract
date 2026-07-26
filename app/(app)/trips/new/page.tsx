@@ -29,6 +29,7 @@ export default function NewTripPage() {
   const [subTab, setSubTab] = useState<'entry' | 'wl'>('entry')
 
   const [date,         setDate]         = useState(() => new Date().toISOString().slice(0, 10))
+  const [wlDate,       setWlDate]       = useState(() => new Date().toISOString().slice(0, 10))
   const [trainNo,      setTrainNo]      = useState('')
   const [wlNo,         setWlNo]         = useState('')
   const [acwp,         setAcwp]         = useState(true)
@@ -307,7 +308,7 @@ export default function NewTripPage() {
         { id: 'entry', label: 'Trip Entry',             icon: <ClipboardList size={14} /> },
         { id: 'wl',    label: 'WL Placement Compare',   icon: <GitCompare size={14} /> },
       ] as const).map(t => (
-        <button key={t.id} onClick={() => setSubTab(t.id)} style={{
+        <button key={t.id} onClick={() => { setSubTab(t.id); if (t.id === 'wl') setWlDate(date) }} style={{
           display: 'flex', alignItems: 'center', gap: 6,
           padding: '8px 16px', fontSize: 13, fontWeight: 600,
           background: 'none', border: 'none', cursor: 'pointer',
@@ -325,7 +326,7 @@ export default function NewTripPage() {
     <div className="flex-1 min-w-0">
 
     {/* ── WL Placement Compare ── */}
-    {subTab === 'wl' && <WLCompareModule initialDate={date} />}
+    {subTab === 'wl' && <WLCompareModule initialDate={wlDate} onDateChange={setWlDate} />}
 
     {/* ── Trip Entry form ── */}
     {subTab === 'entry' && <div className="space-y-5">
@@ -758,7 +759,7 @@ export default function NewTripPage() {
 
     {/* ── Today's schedule panel — always visible ── */}
     <div className="shrink-0 sticky top-4 w-56">
-      <TodayPanel date={date} currentTrain={subTab === 'entry' ? trainNo.trim() || undefined : undefined} />
+      <TodayPanel date={subTab === 'entry' ? date : wlDate} currentTrain={subTab === 'entry' ? trainNo.trim() || undefined : undefined} />
     </div>
     </div>
     </div>

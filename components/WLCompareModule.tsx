@@ -11,9 +11,14 @@ type WLResult = {
   warnings: SheetWarning[]
 }
 
-export default function WLCompareModule({ initialDate }: { initialDate?: string }) {
+export default function WLCompareModule({ initialDate, onDateChange }: { initialDate?: string; onDateChange?: (d: string) => void }) {
   const today = new Date().toISOString().slice(0, 10)
   const [date,    setDate]    = useState(initialDate ?? today)
+
+  function handleDateChange(d: string) {
+    setDate(d)
+    onDateChange?.(d)
+  }
   const [loading, setLoading] = useState(false)
   const [result,  setResult]  = useState<WLResult | null>(null)
   const [error,   setError]   = useState('')
@@ -44,7 +49,7 @@ export default function WLCompareModule({ initialDate }: { initialDate?: string 
             <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', letterSpacing: '.04em', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>
               Date to Compare
             </label>
-            <input type="date" className="input" value={date} onChange={e => setDate(e.target.value)} />
+            <input type="date" className="input" value={date} onChange={e => handleDateChange(e.target.value)} />
           </div>
           <button onClick={compare} disabled={loading} className="btn btn-primary" style={{ height: 38 }}>
             {loading ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <GitCompare size={14} />}
