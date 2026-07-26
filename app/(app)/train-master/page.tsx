@@ -177,6 +177,7 @@ export default function TrainMasterPage() {
             {[
               { label: 'AC Coach',      color: '#2563EB', bg: 'rgba(37,99,235,.1)' },
               { label: 'NAC Coach',     color: '#22C55E', bg: 'rgba(34,197,94,.1)' },
+              { label: 'Vande Bharat',  color: '#7C3AED', bg: 'rgba(124,58,237,.1)' },
               { label: 'Generator/BV',  color: '#94A3B8', bg: 'rgba(148,163,184,.1)' },
             ].map(l => (
               <div key={l.label} style={{
