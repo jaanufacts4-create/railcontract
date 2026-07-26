@@ -1,6 +1,5 @@
-import Sidebar   from '@/components/Sidebar'
-import TopBar    from '@/components/TopBar'
-import AppLoader from '@/components/AppLoader'
+import Sidebar from '@/components/Sidebar'
+import TopBar  from '@/components/TopBar'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -8,12 +7,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <Sidebar />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
         <TopBar />
-        {/* No padding here — AppLoader injects it for the content div */}
-        {/* overflow:hidden kills the stray scrollbar; AppLoader's inner div scrolls */}
-        <main style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
-          <AppLoader>
-            {children}
-          </AppLoader>
+        <main style={{ flex: 1, overflowY: 'auto', padding: '28px 32px' }}>
+          {children}
         </main>
       </div>
     </div>
