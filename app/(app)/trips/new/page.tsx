@@ -320,13 +320,15 @@ export default function NewTripPage() {
       ))}
     </div>
 
+    {/* ── Content + sidebar ── */}
+    <div className="flex gap-5 items-start">
+    <div className="flex-1 min-w-0">
+
     {/* ── WL Placement Compare ── */}
     {subTab === 'wl' && <WLCompareModule initialDate={date} />}
 
-    {/* ── Trip Entry ── */}
-    {subTab === 'entry' && <div className="flex gap-5 items-start">
-    {/* ── Main form ── */}
-    <div className="flex-1 min-w-0 space-y-5">
+    {/* ── Trip Entry form ── */}
+    {subTab === 'entry' && <div className="space-y-5">
       <h1 className="text-xl font-bold">New Trip Entry</h1>
 
       {/* ── Header ── */}
@@ -752,11 +754,15 @@ export default function NewTripPage() {
       )}
     </div>
 
-    {/* ── Today's schedule panel ── */}
-    <div className="shrink-0 sticky top-4 w-56">
-      <TodayPanel date={date} currentTrain={trainNo.trim() || undefined} />
-    </div>
     </div>}
+
+    </div>
+
+    {/* ── Today's schedule panel — always visible ── */}
+    <div className="shrink-0 sticky top-4 w-56">
+      <TodayPanel date={date} currentTrain={subTab === 'entry' ? trainNo.trim() || undefined : undefined} />
+    </div>
+    </div>
     </div>
   )
 }
