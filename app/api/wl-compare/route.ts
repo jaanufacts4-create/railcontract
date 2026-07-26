@@ -81,6 +81,9 @@ export async function GET(req: Request) {
     if (!parsedDate) continue           // skip rows with unparseable date
     if (parsedDate !== date) continue   // different date
 
+    // Normalize combined entries: "54613 + 54611" → "54613+54611"
+    const normalizedTrain = trainCol.replace(/\s*\+\s*/g, '+')
+
     // ── Warn: Column D empty but row belongs to this date ────────────────
     if (!trainCol) {
       if (isPrimary(typeCol)) {
@@ -96,16 +99,16 @@ export async function GET(req: Request) {
     if (!typeCol) {
       warnings.push({
         type: 'empty_type',
-        message: `Row ${rowNum}: Train "${trainCol}" has no Type in Column J`,
-        row: trainCol,
+        message: `Row ${rowNum}: Train "${normalizedTrain}" has no Type in Column J`,
+        row: normalizedTrain,
       })
     }
 
-    if (isValidTrainNo(trainCol)) {
+    if (isValidTrainNo(normalizedTrain)) {
       if (!isPrimary(typeCol)) continue
 
       // Split combined entries like "54613+54611"
-      for (const t of trainCol.split('+')) {
+      for (const t of normalizedTrain.split('+')) {
         const tn = t.trim()
         if (!tn) continue
 
@@ -123,7 +126,7 @@ export async function GET(req: Request) {
       }
     } else {
       // Special/non-numeric entries — collect regardless of type for visibility
-      specialSet.add(trainCol)
+      specialSet.add(normalizedTrain)
     }
   }
 
@@ -160,14 +163,41 @@ export async function GET(req: Request) {
       nac_count: r.nac_count as number,
     }))
 
-  const schedSet = new Set(scheduledTrains.map(t => t.train_no))
+  // Build expanded schedule set — split combined entries like "54613+54611"
+  // so order-independent matching works (WL "54611+54613" == sched "54613+54611")
+  const schedSet     = new Set<string>()
+  const schedRawNos  = scheduledTrains.map(t => t.train_no)
+  for (const tn of schedRawNos) {
+    schedSet.add(tn)  // keep original too
+    for (const part of tn.split('+').map(p => p.trim()).filter(Boolean)) {
+      schedSet.add(part)
+    }
+  }
+
+  // Also expand wlSet — individual parts of combined entries already added above,
+  // but also add the sorted canonical form so "54611+54613" matches "54613+54611"
+  for (const tn of [...wlSet]) {
+    if (tn.includes('+')) {
+      const sorted = tn.split('+').map(p => p.trim()).sort().join('+')
+      wlSet.add(sorted)
+    }
+  }
+  for (const tn of schedRawNos) {
+    if (tn.includes('+')) {
+      const sorted = tn.split('+').map(p => p.trim()).sort().join('+')
+      schedSet.add(sorted)
+    }
+  }
 
   // ── Diff ─────────────────────────────────────────────────────────────────
   const matched        = wlTrains.filter(t => schedSet.has(t))
   const inWLOnly       = wlTrains.filter(t => !schedSet.has(t))   // in WL but not in schedule
-  const inScheduleOnly = scheduledTrains                           // in schedule but not in WL
-    .filter(t => !wlSet.has(t.train_no))
-    .map(t => t.train_no)
+  const inScheduleOnly = schedRawNos                               // in schedule but not in WL
+    .filter(tn => {
+      // A schedule train is "missing" only if none of its parts are in wlSet
+      const parts = tn.split('+').map(p => p.trim()).filter(Boolean)
+      return !parts.some(p => wlSet.has(p)) && !wlSet.has(tn)
+    })
 
   return NextResponse.json({
     date,
