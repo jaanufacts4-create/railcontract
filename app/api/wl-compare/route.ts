@@ -99,6 +99,9 @@ export async function GET(req: Request) {
     // Normalize spaces around +: "54613 + 54611" → "54613+54611"
     const tn = trainCol.replace(/\s*\+\s*/g, '+')
 
+    // "S" in Column D = Secondary MCC entry — skip silently (not our depot's Primary)
+    if (tn.toUpperCase() === 'S') continue
+
     // ── Warn: Column D empty ─────────────────────────────────────────────
     if (!tn) {
       if (isPrimary(typeCol)) {
