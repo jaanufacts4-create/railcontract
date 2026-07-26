@@ -172,6 +172,26 @@ export async function GET(req: Request) {
     ws.mergeCells(4, col, 5, col)
   }
 
+  // ── Day aggregates for summary sheets ────────────────────────────────
+  type DayAgg = {
+    normAC: number; normNAC: number; normExt: number; normVB: number
+    normACPen: number; normNACPen: number; normExtPen: number; normBH: number
+    intAC: number; intNAC: number; intExt: number; intVB: number
+    intACPen: number; intNACPen: number; intExtPen: number; intBH: number
+  }
+  const dayAggMap = new Map<string, DayAgg>()
+  function getAgg(d: string): DayAgg {
+    if (!dayAggMap.has(d)) {
+      dayAggMap.set(d, {
+        normAC: 0, normNAC: 0, normExt: 0, normVB: 0,
+        normACPen: 0, normNACPen: 0, normExtPen: 0, normBH: 0,
+        intAC: 0, intNAC: 0, intExt: 0, intVB: 0,
+        intACPen: 0, intNACPen: 0, intExtPen: 0, intBH: 0,
+      })
+    }
+    return dayAggMap.get(d)!
+  }
+
   // ── Data rows ─────────────────────────────────────────────────────────
   let currentRow = 6
 
@@ -358,6 +378,19 @@ export async function GET(req: Request) {
         ws.mergeCells(r1, col, r3, col)
       }
 
+      // Collect into dayAggMap for summary sheets
+      const vbNorm = Object.entries(typeMap)
+        .filter(([, ct]) => ct.toUpperCase() === 'LWACZAC').length
+      const nagg = getAgg(date)
+      nagg.normAC     += acScores.length
+      nagg.normNAC    += nacScores.length
+      nagg.normExt    += extScores.length
+      nagg.normVB     += vbNorm
+      nagg.normACPen  += acSlabResult.totalPenalty
+      nagg.normNACPen += nacSlabResult.totalPenalty
+      nagg.normExtPen += extSlabResult?.totalPenalty ?? 0
+      nagg.normBH     += tripBH
+
       currentRow += 3
     }
 
@@ -415,12 +448,14 @@ export async function GET(req: Request) {
   // ════════════════════════════════════════════════════════════════════
   const ws2 = wb.addWorksheet('Intensive Summ')
 
-  // Header row 1
-  ws2.getRow(1).getCell(1).value =
+  // ── Row 1: Title (A1:BH1 merged) ──────────────────────────────────────
+  ws2.getRow(1).getCell(COL.A).value =
     `Intensive Coach Cleaning Summary — ${monthName}`
-  ws2.getRow(1).getCell(1).font = { bold: true }
+  ws2.getRow(1).getCell(COL.A).font      = { bold: true, size: 11 }
+  ws2.getRow(1).getCell(COL.A).alignment = { horizontal: 'center', vertical: 'middle' }
+  ws2.mergeCells(1, COL.A, 1, COL.BH)
 
-  // Header row 2
+  // ── Row 2: Section header labels ─────────────────────────────────────
   const ih2 = ws2.getRow(2)
   ih2.getCell(COL.A).value  = 'Date'
   ih2.getCell(COL.B).value  = 'Train no'
@@ -431,17 +466,17 @@ export async function GET(req: Request) {
   ih2.getCell(COL.G).value  = 'Rating/coach (AC/NAC out of 18 | Ext out of 3)'
   ih2.getCell(COL.AE).value = 'Coaches under % slab'
   ih2.getCell(COL.AJ).value = 'Penalty as per Annex A1 (Rs.)'
-  ih2.getCell(COL.AO).value = 'AC Penalty'
-  ih2.getCell(COL.AP).value = 'NAC Penalty'
-  ih2.getCell(COL.AQ).value = 'Total Penalty'
+  ih2.getCell(COL.AR).value = 'MP Reqd'
+  ih2.getCell(COL.AS).value = 'MP Deployed'
+  ih2.getCell(COL.AT).value = 'Penalty as per A1-Back Side (Rs.)'
 
-  // Header row 3 — coach positions
+  // ── Row 3: Coach position numbers ────────────────────────────────────
   const ih3 = ws2.getRow(3)
   for (let pos = 1; pos <= 24; pos++) {
     ih3.getCell(COL.G + pos - 1).value = pos
   }
 
-  // Header row 4 — slab labels (same % thresholds but shown for max 18)
+  // ── Row 4: Sub-labels ────────────────────────────────────────────────
   const ih4 = ws2.getRow(4)
   ih4.getCell(COL.AE).value = '≥86% (AC/NAC ≥16, Ext ≥3)'
   ih4.getCell(COL.AF).value = '76–85%'
@@ -453,8 +488,13 @@ export async function GET(req: Request) {
   ih4.getCell(COL.AL).value = '66–75% (10%)'
   ih4.getCell(COL.AM).value = '50–65% (20%)'
   ih4.getCell(COL.AN).value = '<50% (100%)'
+  ih4.getCell(COL.AO).value = 'AC Penalty'
+  ih4.getCell(COL.AP).value = 'NAC Penalty'
+  ih4.getCell(COL.AQ).value = 'Ext Penalty'
+  for (let i = 0; i < 14; i++) ih4.getCell(COL.AT + i).value = ANNEX_LABELS[i]
+  ih4.getCell(COL.BH).value = 'Total Annex\nPenalty'
 
-  // Style intensity header rows
+  // ── Style header rows 2-4 ────────────────────────────────────────────
   const PURPLE = 'FF4B0082'
   for (let r = 2; r <= 4; r++) {
     ws2.getRow(r).eachCell(cell => {
@@ -468,36 +508,62 @@ export async function GET(req: Request) {
     })
   }
   ws2.getRow(2).height = 40
+  ws2.getRow(3).height = 18
   ws2.getRow(4).height = 50
 
+  // ── Header merges ────────────────────────────────────────────────────
+  for (const col of [COL.A, COL.B, COL.C, COL.D, COL.E, COL.F]) ws2.mergeCells(2, col, 4, col)
+  ws2.mergeCells(2, COL.G,  2, COL.G + 23)              // Rating section header
+  for (let pos = 1; pos <= 24; pos++) ws2.mergeCells(3, COL.G + pos - 1, 4, COL.G + pos - 1)
+  ws2.mergeCells(2, COL.AE, 3, COL.AI)                  // Slab section header
+  for (let col = COL.AE; col <= COL.AI; col++) ws2.mergeCells(4, col, 4, col)
+  ws2.mergeCells(2, COL.AJ, 3, COL.AQ)                  // Annex A1 section header
+  for (let col = COL.AJ; col <= COL.AQ; col++) ws2.mergeCells(4, col, 4, col)
+  ws2.mergeCells(2, COL.AR, 4, COL.AR)                  // MP Reqd
+  ws2.mergeCells(2, COL.AS, 4, COL.AS)                  // MP Deployed
+  ws2.mergeCells(2, COL.AT, 3, COL.BH)                  // A1-Back Side header
+  for (let col = COL.AT; col <= COL.BH; col++) ws2.mergeCells(4, col, 4, col)
+
   // ── Intensive data rows ──────────────────────────────────────────────
-  // Structure mirrors Normal: 3 rows per trip (AC | NAC | Exterior)
-  // Interior (AC/NAC) max score = 18; Exterior max = 3
-  // Coach columns use SEQUENTIAL numbering (1,2,3...) — NOT actual train positions
   let iRow = 5
-  let igAC = 0, igNAC = 0, igExt = 0
+  let igAC = 0, igNAC = 0, igExt = 0, igBH = 0
 
   const LIGHT_PURPLE = 'FFE8D5F5'
   const LIGHT_LAVNAC = 'FFD5E8F5'
   const LIGHT_ORG_I  = 'FFFDE9D9'
 
   for (const [date, trips] of byDate) {
-    let dayIntAC = 0, dayIntNAC = 0, dayIntExt = 0
+    let dayIntAC = 0, dayIntNAC = 0, dayIntExt = 0, dayIntBH = 0
     let anyIntensive = false
 
     for (const trip of trips) {
       const tripId  = trip.id as number
       const trainNo = trip.train_no as string
 
-      // Load interior + exterior scores, sorted by actual position
-      const intRes = await db.execute({
-        sql:  'SELECT position, coach_type, score, ext_score FROM intensive_scores WHERE trip_id=? ORDER BY position',
-        args: [tripId],
-      })
+      // Load scores + manpower + annex penalties
+      const [intRes, iMpRes, iPenRes] = await Promise.all([
+        db.execute({ sql: 'SELECT position, coach_type, score, ext_score FROM intensive_scores WHERE trip_id=? ORDER BY position', args: [tripId] }),
+        db.execute({ sql: 'SELECT required, deployed FROM manpower WHERE trip_id=?', args: [tripId] }),
+        db.execute({ sql: 'SELECT penalty_type, amount FROM annex_penalties WHERE trip_id=?', args: [tripId] }),
+      ])
       if (!intRes.rows.length) continue
       anyIntensive = true
 
-      // Build sequential list (1,2,3...) — positions are NOT used for column placement
+      const iMpRow    = iMpRes.rows[0]
+      const iMpReq    = iMpRow ? Number(iMpRow.required)  : 0
+      const iMpDeploy = iMpRow ? Number(iMpRow.deployed)  : 0
+      const iMpShort  = Math.max(0, iMpReq - iMpDeploy)
+      const iMpPenalty = r2(iMpShort * 2 * minWages)
+
+      const iAnnexMap: Record<number, number> = {}
+      for (const r of iPenRes.rows) iAnnexMap[r.penalty_type as number] = r.amount as number
+      const iAnnexNoMP = Object.entries(iAnnexMap)
+        .filter(([k]) => Number(k) <= 13)
+        .reduce((s: number, [, v]) => s + v, 0)
+      const iTripBH = r2(iAnnexNoMP + iMpPenalty)
+      dayIntBH += iTripBH
+
+      // Build sequential coach list
       type ICoach = { seq: number; ct: string; score: number; extScore: number }
       const allInt: ICoach[] = intRes.rows.map((r, idx) => ({
         seq:      idx + 1,
@@ -509,7 +575,6 @@ export async function GET(req: Request) {
       const acInt  = allInt.filter(c => coachCategory(c.ct) === 'AC')
       const nacInt = allInt.filter(c => coachCategory(c.ct) === 'NAC')
 
-      // Slab calculations: interior → max 18, exterior → max 3
       const acIntSlab  = acInt.length  ? calcSlabs(acInt.map(c => c.score),     acRateNG,  18) : null
       const nacIntSlab = nacInt.length ? calcSlabs(nacInt.map(c => c.score),    nacRateNG, 18) : null
       const extIntSlab = allInt.length ? calcSlabs(allInt.map(c => c.extScore), extRateNG,  3) : null
@@ -535,13 +600,17 @@ export async function GET(req: Request) {
           row.getCell(COL.A).value  = new Date(date)
           row.getCell(COL.A).numFmt = 'DD-MM-YYYY'
           row.getCell(COL.B).value  = isNaN(Number(trainNo)) ? trainNo : Number(trainNo)
+          row.getCell(COL.AR).value = iMpReq
+          row.getCell(COL.AS).value = iMpDeploy
+          for (let i = 1; i <= 13; i++) row.getCell(COL.AT + i - 1).value = iAnnexMap[i] ?? 0
+          row.getCell(COL.AT + 13).value = iMpPenalty   // BG = MP shortage
+          row.getCell(COL.BH).value      = iTripBH
         }
         row.getCell(COL.C).value = section
         row.getCell(COL.D).value = coaches.length
         row.getCell(COL.E).value = rate
         row.getCell(COL.F).value = r2(rateNG)
 
-        // Sequential column: seq 1 → col G, seq 2 → col H, etc.
         for (const c of coaches) {
           row.getCell(COL.G + c.seq - 1).value = c[scoreKey]
         }
@@ -575,6 +644,26 @@ export async function GET(req: Request) {
       writeIntRow(iRow + 1, 'NAC',      nacInt, 'score',    nacRateG, nacRateNG, nacIntSlab, COL.AP, LIGHT_LAVNAC, false)
       writeIntRow(iRow + 2, 'Exterior', allInt, 'extScore', extRateG, extRateNG, extIntSlab, COL.AQ, LIGHT_ORG_I,  false)
 
+      // Merge A, B, AR, AS, AT-BH across 3 rows (same pattern as Normal sheet)
+      const r1 = iRow, r3 = iRow + 2
+      ws2.mergeCells(r1, COL.A,  r3, COL.A)
+      ws2.mergeCells(r1, COL.B,  r3, COL.B)
+      ws2.mergeCells(r1, COL.AR, r3, COL.AR)
+      ws2.mergeCells(r1, COL.AS, r3, COL.AS)
+      for (let col = COL.AT; col <= COL.BH; col++) ws2.mergeCells(r1, col, r3, col)
+
+      // Collect into dayAggMap for summary sheets
+      const vbInt = allInt.filter(c => c.ct.toUpperCase() === 'LWACZAC').length
+      const iagg = getAgg(date)
+      iagg.intAC     += acInt.length
+      iagg.intNAC    += nacInt.length
+      iagg.intExt    += allInt.length
+      iagg.intVB     += vbInt
+      iagg.intACPen  += acIntSlab?.totalPenalty  ?? 0
+      iagg.intNACPen += nacIntSlab?.totalPenalty ?? 0
+      iagg.intExtPen += extIntSlab?.totalPenalty ?? 0
+      iagg.intBH     += iTripBH
+
       iRow += 3
     }
 
@@ -588,6 +677,7 @@ export async function GET(req: Request) {
     dr.getCell(COL.AO).value = r2(dayIntAC)
     dr.getCell(COL.AP).value = r2(dayIntNAC)
     dr.getCell(COL.AQ).value = r2(dayIntExt)
+    dr.getCell(COL.BH).value = r2(dayIntBH)
     dr.eachCell({ includeEmpty: false }, cell => {
       cell.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: TOTAL_BG } }
       cell.font   = { bold: true, size: 9 }
@@ -597,6 +687,7 @@ export async function GET(req: Request) {
     igAC  += dayIntAC
     igNAC += dayIntNAC
     igExt += dayIntExt
+    igBH  += dayIntBH
     iRow++
   }
 
@@ -607,6 +698,7 @@ export async function GET(req: Request) {
     igRow.getCell(COL.AO).value = r2(igAC)
     igRow.getCell(COL.AP).value = r2(igNAC)
     igRow.getCell(COL.AQ).value = r2(igExt)
+    igRow.getCell(COL.BH).value = r2(igBH)
     igRow.eachCell({ includeEmpty: false }, cell => {
       cell.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4B0082' } }
       cell.font   = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 }
@@ -623,9 +715,389 @@ export async function GET(req: Request) {
   ws2.getColumn(COL.E).width = 9
   ws2.getColumn(COL.F).width = 9
   for (let i = 0; i < 24; i++) ws2.getColumn(COL.G + i).width = 5
-  for (let i = COL.AE; i <= COL.AQ; i++) ws2.getColumn(i).width = 12
+  for (let i = COL.AE; i <= COL.BH; i++) ws2.getColumn(i).width = 10
 
   ws2.views = [{ state: 'frozen', xSplit: 6, ySplit: 4 }]
+
+  // ════════════════════════════════════════════════════════════════════
+  // SHEET 3: Normal+Int+VB Summ
+  // ════════════════════════════════════════════════════════════════════
+  const ws3 = wb.addWorksheet('Normal+Int+VB Summ')
+
+  ws3.getRow(1).getCell(1).value = `Normal, Intensive & VB Coaches Summary — ${monthName}`
+  ws3.getRow(1).getCell(1).font = { bold: true, size: 11 }
+  ws3.getRow(1).getCell(1).alignment = { horizontal: 'center', vertical: 'middle' }
+  ws3.mergeCells(1, 1, 1, 13)
+
+  const w3h2 = ws3.getRow(2)
+  w3h2.getCell(1).value  = 'Date'
+  w3h2.getCell(2).value  = 'AC Coaches'
+  w3h2.getCell(5).value  = 'NAC Coaches'
+  w3h2.getCell(8).value  = 'Exterior Coaches'
+  w3h2.getCell(11).value = 'Vande Bharat'
+
+  ws3.mergeCells(2, 1, 3, 1)
+  ws3.mergeCells(2, 2, 2, 4)
+  ws3.mergeCells(2, 5, 2, 7)
+  ws3.mergeCells(2, 8, 2, 10)
+  ws3.mergeCells(2, 11, 2, 13)
+
+  const w3h3 = ws3.getRow(3)
+  w3h3.getCell(1).value  = 'Date'
+  w3h3.getCell(2).value  = 'Normal'
+  w3h3.getCell(3).value  = 'Intensive'
+  w3h3.getCell(4).value  = 'Total'
+  w3h3.getCell(5).value  = 'Normal'
+  w3h3.getCell(6).value  = 'Intensive'
+  w3h3.getCell(7).value  = 'Total'
+  w3h3.getCell(8).value  = 'Normal'
+  w3h3.getCell(9).value  = 'Intensive'
+  w3h3.getCell(10).value = 'Total'
+  w3h3.getCell(11).value = 'Normal'
+  w3h3.getCell(12).value = 'Intensive'
+  w3h3.getCell(13).value = 'Total'
+
+  for (let rr = 2; rr <= 3; rr++) {
+    ws3.getRow(rr).eachCell(cell => {
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' } }
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E79' } }
+      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }
+      cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } }
+    })
+  }
+  ws3.getRow(2).height = 20
+  ws3.getRow(3).height = 18
+
+  let s3row = 4
+  let g3NormAC = 0, g3IntAC = 0, g3NormNAC = 0, g3IntNAC = 0
+  let g3NormExt = 0, g3IntExt = 0, g3NormVB = 0, g3IntVB = 0
+
+  for (const [d3, agg3] of dayAggMap) {
+    const row = ws3.getRow(s3row)
+    row.getCell(1).value  = new Date(d3)
+    row.getCell(1).numFmt = 'DD-MM-YYYY'
+    row.getCell(2).value  = agg3.normAC
+    row.getCell(3).value  = agg3.intAC
+    row.getCell(4).value  = agg3.normAC + agg3.intAC
+    row.getCell(5).value  = agg3.normNAC
+    row.getCell(6).value  = agg3.intNAC
+    row.getCell(7).value  = agg3.normNAC + agg3.intNAC
+    row.getCell(8).value  = agg3.normExt
+    row.getCell(9).value  = agg3.intExt
+    row.getCell(10).value = agg3.normExt + agg3.intExt
+    row.getCell(11).value = agg3.normVB
+    row.getCell(12).value = agg3.intVB
+    row.getCell(13).value = agg3.normVB + agg3.intVB
+    row.eachCell({ includeEmpty: false }, cell => {
+      cell.alignment = { horizontal: 'center', vertical: 'middle' }
+      cell.border = { top: { style: 'hair' }, bottom: { style: 'hair' }, left: { style: 'hair' }, right: { style: 'hair' } }
+      cell.font = { size: 9 }
+    })
+    row.getCell(1).font = { size: 9, bold: true }
+    g3NormAC += agg3.normAC;  g3IntAC  += agg3.intAC
+    g3NormNAC += agg3.normNAC; g3IntNAC += agg3.intNAC
+    g3NormExt += agg3.normExt; g3IntExt += agg3.intExt
+    g3NormVB  += agg3.normVB;  g3IntVB  += agg3.intVB
+    s3row++
+  }
+
+  const ws3gt = ws3.getRow(s3row)
+  ws3gt.getCell(1).value  = 'GRAND TOTAL'
+  ws3gt.getCell(2).value  = g3NormAC;  ws3gt.getCell(3).value  = g3IntAC;  ws3gt.getCell(4).value  = g3NormAC + g3IntAC
+  ws3gt.getCell(5).value  = g3NormNAC; ws3gt.getCell(6).value  = g3IntNAC; ws3gt.getCell(7).value  = g3NormNAC + g3IntNAC
+  ws3gt.getCell(8).value  = g3NormExt; ws3gt.getCell(9).value  = g3IntExt; ws3gt.getCell(10).value = g3NormExt + g3IntExt
+  ws3gt.getCell(11).value = g3NormVB;  ws3gt.getCell(12).value = g3IntVB;  ws3gt.getCell(13).value = g3NormVB + g3IntVB
+  ws3gt.eachCell({ includeEmpty: false }, cell => {
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFF0000' } }
+    cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 }
+    cell.border = { top: { style: 'medium' }, bottom: { style: 'medium' } }
+    cell.alignment = { horizontal: 'center' }
+  })
+
+  ws3.getColumn(1).width = 12
+  for (let c = 2; c <= 13; c++) ws3.getColumn(c).width = 11
+
+  // ════════════════════════════════════════════════════════════════════
+  // SHEET 4: PM MCC Normal & Int.
+  // ════════════════════════════════════════════════════════════════════
+  const ws4 = wb.addWorksheet('PM MCC Normal & Int.')
+
+  ws4.getRow(1).getCell(1).value = `PM MCC Normal & Intensive Summary — ${monthName}`
+  ws4.getRow(1).getCell(1).font = { bold: true, size: 11 }
+  ws4.getRow(1).getCell(1).alignment = { horizontal: 'center', vertical: 'middle' }
+  ws4.mergeCells(1, 1, 1, 8)
+
+  const w4h = ws4.getRow(2)
+  w4h.getCell(1).value = 'Date'
+  w4h.getCell(2).value = 'No. of AC Coaches (incl. VB)'
+  w4h.getCell(3).value = 'No. of Exterior Coaches'
+  w4h.getCell(4).value = 'No. of NAC Coaches'
+  w4h.getCell(5).value = 'AC Penalty (₹)'
+  w4h.getCell(6).value = 'NAC Penalty (₹)'
+  w4h.getCell(7).value = 'Exterior Penalty (₹)'
+  w4h.getCell(8).value = 'Penalty as per A1-Back Side (₹)'
+  w4h.eachCell(cell => {
+    cell.font = { bold: true, color: { argb: 'FFFFFFFF' } }
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F5C5C' } }
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }
+    cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } }
+  })
+  ws4.getRow(2).height = 40
+
+  let s4row = 3
+  let g4AC = 0, g4Ext = 0, g4NAC = 0
+  let g4ACPen = 0, g4NACPen = 0, g4ExtPen = 0, g4BH = 0
+
+  for (const [d4, agg4] of dayAggMap) {
+    const acT   = agg4.normAC  + agg4.intAC
+    const extT  = agg4.normExt + agg4.intExt
+    const nacT  = agg4.normNAC + agg4.intNAC
+    const acP   = r2(agg4.normACPen  + agg4.intACPen)
+    const nacP  = r2(agg4.normNACPen + agg4.intNACPen)
+    const extP  = r2(agg4.normExtPen + agg4.intExtPen)
+    const bhT   = r2(agg4.normBH + agg4.intBH)
+    const row4  = ws4.getRow(s4row)
+    row4.getCell(1).value  = new Date(d4)
+    row4.getCell(1).numFmt = 'DD-MM-YYYY'
+    row4.getCell(2).value  = acT
+    row4.getCell(3).value  = extT
+    row4.getCell(4).value  = nacT
+    row4.getCell(5).value  = acP
+    row4.getCell(6).value  = nacP
+    row4.getCell(7).value  = extP
+    row4.getCell(8).value  = bhT
+    row4.eachCell({ includeEmpty: false }, cell => {
+      cell.alignment = { horizontal: 'center', vertical: 'middle' }
+      cell.border = { top: { style: 'hair' }, bottom: { style: 'hair' }, left: { style: 'hair' }, right: { style: 'hair' } }
+      cell.font = { size: 9 }
+    })
+    row4.getCell(1).font = { size: 9, bold: true }
+    g4AC += acT; g4Ext += extT; g4NAC += nacT
+    g4ACPen += acP; g4NACPen += nacP; g4ExtPen += extP; g4BH += bhT
+    s4row++
+  }
+
+  const ws4gt = ws4.getRow(s4row)
+  ws4gt.getCell(1).value = 'TOTAL'
+  ws4gt.getCell(2).value = g4AC
+  ws4gt.getCell(3).value = g4Ext
+  ws4gt.getCell(4).value = g4NAC
+  ws4gt.getCell(5).value = r2(g4ACPen)
+  ws4gt.getCell(6).value = r2(g4NACPen)
+  ws4gt.getCell(7).value = r2(g4ExtPen)
+  ws4gt.getCell(8).value = r2(g4BH)
+  ws4gt.eachCell({ includeEmpty: false }, cell => {
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFF0000' } }
+    cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 }
+    cell.border = { top: { style: 'medium' }, bottom: { style: 'medium' } }
+    cell.alignment = { horizontal: 'center' }
+  })
+
+  ws4.getColumn(1).width = 12
+  for (let c4 = 2; c4 <= 8; c4++) ws4.getColumn(c4).width = 18
+
+  // ════════════════════════════════════════════════════════════════════
+  // SHEET 5: Summary of Penalty
+  // ════════════════════════════════════════════════════════════════════
+  const ws5 = wb.addWorksheet('Summary of Penalty')
+
+  // Load OBHS data for the month
+  const obhsRes = await db.execute({
+    sql:  'SELECT * FROM obhs_monthly WHERE month_year=? LIMIT 1',
+    args: [monthYear],
+  }).catch(() => ({ rows: [] }))
+  const obhsRow = obhsRes.rows[0]
+
+  // Grand totals across all days
+  let totalNormAC = 0, totalNormNAC = 0, totalNormExt = 0, totalNormVB = 0
+  let totalIntAC  = 0, totalIntNAC  = 0, totalIntExt  = 0, totalIntVB  = 0
+  let totalNormACPen = 0, totalNormNACPen = 0, totalNormExtPen = 0, totalNormBH = 0
+  let totalIntACPen  = 0, totalIntNACPen  = 0, totalIntExtPen  = 0, totalIntBH  = 0
+  for (const agg5 of dayAggMap.values()) {
+    totalNormAC    += agg5.normAC;    totalIntAC    += agg5.intAC
+    totalNormNAC   += agg5.normNAC;   totalIntNAC   += agg5.intNAC
+    totalNormExt   += agg5.normExt;   totalIntExt   += agg5.intExt
+    totalNormVB    += agg5.normVB;    totalIntVB    += agg5.intVB
+    totalNormACPen += agg5.normACPen; totalIntACPen += agg5.intACPen
+    totalNormNACPen+= agg5.normNACPen;totalIntNACPen+= agg5.intNACPen
+    totalNormExtPen+= agg5.normExtPen;totalIntExtPen+= agg5.intExtPen
+    totalNormBH    += agg5.normBH;    totalIntBH    += agg5.intBH
+  }
+
+  function ws5Title(rn: number, text: string, cols = 6) {
+    const row = ws5.getRow(rn)
+    row.getCell(1).value = text
+    row.getCell(1).font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 }
+    row.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF243F60' } }
+    row.getCell(1).alignment = { horizontal: 'left', vertical: 'middle' }
+    ws5.mergeCells(rn, 1, rn, cols)
+    row.height = 18
+  }
+
+  function ws5Header(rn: number, labels: string[]) {
+    const row = ws5.getRow(rn)
+    labels.forEach((lbl, i) => {
+      const cell = row.getCell(i + 1)
+      cell.value = lbl
+      cell.font  = { bold: true, color: { argb: 'FFFFFFFF' } }
+      cell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2E5F8A' } }
+      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }
+      cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } }
+    })
+    row.height = 22
+  }
+
+  function ws5Data(rn: number, values: (string | number | null)[], shade = 'FFFAFAFA') {
+    const row = ws5.getRow(rn)
+    values.forEach((v, i) => {
+      const cell = row.getCell(i + 1)
+      cell.value = v
+      cell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: shade } }
+      cell.alignment = { horizontal: i === 0 ? 'left' : 'center', vertical: 'middle' }
+      cell.border = { top: { style: 'hair' }, bottom: { style: 'hair' }, left: { style: 'hair' }, right: { style: 'hair' } }
+      cell.font = { size: 9 }
+    })
+  }
+
+  function ws5Total(rn: number, values: (string | number | null)[]) {
+    ws5Data(rn, values, 'FFFFF2CC')
+    ws5.getRow(rn).eachCell({ includeEmpty: false }, cell => {
+      cell.font = { bold: true, size: 9 }
+      cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } }
+    })
+  }
+
+  // Row 1: Title
+  ws5.getRow(1).getCell(1).value = `Summary of Penalty — ${monthName}`
+  ws5.getRow(1).getCell(1).font = { bold: true, size: 13 }
+  ws5.getRow(1).getCell(1).alignment = { horizontal: 'center', vertical: 'middle' }
+  ws5.mergeCells(1, 1, 1, 6)
+  ws5.getRow(1).height = 28
+
+  let s5r = 3
+
+  // ── Section A: OBHS Summary ───────────────────────────────────────
+  ws5Title(s5r++, 'SECTION A: OBHS SUMMARY')
+  ws5Header(s5r++, ['Coach Type', 'OBHS Hours (Month Total)', 'Remarks'])
+  ws5.mergeCells(s5r - 1, 3, s5r - 1, 6)
+  const obhsTypes = [
+    ['AC Coaches',         obhsRow ? Number(obhsRow.ac_obhs_hrs  ?? 0) : 0],
+    ['NAC Coaches',        obhsRow ? Number(obhsRow.nac_obhs_hrs ?? 0) : 0],
+    ['VB Coaches',         obhsRow ? Number(obhsRow.vb_obhs_hrs  ?? 0) : 0],
+    ['Garib Rath Coaches', obhsRow ? Number(obhsRow.garibrath_obhs_hrs ?? 0) : 0],
+    ['EHK',                obhsRow ? Number(obhsRow.ehk_hrs ?? 0) : 0],
+  ]
+  for (const [lbl, hrs] of obhsTypes) {
+    ws5Data(s5r, [lbl as string, hrs as number, '—'])
+    ws5.mergeCells(s5r, 3, s5r, 6)
+    s5r++
+  }
+  s5r++ // blank row
+
+  // ── Section B: MCC Cleaning Summary ──────────────────────────────
+  ws5Title(s5r++, 'SECTION B: MCC CLEANING SUMMARY (No. of Coaches)')
+  ws5Header(s5r++, ['Type of Coaches', 'Normal Cleaning', 'Intensive Cleaning', 'Total'])
+  ws5.mergeCells(s5r - 1, 4, s5r - 1, 6)
+  const sectionB = [
+    ['AC Coaches',       totalNormAC,  totalIntAC,  totalNormAC + totalIntAC],
+    ['NAC Coaches',      totalNormNAC, totalIntNAC, totalNormNAC + totalIntNAC],
+    ['Exterior Coaches', totalNormExt, totalIntExt, totalNormExt + totalIntExt],
+    ['VB AC Coaches',    totalNormVB,  totalIntVB,  totalNormVB + totalIntVB],
+  ]
+  for (const row of sectionB) {
+    ws5Data(s5r, row as (string | number)[])
+    ws5.mergeCells(s5r, 4, s5r, 6)
+    s5r++
+  }
+  ws5Total(s5r, [
+    'Total',
+    totalNormAC + totalNormNAC + totalNormExt,
+    totalIntAC  + totalIntNAC  + totalIntExt,
+    totalNormAC + totalNormNAC + totalNormExt + totalIntAC + totalIntNAC + totalIntExt,
+  ])
+  ws5.mergeCells(s5r, 4, s5r, 6)
+  s5r += 2 // +blank
+
+  // ── Section C: MCC Penalty Details ───────────────────────────────
+  ws5Title(s5r++, 'SECTION C: MCC PENALTY DETAILS (₹)')
+  ws5Header(s5r++, ['Description', 'Normal Cleaning', 'Intensive Cleaning', 'Total'])
+  ws5.mergeCells(s5r - 1, 4, s5r - 1, 6)
+
+  const normRatingPen = r2(totalNormACPen + totalNormNACPen + totalNormExtPen)
+  const intRatingPen  = r2(totalIntACPen  + totalIntNACPen  + totalIntExtPen)
+  const normBHTotal   = r2(totalNormBH)
+  const intBHTotal    = r2(totalIntBH)
+
+  const sectionC = [
+    ['Penalty as per Annex A-1 (Rating Penalty)',    normRatingPen,  intRatingPen,  r2(normRatingPen + intRatingPen)],
+    ['  — AC Coach Penalty',                          r2(totalNormACPen),  r2(totalIntACPen),  r2(totalNormACPen + totalIntACPen)],
+    ['  — NAC Coach Penalty',                         r2(totalNormNACPen), r2(totalIntNACPen), r2(totalNormNACPen + totalIntNACPen)],
+    ['  — Exterior Coach Penalty',                    r2(totalNormExtPen), r2(totalIntExtPen), r2(totalNormExtPen + totalIntExtPen)],
+    ['Penalty as per Annex A-1 Back Side',            normBHTotal,    intBHTotal,    r2(normBHTotal + intBHTotal)],
+  ]
+  for (const row of sectionC) {
+    ws5Data(s5r, row as (string | number)[])
+    ws5.mergeCells(s5r, 4, s5r, 6)
+    s5r++
+  }
+  ws5Total(s5r, [
+    'Total MCC Penalty',
+    r2(normRatingPen + normBHTotal),
+    r2(intRatingPen  + intBHTotal),
+    r2(normRatingPen + intRatingPen + normBHTotal + intBHTotal),
+  ])
+  ws5.mergeCells(s5r, 4, s5r, 6)
+  s5r += 2
+
+  // ── Section D: OBHS Penalty (manual fill) ───────────────────────
+  ws5Title(s5r++, 'SECTION D: OBHS PENALTY (₹) — fill manually')
+  ws5Header(s5r++, ['Description', 'Amount (₹)', 'Remarks'])
+  ws5.mergeCells(s5r - 1, 3, s5r - 1, 6)
+  ws5Data(s5r, ['OBHS Penalty (from OBHS records)', 0, '—'])
+  ws5.mergeCells(s5r, 3, s5r, 6)
+  s5r += 2
+
+  // ── Section E: Rail Madad Penalty (manual fill) ─────────────────
+  ws5Title(s5r++, 'SECTION E: RAIL MADAD PENALTY (₹) — fill manually')
+  ws5Header(s5r++, ['Description', 'Amount (₹)', 'Remarks'])
+  ws5.mergeCells(s5r - 1, 3, s5r - 1, 6)
+  ws5Data(s5r, ['Rail Madad Complaints Penalty', 0, '—'])
+  ws5.mergeCells(s5r, 3, s5r, 6)
+  s5r += 2
+
+  // ── Section F: Inspection Penalty (manual fill) ─────────────────
+  ws5Title(s5r++, 'SECTION F: INSPECTION / SURPRISE CHECK PENALTY (₹) — fill manually')
+  ws5Header(s5r++, ['Description', 'Amount (₹)', 'Remarks'])
+  ws5.mergeCells(s5r - 1, 3, s5r - 1, 6)
+  ws5Data(s5r, ['Inspection Penalty (from inspection reports)', 0, '—'])
+  ws5.mergeCells(s5r, 3, s5r, 6)
+  s5r += 2
+
+  // ── Grand Summary ────────────────────────────────────────────────
+  ws5Title(s5r++, 'GRAND SUMMARY OF TOTAL PENALTY (₹)')
+  ws5Header(s5r++, ['Section', 'Description', 'Amount (₹)'])
+  ws5.mergeCells(s5r - 1, 3, s5r - 1, 6)
+  const grandRows = [
+    ['Section C', 'MCC Penalty (Rating + Annex A-1 Back)',           r2(normRatingPen + intRatingPen + normBHTotal + intBHTotal)],
+    ['Section D', 'OBHS Penalty',                                    0],
+    ['Section E', 'Rail Madad Penalty',                              0],
+    ['Section F', 'Inspection Penalty',                              0],
+  ]
+  for (const gr of grandRows) {
+    ws5Data(s5r, gr as (string | number)[])
+    ws5.mergeCells(s5r, 3, s5r, 6)
+    s5r++
+  }
+  ws5Total(s5r, ['', 'GRAND TOTAL PENALTY', r2(normRatingPen + intRatingPen + normBHTotal + intBHTotal)])
+  ws5.mergeCells(s5r, 3, s5r, 6)
+
+  // Column widths for ws5
+  ws5.getColumn(1).width = 40
+  ws5.getColumn(2).width = 20
+  ws5.getColumn(3).width = 16
+  ws5.getColumn(4).width = 16
+  ws5.getColumn(5).width = 16
+  ws5.getColumn(6).width = 16
 
   // ── Stream buffer ────────────────────────────────────────────────────
   const buf = await wb.xlsx.writeBuffer()
