@@ -366,7 +366,7 @@ async function migrateSecondaryBilling() {
   `)
 
   const { rows: loaCheck } = await db.execute('SELECT COUNT(*) as cnt FROM sec_loa_quantities')
-  if (Number(loaCheck.cnt) === 0) {
+  if (Number(loaCheck[0].cnt) === 0) {
     // Seed with placeholder LOA — user updates these via sec/loa page
     const SEC_LOA = [
       [1, 'Mechanized coach cleaning - Interior',  'Coaches', 322.49, 0],
@@ -401,7 +401,7 @@ async function migrateSecondaryBilling() {
     )
   `)
   const { rows: cumCheck } = await db.execute('SELECT COUNT(*) as cnt FROM sec_billing_cumulative')
-  if (Number(cumCheck.cnt) === 0) {
+  if (Number(cumCheck[0].cnt) === 0) {
     for (let i = 1; i <= 2; i++) {
       await db.execute({
         sql:  'INSERT OR IGNORE INTO sec_billing_cumulative (item_no, upto_qty, upto_payment) VALUES (?,0,0)',
