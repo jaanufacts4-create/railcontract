@@ -188,12 +188,12 @@ export async function GET(req: Request) {
   const LIGHT_ORG   = 'FFFDE9D9'
   const TOTAL_BG    = 'FFFFF2CC'
 
-  let dayAOTotal = 0, dayAPTotal = 0, dayAQTotal = 0
+  let dayAOTotal = 0, dayAPTotal = 0, dayAQTotal = 0, dayBHTotal = 0
   let grandAO = 0, grandAP = 0, grandAQ = 0, grandBH = 0
 
   for (const [date, trips] of byDate) {
     const dayStartRow = currentRow
-    dayAOTotal = 0; dayAPTotal = 0; dayAQTotal = 0
+    dayAOTotal = 0; dayAPTotal = 0; dayAQTotal = 0; dayBHTotal = 0
 
     for (const trip of trips) {
       const tripId    = trip.id as number
@@ -213,7 +213,12 @@ export async function GET(req: Request) {
       for (const r of masterRes.rows) typeMap[r.position as number] = r.coach_type as string
 
       const scoreMap: Record<number, number> = {}
-      for (const r of scoresRes.rows) scoreMap[r.position as number] = r.score as number
+      const extScoreMap: Record<number, number> = {}
+      for (const r of scoresRes.rows) {
+        const p = r.position as number
+        if (p < 0) extScoreMap[-p] = r.score as number
+        else scoreMap[p] = r.score as number
+      }
 
       const annexMap: Record<number, number> = {}
       for (const r of penRes.rows) annexMap[r.penalty_type as number] = r.amount as number
@@ -237,9 +242,9 @@ export async function GET(req: Request) {
         if (cat === 'AC')        acScores.push({ pos: p, score: s })
         else if (cat === 'NAC')  nacScores.push({ pos: p, score: s })
       }
-      // Exterior only if not ACWP and there are NAC coaches (exterior of NAC/AC coaches)
+      // Exterior only if not ACWP — use negative-position scores saved separately
       if (!acwp) {
-        for (const { pos } of nacScores) extScores.push({ pos, score: scoreMap[pos] ?? 3 })
+        for (const { pos } of nacScores) extScores.push({ pos, score: extScoreMap[pos] ?? 3 })
       }
 
       const acSlabResult  = calcSlabs(acScores.map(x => x.score),  acRateNG,  15)
@@ -271,11 +276,12 @@ export async function GET(req: Request) {
           row.getCell(COL.B).value  = isNaN(Number(trainNo)) ? trainNo : Number(trainNo)
           row.getCell(COL.AR).value = r2(mpReq)
           row.getCell(COL.AS).value = mpDeploy
-          // Annex penalties in AT-BG
-          for (let i = 1; i <= 14; i++) {
+          // Annex penalties AT–BG: types 1-13 user-entered, type 14 = auto-calc MP penalty
+          for (let i = 1; i <= 13; i++) {
             row.getCell(COL.AT + i - 1).value = annexMap[i] ?? 0
           }
-          row.getCell(COL.BH).value = annexTotal + mpPenalty
+          row.getCell(COL.AT + 13).value = mpPenalty   // BG = penalty-14 (MP shortage)
+          row.getCell(COL.BH).value = tripBH            // total of AT:BG
         }
 
         row.getCell(COL.C).value = section
@@ -330,6 +336,14 @@ export async function GET(req: Request) {
         row.getCell(COL.C).font = { size: 9, bold: true }
       }
 
+      // BH = penalties 1-13 (user-entered) + penalty 14 (auto-calc from manpower)
+      const annexNoMP = Object.entries(annexMap)
+        .filter(([k]) => Number(k) <= 13)
+        .reduce((s: number, [, v]) => s + v, 0)
+      const tripBH = r2(annexNoMP + mpPenalty)
+      dayBHTotal += tripBH
+      grandBH    += tripBH
+
       writeSection(acRowNum,  'AC',       acScores,  acRateG,  acRateNG,  acSlabResult,  LIGHT_BLUE)
       writeSection(nacRowNum, 'NAC',      nacScores, nacRateG, nacRateNG, nacSlabResult, LIGHT_GREEN)
       writeSection(extRowNum, 'Exterior', extScores, extRateG, extRateNG, extSlabResult, LIGHT_ORG)
@@ -355,6 +369,7 @@ export async function GET(req: Request) {
     totRow.getCell(COL.AO).value = r2(dayAOTotal)
     totRow.getCell(COL.AP).value = r2(dayAPTotal)
     totRow.getCell(COL.AQ).value = r2(dayAQTotal)
+    totRow.getCell(COL.BH).value = r2(dayBHTotal)
     totRow.eachCell({ includeEmpty: false }, cell => {
       cell.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: TOTAL_BG } }
       cell.font   = { bold: true, size: 9 }
@@ -374,6 +389,7 @@ export async function GET(req: Request) {
   gtRow.getCell(COL.AO).value = r2(grandAO)
   gtRow.getCell(COL.AP).value = r2(grandAP)
   gtRow.getCell(COL.AQ).value = r2(grandAQ)
+  gtRow.getCell(COL.BH).value = r2(grandBH)
   gtRow.eachCell({ includeEmpty: false }, cell => {
     cell.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFF0000' } }
     cell.font   = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 }
