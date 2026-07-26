@@ -379,8 +379,9 @@ export async function GET(req: Request) {
       }
 
       // Collect into dayAggMap for summary sheets
-      const vbNorm = Object.entries(typeMap)
-        .filter(([, ct]) => ct.toUpperCase() === 'LWACZAC').length
+      // Count only scored (attended) VB coaches, not all positions in train master
+      const vbNorm = Object.keys(scoreMap)
+        .filter(pos => (typeMap[Number(pos)] ?? '').toUpperCase() === 'LWACZAC').length
       const nagg = getAgg(date)
       nagg.normAC     += acScores.length
       nagg.normNAC    += nacScores.length
