@@ -14,13 +14,12 @@ export default function LoadingScreen({ onDone }: { onDone: () => void }) {
       setTimeout(onDone, 600)
     }
 
-    // Fallback if video can't autoplay
     let fallbackTimer: ReturnType<typeof setTimeout> | null = null
     const startFallback = () => {
       fallbackTimer = setTimeout(() => {
         setFadeOut(true)
         setTimeout(onDone, 600)
-      }, 3000)
+      }, 3500)
     }
 
     video.addEventListener('ended', onEnd)
@@ -33,31 +32,30 @@ export default function LoadingScreen({ onDone }: { onDone: () => void }) {
   }, [onDone])
 
   return (
+    /* Full content-area overlay — transparent so page BG shows around the video */
     <div style={{
       position: 'absolute',
       inset: 0,
       zIndex: 100,
-      overflow: 'hidden',
-      // Transparent — page background shows through
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
       background: 'transparent',
       opacity: fadeOut ? 0 : 1,
       transition: fadeOut ? 'opacity 0.6s cubic-bezier(0.4,0,0.2,1)' : 'opacity 0.2s ease',
       pointerEvents: fadeOut ? 'none' : 'all',
     }}>
+      {/* Small centered video — page BG visible all around */}
       <video
         ref={videoRef}
         src="/loading-video.mp4"
         muted
         playsInline
         style={{
-          position: 'absolute',
-          inset: 0,
-          width: '100%',
-          height: '100%',
-          objectFit: 'contain',
-          // Makes white/light background of video transparent,
-          // dark animation elements stay visible over page BG
-          mixBlendMode: 'multiply',
+          width: 340,
+          maxWidth: '70%',
+          height: 'auto',
+          borderRadius: 16,
         }}
       />
     </div>
