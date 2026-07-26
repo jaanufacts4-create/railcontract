@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { db, ensureDB } from '@/lib/db'
 
 const SHEET_CSV_URL =
-  'https://docs.google.com/spreadsheets/d/1EIimvZvfC57JPswfAHmCp4dZN3JLNEZEe4L9_AX8i4g/gviz/tq?tqx=out:csv&gid=2030790141'
+  'https://docs.google.com/spreadsheets/d/1EIimvZvfC57JPswfAHmCp4dZN3JLNEZEe4L9_AX8i4g/export?format=csv&gid=2030790141'
 
 const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
 
