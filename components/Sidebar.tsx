@@ -7,7 +7,7 @@ import {
   ClipboardList, PlusCircle, Train, CalendarDays,
   Settings, ChevronLeft, ChevronRight, Building2, Layers,
   Sparkles, BarChart3, ChevronDown, ChevronUp,
-  Clock4, TrendingUp, FileSpreadsheet, LayoutDashboard,
+  Clock4, TrendingUp, FileSpreadsheet, LayoutDashboard, Receipt,
 } from 'lucide-react'
 
 const GROUPS = [
@@ -21,6 +21,7 @@ const GROUPS = [
       { href: '/obhs',         label: 'OBHS Hours',               icon: Clock4          },
       { href: '/settings',     label: 'Settings',                 icon: Settings        },
       { href: '/reports',      label: 'Reports',                  icon: BarChart3       },
+      { href: '/billing',      label: 'Billing Certificate',      icon: Receipt         },
     ],
   },
   {
