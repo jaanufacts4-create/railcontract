@@ -98,18 +98,18 @@ export default function WLCompareModule({ initialDate, onDateChange }: { initial
                   return (
                     <div key={t.train_no} style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      padding: '7px 12px', borderRadius: 8,
+                      padding: '4px 8px', borderRadius: 6,
                       background: inWL ? 'rgba(22,101,52,.08)' : 'rgba(239,68,68,.06)',
                       border: `1px solid ${inWL ? 'rgba(22,101,52,.18)' : 'rgba(239,68,68,.15)'}`,
                     }}>
-                      <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--text)', minWidth: 70 }}>
+                      <span style={{ fontWeight: 700, fontSize: 12, color: 'var(--text)', minWidth: 60 }}>
                         {t.train_no}
                       </span>
                       <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
-                        {t.ac_count  > 0 && <span style={{ marginRight: 6 }}>AC:{t.ac_count}</span>}
+                        {t.ac_count  > 0 && <span style={{ marginRight: 4 }}>AC:{t.ac_count}</span>}
                         {t.nac_count > 0 && <span>NAC:{t.nac_count}</span>}
                       </span>
-                      <span style={{ fontSize: 16 }}>{inWL ? '✅' : '❌'}</span>
+                      <span style={{ fontSize: 13 }}>{inWL ? '✅' : '❌'}</span>
                     </div>
                   )
                 })}
