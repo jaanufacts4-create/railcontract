@@ -108,7 +108,7 @@ function ScheduleTab() {
           </div>
           <div style={{ marginBottom: 16 }}>
             <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', letterSpacing: '.04em', textTransform: 'uppercase', display: 'block', marginBottom: 8 }}>
-              Running Days
+              Maintenance Days
             </label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {ALL_DAYS.map(day => (
@@ -146,7 +146,7 @@ function ScheduleTab() {
             <thead>
               <tr>
                 <th style={{ textAlign: 'left', paddingLeft: 20 }}>Train No.</th>
-                <th style={{ textAlign: 'left' }}>Running Days</th>
+                <th style={{ textAlign: 'left' }}>Maintenance Days</th>
                 <th>AC</th><th>NAC</th><th>Total</th>
                 <th style={{ width: 80 }}></th>
               </tr>
