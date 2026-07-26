@@ -54,15 +54,23 @@ export default function NewTripPage() {
   const [showSuggestions, setShowSuggestions] = useState(false)
   const trainInputRef = useRef<HTMLDivElement>(null)
 
+  // ── Supervisor autocomplete ─────────────────────────────────────────────────
+  const [allSupervisors,     setAllSupervisors]     = useState<string[]>([])
+  const [showSupSuggestions, setShowSupSuggestions] = useState(false)
+  const supInputRef = useRef<HTMLDivElement>(null)
+
   useEffect(() => {
     fetch('/api/train-master').then(r => r.json()).then((list: string[]) => setAllTrains(list)).catch(() => {})
+    fetch('/api/supervisors').then(r => r.json()).then((list: string[]) => setAllSupervisors(list)).catch(() => {})
   }, [])
 
-  // Hide dropdown when clicking outside
+  // Hide dropdowns when clicking outside
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
       if (trainInputRef.current && !trainInputRef.current.contains(e.target as Node))
         setShowSuggestions(false)
+      if (supInputRef.current && !supInputRef.current.contains(e.target as Node))
+        setShowSupSuggestions(false)
     }
     document.addEventListener('mousedown', onClickOutside)
     return () => document.removeEventListener('mousedown', onClickOutside)
@@ -70,6 +78,10 @@ export default function NewTripPage() {
 
   const suggestions = trainNo.length >= 2
     ? allTrains.filter(t => t.startsWith(trainNo) && t !== trainNo).slice(0, 8)
+    : []
+
+  const supSuggestions = supervisor.length >= 2
+    ? allSupervisors.filter(s => s.toLowerCase().includes(supervisor.toLowerCase()) && s !== supervisor).slice(0, 6)
     : []
 
   type SchedWarn = {
@@ -308,7 +320,36 @@ export default function NewTripPage() {
           <input className="input" value={wlNo} onChange={e => setWlNo(e.target.value)} placeholder="e.g. 4" />
         </Field>
         <Field label="Supervisor">
-          <input className="input" value={supervisor} onChange={e => setSupervisor(e.target.value)} />
+          <div ref={supInputRef} style={{ position: 'relative' }}>
+            <input className="input" value={supervisor}
+              onChange={e => { setSupervisor(e.target.value); setShowSupSuggestions(true) }}
+              onFocus={() => setShowSupSuggestions(true)}
+              autoComplete="off"
+              placeholder="Name" />
+            {showSupSuggestions && supSuggestions.length > 0 && (
+              <div style={{
+                position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
+                background: 'var(--surface)', border: '1.5px solid var(--border-md)',
+                borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+                marginTop: 2, overflow: 'hidden',
+              }}>
+                {supSuggestions.map(s => (
+                  <div key={s}
+                    onMouseDown={() => { setSupervisor(s); setShowSupSuggestions(false) }}
+                    style={{
+                      padding: '7px 12px', fontSize: 13, fontWeight: 500,
+                      cursor: 'pointer', color: 'var(--text)',
+                      borderBottom: '1px solid var(--border)',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                  >
+                    👤 {s}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </Field>
         <Field label="Exterior — ACWP?">
           <label className="flex items-center gap-2 mt-1.5 cursor-pointer select-none">
