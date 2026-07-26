@@ -12,7 +12,8 @@ let _migrated        = false
 let _scheduleEnsured = false
 let _secMigrated     = false
 let _loaMigrated     = false
-let _billingMigrated = false
+let _billingMigrated  = false
+let _secBillingMigrated = false
 export async function ensureDB() {
   if (!_migrated) {
     await migrate()
@@ -33,6 +34,10 @@ export async function ensureDB() {
   if (!_billingMigrated) {
     await migrateBillingCumulative()
     _billingMigrated = true
+  }
+  if (!_secBillingMigrated) {
+    await migrateSecondaryBilling()
+    _secBillingMigrated = true
   }
   await migrateMonthlyBills()
 }
@@ -345,6 +350,65 @@ async function migrateMonthlyBills() {
       generated_at      TEXT NOT NULL DEFAULT (datetime('now'))
     )
   `)
+}
+
+/** ─── Secondary contract LOA + monthly bills ────────────────────────────── */
+async function migrateSecondaryBilling() {
+  // LOA quantities for secondary (M/s Dynamic Services) — user can edit via UI
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS sec_loa_quantities (
+      item_no   INTEGER PRIMARY KEY,
+      item_name TEXT    NOT NULL,
+      unit      TEXT    NOT NULL,
+      rate_gst  REAL    NOT NULL DEFAULT 0,
+      loa_qty   REAL    NOT NULL DEFAULT 0
+    )
+  `)
+
+  const { rows: loaCheck } = await db.execute('SELECT COUNT(*) as cnt FROM sec_loa_quantities')
+  if (Number(loaCheck.cnt) === 0) {
+    // Seed with placeholder LOA — user updates these via sec/loa page
+    const SEC_LOA = [
+      [1, 'Mechanized coach cleaning - Interior',  'Coaches', 322.49, 0],
+      [2, 'Mechanized coach cleaning - Exterior',  'Coaches', 144.28, 0],
+    ]
+    for (const [item_no, item_name, unit, rate_gst, loa_qty] of SEC_LOA) {
+      await db.execute({
+        sql:  'INSERT OR IGNORE INTO sec_loa_quantities (item_no, item_name, unit, rate_gst, loa_qty) VALUES (?,?,?,?,?)',
+        args: [item_no, item_name, unit, rate_gst, loa_qty],
+      })
+    }
+  }
+
+  // Monthly bills for secondary contract
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS sec_monthly_bills (
+      month_year        TEXT PRIMARY KEY,
+      gross_amount      REAL NOT NULL DEFAULT 0,
+      penalty           REAL NOT NULL DEFAULT 0,
+      penalty_breakdown TEXT,
+      net_amount        REAL NOT NULL DEFAULT 0,
+      generated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `)
+
+  // Cumulative for secondary
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS sec_billing_cumulative (
+      item_no      INTEGER PRIMARY KEY,
+      upto_qty     REAL NOT NULL DEFAULT 0,
+      upto_payment REAL NOT NULL DEFAULT 0
+    )
+  `)
+  const { rows: cumCheck } = await db.execute('SELECT COUNT(*) as cnt FROM sec_billing_cumulative')
+  if (Number(cumCheck.cnt) === 0) {
+    for (let i = 1; i <= 2; i++) {
+      await db.execute({
+        sql:  'INSERT OR IGNORE INTO sec_billing_cumulative (item_no, upto_qty, upto_payment) VALUES (?,0,0)',
+        args: [i],
+      })
+    }
+  }
 }
 
 /** ─── Billing cumulative (running upto-date totals) ─────────────────────── */
