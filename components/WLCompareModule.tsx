@@ -92,24 +92,22 @@ export default function WLCompareModule({ initialDate, onDateChange }: { initial
               <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '.04em' }}>
                 Scheduled Trains — WL Status
               </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxWidth: 300 }}>
                 {trains.map(t => {
                   const inWL = matchedSet.has(t.train_no)
                   return (
                     <div key={t.train_no} style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      padding: '4px 8px', borderRadius: 6,
-                      background: inWL ? 'rgba(22,101,52,.08)' : 'rgba(239,68,68,.06)',
-                      border: `1px solid ${inWL ? 'rgba(22,101,52,.18)' : 'rgba(239,68,68,.15)'}`,
+                      padding: '4px 8px', borderRadius: 4, fontSize: 12,
+                      background: inWL ? 'rgba(22,101,52,.10)' : 'rgba(239,68,68,.08)',
+                      color: inWL ? '#166534' : '#991B1B',
                     }}>
-                      <span style={{ fontWeight: 700, fontSize: 12, color: 'var(--text)', minWidth: 60 }}>
-                        {t.train_no}
-                      </span>
-                      <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
+                      <span style={{ fontWeight: 600, minWidth: 55 }}>{t.train_no}</span>
+                      <span style={{ color: '#94A3B8', fontSize: 11 }}>
                         {t.ac_count  > 0 && <span style={{ marginRight: 4 }}>AC:{t.ac_count}</span>}
                         {t.nac_count > 0 && <span>NAC:{t.nac_count}</span>}
                       </span>
-                      <span style={{ fontSize: 13 }}>{inWL ? '✅' : '❌'}</span>
+                      <span>{inWL ? '✅' : '⏳'}</span>
                     </div>
                   )
                 })}
