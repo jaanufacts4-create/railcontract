@@ -24,7 +24,7 @@ export async function GET(req: Request) {
 
   // Load trips for the month
   const trips = await db.execute({
-    sql:  'SELECT * FROM trips WHERE month_year=? ORDER BY date, train_no',
+    sql:  'SELECT * FROM trips WHERE month_year=? ORDER BY date ASC, id ASC',
     args: [monthYear],
   })
 

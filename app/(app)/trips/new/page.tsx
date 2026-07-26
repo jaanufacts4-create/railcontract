@@ -215,17 +215,19 @@ export default function NewTripPage() {
   }
 
   function setC(position: number, cIdx: number, val: number) {
+    const clamped = Math.min(3, Math.max(0, val))
     setCriteria(prev => {
       const row = [...(prev[position] ?? [...DEFAULT_CRITERIA])] as CriteriaRow
-      row[cIdx] = val
+      row[cIdx] = clamped
       return { ...prev, [position]: row }
     })
   }
 
   function setIC(position: number, cIdx: number, val: number) {
+    const clamped = Math.min(3, Math.max(0, val))
     setIntCriteria(prev => {
       const row = [...(prev[position] ?? [...INT_DEFAULT_CRITERIA])] as CriteriaRow
-      row[cIdx] = val
+      row[cIdx] = clamped
       return { ...prev, [position]: row }
     })
   }
@@ -234,6 +236,22 @@ export default function NewTripPage() {
   async function submit() {
     if (!trainNo || !date) return setMsg('Date and Train No. are required.')
     if (!positions.length)  return setMsg('Please pull train data first.')
+
+    // Validate: no coach total should exceed max (15 normal, 18 intensive)
+    const overLimit: string[] = []
+    for (const p of attendable) {
+      const tot = scores[p.position] ?? 0
+      if (tot > 15) overLimit.push(`Coach ${p.position} (${p.coach_type}): ${tot}/15`)
+    }
+    for (const p of intPositions) {
+      const cr  = intCriteria[p.position] ?? ([...INT_DEFAULT_CRITERIA] as CriteriaRow)
+      const tot = calcTotal(cr)
+      if (tot > 18) overLimit.push(`INT Coach ${p.position}: ${tot}/18`)
+    }
+    if (overLimit.length > 0) {
+      return setMsg(`⚠ Score over limit — fix before saving:\n${overLimit.join('\n')}`)
+    }
+
     setLoading(true)
 
     const monthYear = date.slice(0, 7)
@@ -263,7 +281,12 @@ export default function NewTripPage() {
 
     setLoading(false)
     if (res.ok) {
-      router.push('/trips')
+      // Reset form — stay on page for next entry
+      setTrainNo(''); setWlNo(''); setSupervisor('')
+      setPositions([]); setCriteria({}); setExtScores({})
+      setIntCriteria({}); setIntExtScores({}); setCompOverride({}); setIntPrevType({})
+      setDeployed(0); setPenalties({}); setSchedWarn(null)
+      setMsg('✅ Trip saved! Enter next trip or go to Trips list.')
     } else {
       const body = await res.json().catch(() => ({}))
       const msg  = body.error ?? `Error ${res.status}`

@@ -23,7 +23,7 @@ export async function GET(req: Request) {
       (SELECT COUNT(*) FROM intensive_scores WHERE trip_id=t.id)                   AS int_count
     FROM trips t
     ${monthYear ? 'WHERE t.month_year=?' : ''}
-    ORDER BY t.date, t.train_no
+    ORDER BY t.date ASC, t.id ASC
     ${monthYear ? '' : 'LIMIT 200'}
   `
   const trips = await db.execute({ sql, args: monthYear ? [monthYear] : [] })
