@@ -551,7 +551,7 @@ export default function SchedulePage() {
   const TABS = [
     { id: 'schedule', label: 'Schedule of Trains', icon: <CalendarDays size={14} /> },
     { id: 'master',   label: 'Train Master',        icon: <Train size={14} /> },
-    { id: 'wl',       label: 'WL Compare',          icon: <GitCompare size={14} /> },
+    { id: 'wl',       label: 'WL Placement Compare', icon: <GitCompare size={14} /> },
   ] as const
 
   return (

@@ -3,6 +3,7 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { coachCategory, PENALTY_LABELS } from '@/lib/types'
 import TodayPanel from '@/components/TodayPanel'
+import WLPanel    from '@/components/WLPanel'
 
 // Sub-criteria: [c1(1X2), c2, c3, c4, c5]
 // Normal  total = c1×2 + c2 + c3 + c4 + c5      (max 15, c5 default 0)
@@ -727,6 +728,7 @@ export default function NewTripPage() {
     {/* ── Today's schedule panel ── */}
     <div className="shrink-0 sticky top-4 w-56">
       <TodayPanel date={date} currentTrain={trainNo.trim() || undefined} />
+      <WLPanel date={date} />
     </div>
     </div>
   )
