@@ -16,7 +16,6 @@ const GROUPS = [
     label: 'Primary MCC/OBHS Bill',
     sub:   'MPPL',
     links: [
-      { href: '/dashboard',    label: 'Dashboard',                icon: LayoutDashboard },
       { href: '/trips',        label: 'Trips - MCC',              icon: ClipboardList   },
       { href: '/trips/new',    label: 'New Trip',                 icon: PlusCircle      },
       { href: '/train-master', label: 'Train Master',             icon: Train           },
@@ -120,6 +119,52 @@ export default function Sidebar() {
 
       {/* Nav */}
       <nav style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '12px 0' }}>
+
+        {/* ── Pinned: Dashboard (always visible) ── */}
+        {(() => {
+          const active = path === '/dashboard'
+          return (
+            <div style={{ padding: '0 8px 8px', borderBottom: '1px solid var(--sb-border)', marginBottom: 8 }}>
+              <Link
+                href="/dashboard"
+                title={collapsed ? 'Dashboard' : undefined}
+                style={{
+                  display: 'flex', alignItems: 'center',
+                  gap: 10, padding: collapsed ? '8px 0' : '8px 12px',
+                  borderRadius: 9,
+                  background: active ? 'var(--sb-active-bg)' : 'transparent',
+                  color:      active ? 'var(--sb-active)' : 'var(--sb-text)',
+                  textDecoration: 'none',
+                  transition: 'background .12s, color .12s',
+                  justifyContent: collapsed ? 'center' : 'flex-start',
+                }}
+                onMouseEnter={e => {
+                  if (!active) {
+                    (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,.05)'
+                    ;(e.currentTarget as HTMLElement).style.color = 'var(--sb-text-hover)'
+                  }
+                }}
+                onMouseLeave={e => {
+                  if (!active) {
+                    (e.currentTarget as HTMLElement).style.background = 'transparent'
+                    ;(e.currentTarget as HTMLElement).style.color = 'var(--sb-text)'
+                  }
+                }}
+              >
+                <LayoutDashboard size={16} strokeWidth={active ? 2.2 : 1.8} style={{ flexShrink: 0 }} />
+                {!collapsed && (
+                  <span style={{ fontSize: 14, fontWeight: active ? 700 : 500, whiteSpace: 'nowrap', letterSpacing: '-.01em' }}>
+                    Dashboard
+                  </span>
+                )}
+                {!collapsed && active && (
+                  <div style={{ marginLeft: 'auto', width: 5, height: 5, borderRadius: '50%', background: 'var(--sb-active)', flexShrink: 0 }} />
+                )}
+              </Link>
+            </div>
+          )
+        })()}
+
         {GROUPS.map(group => {
           const GroupIcon = GROUP_ICONS[group.id]
           const isOpen    = openGroups[group.id] !== false
