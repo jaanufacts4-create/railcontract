@@ -58,10 +58,12 @@ export async function verifyToken(token: string): Promise<string | null> {
   }
 }
 
+const SECURE = process.env.NODE_ENV === 'production' ? '; Secure' : ''
+
 export function setCookieHeader(token: string): string {
-  return `${COOKIE_NAME}=${token}; HttpOnly; Path=/; Max-Age=${MAX_AGE}; SameSite=Lax`
+  return `${COOKIE_NAME}=${token}; HttpOnly; Path=/; Max-Age=${MAX_AGE}; SameSite=Strict${SECURE}`
 }
 
 export function clearCookieHeader(): string {
-  return `${COOKIE_NAME}=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax`
+  return `${COOKIE_NAME}=; HttpOnly; Path=/; Max-Age=0; SameSite=Strict${SECURE}`
 }

@@ -217,9 +217,9 @@ async function migrateSecondary() {
       created_at   TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
-    -- Seed default super admin (admin / Admin@1234)
+    -- Seed default super admin (admin / Admin@1234) — bcrypt hash
     INSERT OR IGNORE INTO users (username, password_hash, role) VALUES
-      ('admin', 'c5179c7a6f666319b5fb4bea7e9589eb74100c0d7dbe85d4b2a0b63db5660f44', 'admin');
+      ('admin', '$2b$12$hzeHmVGoaOnori1Sh1kE4.TZHWy2qfrbAVORtEmvcq1B/1Zi61TZ6', 'admin');
 
     -- OBHS monthly summary (extracted from uploaded Excel)
     CREATE TABLE IF NOT EXISTS obhs_monthly (
