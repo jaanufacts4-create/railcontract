@@ -90,7 +90,7 @@ export default function SecSchedulePage() {
             ))}
           </div>
           <div style={{ marginBottom: 16 }}>
-            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', letterSpacing: '.04em', textTransform: 'uppercase', display: 'block', marginBottom: 8 }}>Running Days</label>
+            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', letterSpacing: '.04em', textTransform: 'uppercase', display: 'block', marginBottom: 8 }}>Maintenance Days</label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {ALL_DAYS.map(day => (
                 <button key={day} type="button" onClick={() => toggleDay(day)} style={{
@@ -128,7 +128,7 @@ export default function SecSchedulePage() {
             <thead>
               <tr>
                 <th style={{ textAlign: 'left', paddingLeft: 20 }}>Train No.</th>
-                <th style={{ textAlign: 'left' }}>Running Days</th>
+                <th style={{ textAlign: 'left' }}>Maintenance Days</th>
                 <th>AC</th><th>NAC</th><th>Total</th><th>Req. MP</th>
                 <th style={{ width: 80 }}></th>
               </tr>

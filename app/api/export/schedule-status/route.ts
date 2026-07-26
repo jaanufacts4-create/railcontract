@@ -251,7 +251,7 @@ export async function GET(req: Request) {
 
   // Header row
   ws3.getRow(2).height = 20
-  const ts3hdrs = ['Train No.', 'Running Days', 'AC', 'NAC', 'Total Load', 'Trips in Range', 'Total AC', 'Total NAC', 'Grand Total']
+  const ts3hdrs = ['Train No.', 'Maintenance Days', 'AC', 'NAC', 'Total Load', 'Trips in Range', 'Total AC', 'Total NAC', 'Grand Total']
   ts3hdrs.forEach((v, i) => {
     const c = ws3.getRow(2).getCell(i + 1)
     c.value     = v

@@ -411,7 +411,7 @@ function ReportsContent() {
                       <thead>
                         <tr>
                           <th style={{ textAlign: 'left', paddingLeft: 20 }}>Train No.</th>
-                          <th style={{ textAlign: 'left' }}>Running Days</th>
+                          <th style={{ textAlign: 'left' }}>Maintenance Days</th>
                           <th>AC/trip</th><th>NAC/trip</th><th>Load/trip</th>
                           <th>Trips in Range</th><th>Total AC</th><th>Total NAC</th><th>Grand Total</th>
                         </tr>
