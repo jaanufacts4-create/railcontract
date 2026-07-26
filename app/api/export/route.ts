@@ -774,11 +774,14 @@ export async function GET(req: Request) {
 
   for (const [d3, agg3] of dayAggMap) {
     const row = ws3.getRow(s3row)
+    // AC columns = AC excluding VB (VB is shown separately in K/L/M)
+    const acNorm = agg3.normAC - agg3.normVB
+    const acInt  = agg3.intAC  - agg3.intVB
     row.getCell(1).value  = new Date(d3)
     row.getCell(1).numFmt = 'DD-MM-YYYY'
-    row.getCell(2).value  = agg3.normAC
-    row.getCell(3).value  = agg3.intAC
-    row.getCell(4).value  = agg3.normAC + agg3.intAC
+    row.getCell(2).value  = acNorm
+    row.getCell(3).value  = acInt
+    row.getCell(4).value  = acNorm + acInt
     row.getCell(5).value  = agg3.normNAC
     row.getCell(6).value  = agg3.intNAC
     row.getCell(7).value  = agg3.normNAC + agg3.intNAC
@@ -794,7 +797,7 @@ export async function GET(req: Request) {
       cell.font = { size: 9 }
     })
     row.getCell(1).font = { size: 9, bold: true }
-    g3NormAC += agg3.normAC;  g3IntAC  += agg3.intAC
+    g3NormAC += acNorm;    g3IntAC  += acInt
     g3NormNAC += agg3.normNAC; g3IntNAC += agg3.intNAC
     g3NormExt += agg3.normExt; g3IntExt += agg3.intExt
     g3NormVB  += agg3.normVB;  g3IntVB  += agg3.intVB
