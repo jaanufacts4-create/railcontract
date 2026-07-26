@@ -132,8 +132,8 @@ export async function GET(req: Request) {
         if (sorted !== tn) wlPrimarySet.add(sorted)
       }
     } else {
-      // Non-numeric — spare stock, pilots, etc.
-      specialSet.add(tn)
+      // Non-numeric — only show if Primary type (S-type / secondary ignored)
+      if (isPrimary(typeCol)) specialSet.add(tn)
     }
   }
 
