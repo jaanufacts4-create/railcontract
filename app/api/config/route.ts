@@ -20,6 +20,14 @@ export async function POST(req: Request) {
             ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at`,
       args: [key, String(value), now],
     })
+    // Sync Nirmal rate to nirmal_loa_quantities table (both AC+NAC items use same rate)
+    if (key === 'nirmal_rate_gst') {
+      const rate = Number(value)
+      if (rate > 0) {
+        await db.execute({ sql: 'UPDATE nirmal_loa_quantities SET rate_gst=? WHERE item_no=1', args: [rate] })
+        await db.execute({ sql: 'UPDATE nirmal_loa_quantities SET rate_gst=? WHERE item_no=2', args: [rate] })
+      }
+    }
   }
   return NextResponse.json({ ok: true })
 }

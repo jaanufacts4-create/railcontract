@@ -8,12 +8,13 @@ const authToken = process.env.TURSO_AUTH_TOKEN   ?? undefined
 export const db = createClient({ url, authToken })
 
 // Auto-migrate on first use — no manual script needed
-let _migrated        = false
-let _scheduleEnsured = false
-let _secMigrated     = false
-let _loaMigrated     = false
-let _billingMigrated  = false
+let _migrated           = false
+let _scheduleEnsured    = false
+let _secMigrated        = false
+let _loaMigrated        = false
+let _billingMigrated    = false
 let _secBillingMigrated = false
+let _nirmalMigrated     = false
 export async function ensureDB() {
   if (!_migrated) {
     await migrate()
@@ -38,6 +39,10 @@ export async function ensureDB() {
   if (!_secBillingMigrated) {
     await migrateSecondaryBilling()
     _secBillingMigrated = true
+  }
+  if (!_nirmalMigrated) {
+    await migrateNirmal()
+    _nirmalMigrated = true
   }
   await migrateMonthlyBills()
 }
@@ -409,6 +414,67 @@ async function migrateSecondaryBilling() {
       })
     }
   }
+}
+
+/** ─── Nirmal Facility Management Service ────────────────────────────────── */
+async function migrateNirmal() {
+  // Config defaults for Nirmal rate
+  await db.execute(`
+    INSERT OR IGNORE INTO config (key, value) VALUES ('nirmal_rate_gst', '569')
+  `)
+
+  // LOA for Nirmal (2 items: AC + NAC at same rate)
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS nirmal_loa_quantities (
+      item_no   INTEGER PRIMARY KEY,
+      item_name TEXT    NOT NULL,
+      unit      TEXT    NOT NULL,
+      rate_gst  REAL    NOT NULL DEFAULT 0,
+      loa_qty   REAL    NOT NULL DEFAULT 0
+    )
+  `)
+
+  const { rows: loaCheck } = await db.execute('SELECT COUNT(*) as cnt FROM nirmal_loa_quantities')
+  if (Number(loaCheck[0].cnt) === 0) {
+    const NIRMAL_LOA = [
+      [1, 'Mechanized Coach Cleaning - AC Coaches',  'Coaches', 569, 0],
+      [2, 'Mechanized Coach Cleaning - NAC Coaches', 'Coaches', 569, 0],
+    ]
+    for (const [item_no, item_name, unit, rate_gst, loa_qty] of NIRMAL_LOA) {
+      await db.execute({
+        sql:  'INSERT OR IGNORE INTO nirmal_loa_quantities (item_no, item_name, unit, rate_gst, loa_qty) VALUES (?,?,?,?,?)',
+        args: [item_no, item_name, unit, rate_gst, loa_qty],
+      })
+    }
+  }
+
+  // Cumulative upto-date totals
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS nirmal_billing_cumulative (
+      item_no      INTEGER PRIMARY KEY,
+      upto_qty     REAL NOT NULL DEFAULT 0,
+      upto_payment REAL NOT NULL DEFAULT 0
+    )
+  `)
+  const { rows: cumCheck } = await db.execute('SELECT COUNT(*) as cnt FROM nirmal_billing_cumulative')
+  if (Number(cumCheck[0].cnt) === 0) {
+    for (let i = 1; i <= 2; i++) {
+      await db.execute({
+        sql:  'INSERT OR IGNORE INTO nirmal_billing_cumulative (item_no, upto_qty, upto_payment) VALUES (?,0,0)',
+        args: [i],
+      })
+    }
+  }
+
+  // Monthly bills log
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS nirmal_monthly_bills (
+      month_year   TEXT PRIMARY KEY,
+      gross_amount REAL NOT NULL DEFAULT 0,
+      net_amount   REAL NOT NULL DEFAULT 0,
+      generated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `)
 }
 
 /** ─── Billing cumulative (running upto-date totals) ─────────────────────── */

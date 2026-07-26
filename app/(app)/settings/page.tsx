@@ -3,11 +3,12 @@ import { useEffect, useState } from 'react'
 import { Save, IndianRupee, Percent, BadgeInfo, Users, Plus, Trash2, KeyRound, ShieldCheck, User } from 'lucide-react'
 
 const FIELDS = [
-  { key: 'ac_rate_gst',  label: 'AC Rate (with GST)',       prefix: '₹', icon: IndianRupee, desc: 'Per coach per trip rate for AC coaches including GST' },
-  { key: 'nac_rate_gst', label: 'NAC Rate (with GST)',      prefix: '₹', icon: IndianRupee, desc: 'Per coach per trip rate for NAC coaches including GST' },
-  { key: 'ext_rate_gst', label: 'Exterior Rate (with GST)', prefix: '₹', icon: IndianRupee, desc: 'Per coach per trip rate for exterior cleaning including GST' },
-  { key: 'gst_pct',      label: 'GST %',                    prefix: '',  icon: Percent,     desc: 'Current GST percentage applied to all rates' },
-  { key: 'min_wages',    label: 'Minimum Wages / day',      prefix: '₹', icon: IndianRupee, desc: 'Used for manpower penalty calculation. Update every ~6 months.' },
+  { key: 'ac_rate_gst',     label: 'AC Rate (with GST)',           prefix: '₹', icon: IndianRupee, desc: 'Per coach per trip rate for AC coaches including GST (Primary MCC)' },
+  { key: 'nac_rate_gst',    label: 'NAC Rate (with GST)',          prefix: '₹', icon: IndianRupee, desc: 'Per coach per trip rate for NAC coaches including GST (Primary MCC)' },
+  { key: 'ext_rate_gst',    label: 'Exterior Rate (with GST)',     prefix: '₹', icon: IndianRupee, desc: 'Per coach per trip rate for exterior cleaning including GST' },
+  { key: 'gst_pct',         label: 'GST %',                        prefix: '',  icon: Percent,     desc: 'Current GST percentage applied to all rates' },
+  { key: 'min_wages',       label: 'Minimum Wages / day',          prefix: '₹', icon: IndianRupee, desc: 'Used for manpower penalty calculation. Update every ~6 months.' },
+  { key: 'nirmal_rate_gst', label: 'Nirmal Rate (with GST)',       prefix: '₹', icon: IndianRupee, desc: 'Per coach rate for Nirmal (AC & NAC, same rate for both) including GST' },
 ]
 
 type UserRow = { username: string; role: string; created_at: string }
