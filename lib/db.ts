@@ -15,6 +15,7 @@ let _loaMigrated        = false
 let _billingMigrated    = false
 let _secBillingMigrated = false
 let _nirmalMigrated     = false
+let _nirmalV2Migrated   = false
 export async function ensureDB() {
   if (!_migrated) {
     await migrate()
@@ -43,6 +44,10 @@ export async function ensureDB() {
   if (!_nirmalMigrated) {
     await migrateNirmal()
     _nirmalMigrated = true
+  }
+  if (!_nirmalV2Migrated) {
+    await migrateNirmalV2()
+    _nirmalV2Migrated = true
   }
   await migrateMonthlyBills()
 }
@@ -475,6 +480,108 @@ async function migrateNirmal() {
       generated_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
   `)
+}
+
+/** ─── Nirmal V2 — trips, scores, OBHS, extended LOA ────────────────────── */
+async function migrateNirmalV2() {
+  // Trips table for Nirmal
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS nirmal_trips (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      date       TEXT    NOT NULL,
+      train_no   TEXT    NOT NULL,
+      wl_no      TEXT,
+      supervisor TEXT    NOT NULL DEFAULT '',
+      month_year TEXT    NOT NULL,
+      created_at TEXT    NOT NULL DEFAULT (datetime('now'))
+    )
+  `)
+
+  // Coach scores (reuses train_master for coach_type lookup)
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS nirmal_coach_scores (
+      id       INTEGER PRIMARY KEY AUTOINCREMENT,
+      trip_id  INTEGER NOT NULL REFERENCES nirmal_trips(id) ON DELETE CASCADE,
+      position INTEGER NOT NULL,
+      score    INTEGER NOT NULL DEFAULT 0
+    )
+  `)
+
+  // Intensive cleaning scores
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS nirmal_intensive_scores (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      trip_id    INTEGER NOT NULL REFERENCES nirmal_trips(id) ON DELETE CASCADE,
+      position   INTEGER NOT NULL,
+      coach_type TEXT    NOT NULL DEFAULT '',
+      score      INTEGER NOT NULL DEFAULT 0,
+      ext_score  INTEGER NOT NULL DEFAULT 0
+    )
+  `)
+
+  // Manpower
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS nirmal_manpower (
+      id       INTEGER PRIMARY KEY AUTOINCREMENT,
+      trip_id  INTEGER NOT NULL REFERENCES nirmal_trips(id) ON DELETE CASCADE,
+      section  TEXT    NOT NULL,
+      required INTEGER NOT NULL DEFAULT 0,
+      deployed INTEGER NOT NULL DEFAULT 0
+    )
+  `)
+
+  // Annex penalties
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS nirmal_annex_penalties (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      trip_id      INTEGER NOT NULL REFERENCES nirmal_trips(id) ON DELETE CASCADE,
+      penalty_type INTEGER NOT NULL,
+      amount       REAL    NOT NULL DEFAULT 0
+    )
+  `)
+
+  // OBHS monthly (same structure as Primary)
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS nirmal_obhs_monthly (
+      month_year          TEXT PRIMARY KEY,
+      ac_obhs_hrs         REAL NOT NULL DEFAULT 0,
+      nac_obhs_hrs        REAL NOT NULL DEFAULT 0,
+      vb_obhs_hrs         REAL NOT NULL DEFAULT 0,
+      garibrath_obhs_hrs  REAL NOT NULL DEFAULT 0,
+      ehk_hrs             REAL NOT NULL DEFAULT 0,
+      raw_json            TEXT,
+      uploaded_at         TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `)
+
+  // Extend nirmal_loa_quantities to 7 items (add OBHS items if not present)
+  const { rows: loaRows } = await db.execute('SELECT COUNT(*) as cnt FROM nirmal_loa_quantities')
+  if (Number(loaRows[0].cnt) < 7) {
+    const NIRMAL_LOA_EXTRA = [
+      [3, 'OBHS in AC with Toiletries in coaches',                          'Hours',  0, 0],
+      [4, 'OBHS in NAC with Handwash in coaches',                           'Hours',  0, 0],
+      [5, 'OBHS in AC with Toiletries in VB coaches',                       'Hours',  0, 0],
+      [6, 'OBHS in AC with Toiletries in Garibrath Coaches',                'Hours',  0, 0],
+      [7, 'Supervision/ monitoring of OBHS staff in all rakes of trains',   'Hours',  0, 0],
+    ]
+    for (const [item_no, item_name, unit, rate_gst, loa_qty] of NIRMAL_LOA_EXTRA) {
+      await db.execute({
+        sql:  'INSERT OR IGNORE INTO nirmal_loa_quantities (item_no, item_name, unit, rate_gst, loa_qty) VALUES (?,?,?,?,?)',
+        args: [item_no, item_name, unit, rate_gst, loa_qty],
+      })
+    }
+  }
+
+  // Extend nirmal_billing_cumulative to 7 rows
+  const { rows: cumRows } = await db.execute('SELECT COUNT(*) as cnt FROM nirmal_billing_cumulative')
+  if (Number(cumRows[0].cnt) < 7) {
+    for (let i = 3; i <= 7; i++) {
+      await db.execute({
+        sql:  'INSERT OR IGNORE INTO nirmal_billing_cumulative (item_no, upto_qty, upto_payment) VALUES (?,0,0)',
+        args: [i],
+      })
+    }
+  }
 }
 
 /** ─── Billing cumulative (running upto-date totals) ─────────────────────── */

@@ -39,6 +39,11 @@ export async function POST(req: NextRequest) {
     args: [month_year],
   })
 
+  const { rows: obhs } = await db.execute({
+    sql: 'SELECT * FROM nirmal_obhs_monthly WHERE month_year = ?',
+    args: [month_year],
+  })
+
   const { rows: loa } = await db.execute(
     'SELECT item_no, rate_gst FROM nirmal_loa_quantities ORDER BY item_no'
   )
@@ -57,11 +62,17 @@ export async function POST(req: NextRequest) {
 
   const m  = mcc[0]  ?? {}
   const iv = intv[0] ?? {}
+  const o  = obhs[0] ?? {}
 
-  // Item 1 = AC coaches, Item 2 = NAC coaches
+  // 7 items: AC, NAC, OBHS AC, OBHS NAC, OBHS VB, OBHS Garib, EHK
   const jQty: number[] = [
     Math.round((Number(m.ac_coaches)  || 0) + (Number(iv.ac_coaches)  || 0)),
     Math.round((Number(m.nac_coaches) || 0) + (Number(iv.nac_coaches) || 0)),
+    Math.round((Number(o.ac_obhs_hrs)        || 0) * 100) / 100,
+    Math.round((Number(o.nac_obhs_hrs)       || 0) * 100) / 100,
+    Math.round((Number(o.vb_obhs_hrs)        || 0) * 100) / 100,
+    Math.round((Number(o.garibrath_obhs_hrs) || 0) * 100) / 100,
+    Math.round((Number(o.ehk_hrs)            || 0) * 100) / 100,
   ]
 
   // ── Date helpers ─────────────────────────────────────────────────────────
@@ -268,24 +279,29 @@ export async function POST(req: NextRequest) {
   set(17,13,'10',{ size: 20, border: allB, fill: hFill })
   set(17,14,'11',{ size: 20, border: allB, fill: hFill })
 
-  // ── DATA ROWS 18-19 (2 items) ────────────────────────────────────────────
+  // ── DATA ROWS 18-24 (7 items) ────────────────────────────────────────────
   const ITEMS = [
-    { desc: 'Coach Cleaning of Primary Trains\n(AC Coaches)',  unit: 'Coaches' },
-    { desc: 'Coach Cleaning of Primary Trains\n(NAC Coaches)', unit: 'Coaches' },
+    { desc: 'Coach Cleaning of Primary Trains\n(AC Coaches)',                          unit: 'Coaches' },
+    { desc: 'Coach Cleaning of Primary Trains\n(NAC Coaches)',                         unit: 'Coaches' },
+    { desc: 'OBHS in AC with Toiletries in coaches',                                   unit: 'Hours'   },
+    { desc: 'OBHS in NAC with Handwash in coaches',                                    unit: 'Hours'   },
+    { desc: 'OBHS in AC with Toiletries in VB coaches',                                unit: 'Hours'   },
+    { desc: 'OBHS in AC with Toiletries in Garibrath Coaches',                         unit: 'Hours'   },
+    { desc: 'Supervision/ monitoring of OBHS staff in all rakes of trains',            unit: 'Hours'   },
   ]
 
   let totalSincePayment = 0
   let totalUptoPayment  = 0
 
-  // Remarks merged across both data rows
-  merge(18,14,19,14)
+  // Remarks merged across all data rows
+  merge(18,14,24,14)
   set(18,14,'Bills and documents submitted late by Contractor',
     { size: 20, border: allB, halign: 'left' })
 
   const newUptoQty: number[] = []
   const newUptoPay: number[] = []
 
-  for (let i = 0; i < 2; i++) {
+  for (let i = 0; i < 7; i++) {
     const itemNo    = i + 1
     const dr        = 18 + i
     const rate      = rates[itemNo]            ?? 0
@@ -317,26 +333,26 @@ export async function POST(req: NextRequest) {
     set(dr,13, sincePay, { size: 20, border: allB, numFmt: '#,##0.00' })
   }
 
-  // ── ROW 20: Total ────────────────────────────────────────────────────────
-  ws.getRow(20).height = 36.0
-  set(20,1,'',  { border: allB })
-  set(20,2,'',  { border: allB })
-  set(20,3,'',  { border: allB })
-  set(20,4,'',  { border: allB })
-  set(20,7,'',  { border: allB })
-  set(20,8,'',  { border: allB })
-  set(20,10,'', { border: allB })
-  merge(20,11,20,12)
-  set(20,11,'Total', { bold: true, size: 20, border: allB })
-  set(20,13, totalSincePayment, { bold: true, size: 20, border: allB, numFmt: '#,##0.00' })
-  set(20,14,'',  { border: allB })
+  // ── ROW 25: Total ────────────────────────────────────────────────────────
+  ws.getRow(25).height = 36.0
+  set(25,1,'',  { border: allB })
+  set(25,2,'',  { border: allB })
+  set(25,3,'',  { border: allB })
+  set(25,4,'',  { border: allB })
+  set(25,7,'',  { border: allB })
+  set(25,8,'',  { border: allB })
+  set(25,10,'', { border: allB })
+  merge(25,11,25,12)
+  set(25,11,'Total', { bold: true, size: 20, border: allB })
+  set(25,13, totalSincePayment, { bold: true, size: 20, border: allB, numFmt: '#,##0.00' })
+  set(25,14,'',  { border: allB })
 
-  // ── ROW 21: blank spacer ─────────────────────────────────────────────────
-  ws.getRow(21).height = 30.75
-  merge(21,1,21,9)
-  set(21,1,'', {})
+  // ── ROW 26: blank spacer ─────────────────────────────────────────────────
+  ws.getRow(26).height = 30.75
+  merge(26,1,26,9)
+  set(26,1,'', {})
 
-  // ── ROWS 22-29: Payment summary ──────────────────────────────────────────
+  // ── ROWS 27-34: Payment summary ──────────────────────────────────────────
   const totalInclGST = totalSincePayment
   const gst18        = Math.round(totalInclGST * 18 / 118 * 100) / 100
   const exclGST      = Math.round((totalInclGST - gst18) * 100) / 100
@@ -357,7 +373,7 @@ export async function POST(req: NextRequest) {
   ]
 
   summaryRows.forEach(([label, val], idx) => {
-    const sr = 22 + idx
+    const sr = 27 + idx
     ws.getRow(sr).height = 36.75
     merge(sr,1,sr,9)
     set(sr,1,label, { bold: idx === 0 || idx === 7, size: 20, halign: 'left', border: allB })
@@ -369,9 +385,9 @@ export async function POST(req: NextRequest) {
     set(sr,14,'', { border: allB })
   })
 
-  // ── ROW 30: Certification text ───────────────────────────────────────────
-  ws.getRow(30).height = 124.5
-  merge(30,1,30,14)
+  // ── ROW 35: Certification text ───────────────────────────────────────────
+  ws.getRow(35).height = 124.5
+  merge(35,1,35,14)
   set(30,1,
     'Certified that M/s Nirmal Facility Management Service has carried out work mentioned in the abstract and completed it as prescribed. The quantities entered above for payment have been carefully checked and are correct. The work done since last certificate and up to date is as noted above. The measurement have been taken with reference to the actual approved design and the quantities have been computed correctly in the Measurement Book. It is certified that no payment has been made to the contractor for this work other than what is entered in the Payment Certificate (Form No-1338).',
     { size: 20, halign: 'left', valign: 'top', border: allB })
@@ -380,7 +396,7 @@ export async function POST(req: NextRequest) {
   const buf = await wb.xlsx.writeBuffer()
 
   // ── Update nirmal cumulative ──────────────────────────────────────────────
-  for (let i = 0; i < 2; i++) {
+  for (let i = 0; i < 7; i++) {
     await db.execute({
       sql:  'UPDATE nirmal_billing_cumulative SET upto_qty=?, upto_payment=? WHERE item_no=?',
       args: [newUptoQty[i], newUptoPay[i], i + 1],

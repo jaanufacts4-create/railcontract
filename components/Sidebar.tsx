@@ -29,7 +29,12 @@ const GROUPS = [
     label: 'Nirmal Bill',
     sub:   'M/s Nirmal Facility Management',
     links: [
-      { href: '/nirmal/billing', label: 'Billing Certificate', icon: Receipt },
+      { href: '/nirmal/trips',     label: 'Trips',               icon: ClipboardList },
+      { href: '/nirmal/trips/new', label: 'New Trip',            icon: PlusCircle    },
+      { href: '/nirmal/obhs',      label: 'OBHS Hours',          icon: Clock4        },
+      { href: '/nirmal/settings',  label: 'Settings',            icon: Settings      },
+      { href: '/nirmal/reports',   label: 'Reports',             icon: BarChart3     },
+      { href: '/nirmal/billing',   label: 'Billing Certificate', icon: Receipt       },
     ],
   },
   {
