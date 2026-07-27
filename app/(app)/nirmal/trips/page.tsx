@@ -38,7 +38,7 @@ export default function NirmalTripsPage() {
   }, [monthYear])
 
   useEffect(() => {
-    fetch('/api/schedule').then(r => r.json()).then(setSchedules).catch(() => {})
+    fetch('/api/nirmal/schedule').then(r => r.json()).then(setSchedules).catch(() => {})
   }, [])
 
   const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']

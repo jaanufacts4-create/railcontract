@@ -554,6 +554,16 @@ async function migrateNirmalV2() {
     )
   `)
 
+  // Nirmal-specific train schedule (separate from Primary)
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS nirmal_train_schedule (
+      train_no  TEXT PRIMARY KEY,
+      days      TEXT NOT NULL,
+      ac_count  INTEGER DEFAULT 0,
+      nac_count INTEGER DEFAULT 0
+    )
+  `)
+
   // Extend nirmal_loa_quantities to 7 items (add OBHS items if not present)
   const { rows: loaRows } = await db.execute('SELECT COUNT(*) as cnt FROM nirmal_loa_quantities')
   if (Number(loaRows[0].cnt) < 7) {

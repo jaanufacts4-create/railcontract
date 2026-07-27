@@ -124,7 +124,7 @@ export default function NirmalNewTripPage() {
     setCriteria(c)
     setMsg(`Train ${t}: ${pos.length} coaches loaded.`)
     try {
-      const schedAll: Array<{ train_no: string; days: string[]; ac_count: number; nac_count: number }> = await fetch('/api/schedule').then(r => r.json())
+      const schedAll: Array<{ train_no: string; days: string[]; ac_count: number; nac_count: number }> = await fetch('/api/nirmal/schedule').then(r => r.json())
       const sched = schedAll.find(s => s.train_no === t)
       if (!sched) { setSchedWarn({ notInSchedule: true }) } else {
         const [dy, dm, dd] = date.split('-').map(Number)
