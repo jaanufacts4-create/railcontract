@@ -1,37 +1,26 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { Download, CheckCircle, AlertCircle, Loader2, Database, Edit2, Check, X, ChevronDown, ChevronUp } from 'lucide-react'
+import { Download, Loader2, Database, Edit2, Check, X, ChevronDown, ChevronUp } from 'lucide-react'
 
 function fmt(n: number, dec = 0) {
   return Number(n).toLocaleString('en-IN', { maximumFractionDigits: dec })
 }
 
-const ITEM_LABELS = [
-  'AC Coach Cleaning',
-  'NAC Coach Cleaning',
-  'Exterior Cleaning',
-  'VB (22488) Coaches',
-  'OBHS AC Hours',
-  'OBHS NAC Hours',
-  'OBHS VB Hours',
-  'OBHS Garibrath Hours',
-  'Supervision (EHK) Hours',
-]
+const ITEM_LABELS = ['AC Coach Cleaning', 'NAC Coach Cleaning']
 
 type CumItem = {
   item_no: number; item_name: string; unit: string; rate_gst: number
   upto_qty: number; upto_payment: number
 }
 
-export default function BillingPage() {
+export default function NirmalBillingPage() {
   const now = new Date()
   const [monthYear, setMonthYear] = useState(
     `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   )
-  const [preview,    setPreview]    = useState<Record<string, number> | null>(null)
+  const [preview,    setPreview]    = useState<{ ac_coaches: number; nac_coaches: number } | null>(null)
   const [loading,    setLoading]    = useState(false)
   const [generating, setGenerating] = useState(false)
-  const [obhsMonths, setObhsMonths] = useState<string[]>([])
 
   const [cumItems,   setCumItems]   = useState<CumItem[]>([])
   const [cumOpen,    setCumOpen]    = useState(false)
@@ -40,15 +29,10 @@ export default function BillingPage() {
   const [cumEditPay, setCumEditPay] = useState('')
   const [cumSaving,  setCumSaving]  = useState(false)
 
-  useEffect(() => {
-    fetch('/api/obhs').then(r => r.json()).then(d => {
-      setObhsMonths((d.records ?? []).map((r: { month_year: string }) => r.month_year))
-    })
-    loadCumulative()
-  }, [])
+  useEffect(() => { loadCumulative() }, [])
 
   async function loadCumulative() {
-    const d = await fetch('/api/billing/cumulative').then(r => r.json())
+    const d = await fetch('/api/nirmal/billing/cumulative').then(r => r.json())
     setCumItems(d.items ?? [])
   }
 
@@ -56,7 +40,7 @@ export default function BillingPage() {
     setCumSaving(true)
     const qty = parseFloat(cumEditQty) || 0
     const pay = parseFloat(cumEditPay) || 0
-    await fetch('/api/billing/cumulative', {
+    await fetch('/api/nirmal/billing/cumulative', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ items: [{ item_no, upto_qty: qty, upto_payment: pay }] }),
@@ -68,14 +52,14 @@ export default function BillingPage() {
 
   async function loadPreview() {
     setLoading(true); setPreview(null)
-    const data = await fetch(`/api/billing/preview?month_year=${monthYear}`).then(r => r.json())
+    const data = await fetch(`/api/nirmal/billing/preview?month_year=${monthYear}`).then(r => r.json())
     setPreview(data)
     setLoading(false)
   }
 
   async function generate() {
     setGenerating(true)
-    const res = await fetch('/api/billing/generate', {
+    const res = await fetch('/api/nirmal/billing/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ month_year: monthYear }),
@@ -85,7 +69,7 @@ export default function BillingPage() {
       const url  = URL.createObjectURL(blob)
       const a    = document.createElement('a')
       a.href     = url
-      a.download = `Monthly_Petty_${monthYear}.xlsx`
+      a.download = `Nirmal_Bill_${monthYear}.xlsx`
       a.click()
       URL.revokeObjectURL(url)
       await loadCumulative()
@@ -93,15 +77,15 @@ export default function BillingPage() {
     setGenerating(false)
   }
 
-  const hasOBHS   = obhsMonths.includes(monthYear)
   const monthName = new Date(monthYear + '-01').toLocaleString('default', { month: 'long', year: 'numeric' })
+  const previewVals = preview ? [preview.ac_coaches, preview.nac_coaches] : []
 
   return (
     <div style={{ maxWidth: 720 }}>
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Billing Certificate</h1>
         <p style={{ fontSize: 13, color: 'var(--text-3)', marginTop: 4 }}>
-          M/s MAISUR PROJECTS PRIVATE LIMITED — Auto-generate billing certificate
+          M/s Nirmal Facility Management Service — AC &amp; NAC coach cleaning
         </p>
       </div>
 
@@ -163,12 +147,8 @@ export default function BillingPage() {
                       </>
                     ) : (
                       <>
-                        <td style={{ padding: '8px 12px', fontSize: 12, fontFamily: 'monospace', color: 'var(--text)', textAlign: 'right', verticalAlign: 'middle' }}>
-                          {fmt(item.upto_qty, 2)}
-                        </td>
-                        <td style={{ padding: '8px 12px', fontSize: 12, fontFamily: 'monospace', color: 'var(--text)', textAlign: 'right', verticalAlign: 'middle' }}>
-                          {fmt(item.upto_payment, 2)}
-                        </td>
+                        <td style={{ padding: '8px 12px', fontSize: 12, fontFamily: 'monospace', color: 'var(--text)', textAlign: 'right', verticalAlign: 'middle' }}>{fmt(item.upto_qty, 2)}</td>
+                        <td style={{ padding: '8px 12px', fontSize: 12, fontFamily: 'monospace', color: 'var(--text)', textAlign: 'right', verticalAlign: 'middle' }}>{fmt(item.upto_payment, 2)}</td>
                         <td style={{ padding: '8px 12px', verticalAlign: 'middle' }}>
                           <button
                             onClick={() => { setCumEditing(item.item_no); setCumEditQty(String(item.upto_qty)); setCumEditPay(String(item.upto_payment)) }}
@@ -202,13 +182,6 @@ export default function BillingPage() {
             {loading ? <><Loader2 size={14} /> Loading…</> : 'Preview Data'}
           </button>
         </div>
-
-        <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
-          {hasOBHS
-            ? <><CheckCircle size={14} style={{ color: 'var(--success)' }} /><span style={{ color: 'var(--success)', fontWeight: 600 }}>OBHS data uploaded for {monthName}</span></>
-            : <><AlertCircle size={14} style={{ color: 'var(--warning)' }} /><span style={{ color: 'var(--warning)', fontWeight: 600 }}>OBHS data not uploaded for {monthName} — J22:J26 will be 0</span></>
-          }
-        </div>
       </div>
 
       {/* Preview */}
@@ -216,24 +189,19 @@ export default function BillingPage() {
         <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: 20 }}>
           <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)' }}>
             <h2 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Preview — {monthName}</h2>
-            <p style={{ fontSize: 12, color: 'var(--text-4)', margin: '4px 0 0' }}>Current month quantities (since last certificate)</p>
+            <p style={{ fontSize: 12, color: 'var(--text-4)', margin: '4px 0 0' }}>All trains — AC + NAC coaches</p>
           </div>
           <div>
-            {ITEM_LABELS.map((label, i) => {
-              const key = `J${18 + i}` as keyof typeof preview
-              const val = preview[key] ?? 0
-              const src = i < 4 ? 'MCC Trips' : 'OBHS Upload'
-              return (
-                <div key={key} style={{ display: 'flex', alignItems: 'center', padding: '11px 20px', borderBottom: '1px solid var(--border)', gap: 12 }}>
-                  <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'var(--primary)', flexShrink: 0 }}>
-                    {i + 1}
-                  </div>
-                  <div style={{ flex: 1, fontSize: 13, color: 'var(--text)' }}>{label}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-4)', background: 'var(--surface-2)', padding: '2px 8px', borderRadius: 5 }}>{src}</div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', minWidth: 80, textAlign: 'right' }}>{fmt(val, 2)}</div>
+            {ITEM_LABELS.map((label, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', padding: '11px 20px', borderBottom: '1px solid var(--border)', gap: 12 }}>
+                <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'var(--primary)', flexShrink: 0 }}>
+                  {i + 1}
                 </div>
-              )
-            })}
+                <div style={{ flex: 1, fontSize: 13, color: 'var(--text)' }}>{label}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-4)', background: 'var(--surface-2)', padding: '2px 8px', borderRadius: 5 }}>MCC Trips</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', minWidth: 80, textAlign: 'right' }}>{fmt(previewVals[i] ?? 0, 2)}</div>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -246,7 +214,7 @@ export default function BillingPage() {
         }
       </button>
       <p style={{ fontSize: 12, color: 'var(--text-4)', marginTop: 10 }}>
-        Downloads APR26 format Excel — all columns auto-filled. Cumulative updates automatically after each bill.
+        Downloads Nirmal billing certificate (Form-1337) — AC + NAC only. Cumulative updates automatically.
       </p>
     </div>
   )

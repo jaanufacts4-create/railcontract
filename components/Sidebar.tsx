@@ -7,7 +7,7 @@ import {
   ClipboardList, PlusCircle, Train, CalendarDays,
   Settings, ChevronLeft, ChevronRight, Building2, Layers,
   Sparkles, BarChart3, ChevronDown, ChevronUp,
-  Clock4, TrendingUp, FileSpreadsheet, LayoutDashboard, Receipt,
+  Clock4, TrendingUp, FileSpreadsheet, LayoutDashboard, Receipt, Leaf,
 } from 'lucide-react'
 
 const GROUPS = [
@@ -22,6 +22,14 @@ const GROUPS = [
       { href: '/settings',     label: 'Settings',                 icon: Settings        },
       { href: '/reports',      label: 'Reports',                  icon: BarChart3       },
       { href: '/billing',      label: 'Billing Certificate',      icon: Receipt         },
+    ],
+  },
+  {
+    id:    'nirmal',
+    label: 'Nirmal Bill',
+    sub:   'M/s Nirmal Facility Management',
+    links: [
+      { href: '/nirmal/billing', label: 'Billing Certificate', icon: Receipt },
     ],
   },
   {
@@ -46,6 +54,7 @@ const GROUPS = [
 
 const GROUP_ICONS: Record<string, React.ElementType> = {
   primary:   Sparkles,
+  nirmal:    Leaf,
   secondary: Building2,
   rpc:       Layers,
 }
