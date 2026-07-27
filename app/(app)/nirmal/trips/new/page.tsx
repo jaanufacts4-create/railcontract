@@ -478,7 +478,7 @@ export default function NirmalNewTripPage() {
 
     </div>
     <div className="shrink-0 sticky top-4 w-56">
-      <TodayPanel date={subTab === 'entry' ? date : wlDate} currentTrain={subTab === 'entry' ? trainNo.trim() || undefined : undefined} />
+      <TodayPanel date={subTab === 'entry' ? date : wlDate} currentTrain={subTab === 'entry' ? trainNo.trim() || undefined : undefined} scheduleApi="/api/nirmal/schedule" />
     </div>
     </div>
     </div>
