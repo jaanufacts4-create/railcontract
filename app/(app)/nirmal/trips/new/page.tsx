@@ -46,6 +46,7 @@ function NirmalNewTripPage() {
   const [intPrevType,  setIntPrevType]  = useState<Record<number, string>>({})
 
   const [deployed,  setDeployed]  = useState(0)
+  const [panelKey,  setPanelKey]  = useState(0)
   const [penalties, setPenalties] = useState<Penalties>({})
   const [loading,   setLoading]   = useState(false)
   const [msg,       setMsg]       = useState('')
