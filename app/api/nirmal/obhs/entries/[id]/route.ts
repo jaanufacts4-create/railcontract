@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ensureDB, db } from '@/lib/db'
 
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+type Ctx = { params: Promise<{ id: string }> }
+
+export async function PUT(req: NextRequest, ctx: Ctx) {
   await ensureDB()
+  const { id } = await ctx.params
   const body = await req.json()
   const { ehk_present=1, ac_short=0, nac_short=0, psi_pct=0,
           w_penalty=0, x_penalty=0, aa_penalty=0, ab_penalty=0, ac_penalty=0,
@@ -12,13 +15,14 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
           w_penalty=?,x_penalty=?,aa_penalty=?,ab_penalty=?,ac_penalty=?,ad_penalty=?,ae_penalty=?,af_penalty=?
           WHERE id=?`,
     args: [ehk_present,ac_short,nac_short,psi_pct,w_penalty,x_penalty,
-           aa_penalty,ab_penalty,ac_penalty,ad_penalty,ae_penalty,af_penalty,params.id],
+           aa_penalty,ab_penalty,ac_penalty,ad_penalty,ae_penalty,af_penalty,id],
   })
   return NextResponse.json({ ok: true })
 }
 
-export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_: NextRequest, ctx: Ctx) {
   await ensureDB()
-  await db.execute({ sql: 'DELETE FROM nirmal_obhs_entries WHERE id=?', args: [params.id] })
+  const { id } = await ctx.params
+  await db.execute({ sql: 'DELETE FROM nirmal_obhs_entries WHERE id=?', args: [id] })
   return NextResponse.json({ ok: true })
 }
