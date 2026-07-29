@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useMemo } from 'react'
-import { Plus, Train, Trash2, Save, ChevronDown, ChevronUp, Pencil, X } from 'lucide-react'
+import { Plus, Train, Trash2, Save, ChevronDown, ChevronUp, Pencil, X, Download } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 type OBHSTrain = {
@@ -190,8 +190,24 @@ export default function OBHSSchedulePage() {
   const [penaltiesOpen, setPenaltiesOpen] = useState(false)
   const [entrySaving,   setEntrySaving]   = useState(false)
   const [msg,           setMsg]           = useState('')
+  const [downloading,   setDownloading]   = useState(false)
 
   const train = trains.find(t => t.train_no === selected) ?? null
+
+  async function downloadReport() {
+    setDownloading(true)
+    try {
+      const res = await fetch('/api/obhs/report?month_year=' + monthYear)
+      if (!res.ok) { alert('Error generating report'); return }
+      const blob = await res.blob()
+      const url  = URL.createObjectURL(blob)
+      const a    = document.createElement('a')
+      a.href     = url
+      a.download = 'OBHS_Report_' + monthYear + '.xlsx'
+      a.click()
+      URL.revokeObjectURL(url)
+    } finally { setDownloading(false) }
+  }
 
   async function loadTrains() {
     const r = await fetch('/api/obhs/trains')
@@ -348,8 +364,15 @@ export default function OBHSSchedulePage() {
             <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', margin: 0 }}>OBHS Schedule Entry</h1>
             <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '3px 0 0' }}>Per-trip data entry for OBHS billing</p>
           </div>
-          <input type="month" className="input" style={{ width: 155 }}
-            value={monthYear} onChange={e => setMonthYear(e.target.value)} />
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input type="month" className="input" style={{ width: 155 }}
+              value={monthYear} onChange={e => setMonthYear(e.target.value)} />
+            <button className="btn btn-secondary" disabled={downloading} onClick={downloadReport}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
+              <Download size={14} />
+              {downloading ? 'Generating...' : 'Download Report'}
+            </button>
+          </div>
         </div>
 
         {/* Add/Edit Train Form */}
