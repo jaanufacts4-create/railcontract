@@ -94,7 +94,7 @@ export default function TripsPage() {
           <a href={`/api/export/trips?month_year=${monthYear}`} target="_blank" className="btn btn-secondary">
             <Download size={14} /> Export
           </a>
-          <Link href="/trips/new" className="btn btn-primary">
+          <Link href={`/trips/new?month=${monthYear}`} className="btn btn-primary">
             <Plus size={14} /> New Trip
           </Link>
         </div>
@@ -155,7 +155,7 @@ export default function TripsPage() {
             {trips.length === 0 ? `No trips for ${monthYear}.` : 'Try adjusting your filters.'}
           </p>
           {trips.length === 0 && (
-            <Link href="/trips/new" className="btn btn-primary" style={{ marginTop: 4 }}>
+            <Link href={`/trips/new?month=${monthYear}`} className="btn btn-primary" style={{ marginTop: 4 }}>
               <Plus size={14} /> Add First Trip
             </Link>
           )}

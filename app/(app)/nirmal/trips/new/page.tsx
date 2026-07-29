@@ -1,6 +1,6 @@
 'use client'
 import { useState, useMemo, useEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { coachCategory, PENALTY_LABELS } from '@/lib/types'
 import TodayPanel      from '@/components/TodayPanel'
 import WLCompareModule from '@/components/WLCompareModule'
@@ -24,7 +24,15 @@ export default function NirmalNewTripPage() {
   const router = useRouter()
   const [subTab, setSubTab] = useState<'entry' | 'wl'>('entry')
 
-  const [date,        setDate]        = useState(() => new Date().toISOString().slice(0, 10))
+  const searchParams = useSearchParams()
+  const [date,        setDate]        = useState(() => {
+    const m = searchParams.get('month')
+    if (m) {
+      const curMonth = new Date().toISOString().slice(0, 7)
+      return m === curMonth ? new Date().toISOString().slice(0, 10) : `${m}-01`
+    }
+    return new Date().toISOString().slice(0, 10)
+  })
   const [wlDate,      setWlDate]      = useState(() => new Date().toISOString().slice(0, 10))
   const [trainNo,     setTrainNo]     = useState('')
   const [wlNo,        setWlNo]        = useState('')

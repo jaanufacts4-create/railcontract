@@ -69,7 +69,7 @@ export default function SecTripsPage() {
         </div>
         <input type="month" className="input" style={{ width: 155 }} value={monthYear} onChange={e => setMonthYear(e.target.value)} />
         <input placeholder="Filter…" className="input" style={{ width: 160 }} value={filter} onChange={e => setFilter(e.target.value)} />
-        <Link href="/sec/trips/new" className="btn btn-primary"><Plus size={14} /> New Trip</Link>
+        <Link href={`/sec/trips/new?month=${monthYear}`} className="btn btn-primary"><Plus size={14} /> New Trip</Link>
       </div>
 
       {/* Stat chips */}
@@ -92,7 +92,7 @@ export default function SecTripsPage() {
       {!loading && filtered.length === 0 && (
         <div className="card" style={{ padding: 48, textAlign: 'center' }}>
           <p style={{ fontSize: 14, color: 'var(--text-3)', fontWeight: 500 }}>No trips for {monthYear}</p>
-          <Link href="/sec/trips/new" className="btn btn-primary" style={{ marginTop: 12, display: 'inline-flex' }}>
+          <Link href={`/sec/trips/new?month=${monthYear}`} className="btn btn-primary" style={{ marginTop: 12, display: 'inline-flex' }}>
             <Plus size={14} /> Add First Trip
           </Link>
         </div>

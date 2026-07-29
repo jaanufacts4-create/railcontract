@@ -81,7 +81,7 @@ export default function NirmalTripsPage() {
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           <input type="month" className="input" style={{ width: 160 }} value={monthYear} onChange={e => setMonthYear(e.target.value)} />
-          <Link href="/nirmal/trips/new" className="btn btn-primary">
+          <Link href={`/nirmal/trips/new?month=${monthYear}`} className="btn btn-primary">
             <Plus size={14} /> New Trip
           </Link>
         </div>
@@ -125,7 +125,7 @@ export default function NirmalTripsPage() {
             {trips.length === 0 ? 'No trips yet' : 'No results match your search'}
           </p>
           {trips.length === 0 && (
-            <Link href="/nirmal/trips/new" className="btn btn-primary" style={{ marginTop: 4 }}>
+            <Link href={`/nirmal/trips/new?month=${monthYear}`} className="btn btn-primary" style={{ marginTop: 4 }}>
               <Plus size={14} /> Add First Trip
             </Link>
           )}

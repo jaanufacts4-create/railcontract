@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Save, ChevronLeft, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
 
@@ -26,6 +26,7 @@ function today() { return new Date().toISOString().slice(0, 10) }
 
 export default function NewSecTripPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [trains,               setTrains]               = useState<SecTrain[]>([])
   const [ratePerCoach,         setRatePerCoach]         = useState(322.49)
   const [ratePerCoachExterior, setRatePerCoachExterior] = useState(144.28)
@@ -33,7 +34,14 @@ export default function NewSecTripPage() {
   const [dayWarn,              setDayWarn]              = useState<string | null>(null)
 
   // Trip details
-  const [date,        setDate]        = useState(today)
+  const [date,        setDate]        = useState(() => {
+    const m = searchParams.get('month')
+    if (m) {
+      const curMonth = new Date().toISOString().slice(0, 7)
+      return m === curMonth ? today() : `${m}-01`
+    }
+    return today()
+  })
   const [trainNo,     setTrainNo]     = useState('')
   const [acCount,     setAcCount]     = useState(0)
   const [coachCount,  setCoachCount]  = useState(0)
