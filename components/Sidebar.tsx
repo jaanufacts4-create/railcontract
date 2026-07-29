@@ -18,7 +18,8 @@ const GROUPS = [
     links: [
       { href: '/trips',        label: 'Trips - MCC',              icon: ClipboardList   },
       { href: '/schedule',     label: 'Schedule of Trains (MCC)', icon: CalendarDays    },
-      { href: '/obhs',         label: 'OBHS Hours',               icon: Clock4          },
+      { href: '/obhs',          label: 'OBHS Hours',               icon: Clock4          },
+      { href: '/obhs/schedule', label: 'OBHS Schedule Entry',     icon: FileSpreadsheet },
       { href: '/settings',     label: 'Settings',                 icon: Settings        },
       { href: '/reports',      label: 'Reports',                  icon: BarChart3       },
       { href: '/billing',      label: 'Billing Certificate',      icon: Receipt         },

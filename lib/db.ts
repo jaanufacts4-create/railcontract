@@ -16,6 +16,7 @@ let _billingMigrated    = false
 let _secBillingMigrated = false
 let _nirmalMigrated     = false
 let _nirmalV2Migrated   = false
+let _obhsScheduleMigrated = false
 export async function ensureDB() {
   if (!_migrated) {
     await migrate()
@@ -50,6 +51,10 @@ export async function ensureDB() {
     _nirmalV2Migrated = true
   }
   await migrateMonthlyBills()
+  if (!_obhsScheduleMigrated) {
+    await migrateOBHSSchedule()
+    _obhsScheduleMigrated = true
+  }
 }
 
 /** Idempotent — creates train_schedule table + seeds data if empty. Runs once per process. */
@@ -610,6 +615,72 @@ async function migrateBillingCumulative() {
     await db.execute({
       sql:  'INSERT OR IGNORE INTO billing_cumulative (item_no, upto_qty, upto_payment) VALUES (?,0,0)',
       args: [i],
+    })
+  }
+}
+
+/** ─── OBHS Schedule — per-trip entry ───────────────────────────────────── */
+async function migrateOBHSSchedule() {
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS obhs_trains (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      train_no    TEXT    NOT NULL UNIQUE,
+      days        TEXT    NOT NULL DEFAULT '[]',
+      ehk_ws      INTEGER NOT NULL DEFAULT 1,
+      ac_ws       INTEGER NOT NULL DEFAULT 0,
+      nac_ws      INTEGER NOT NULL DEFAULT 0,
+      journey_hrs REAL    NOT NULL DEFAULT 0,
+      ehk_rate    REAL    NOT NULL DEFAULT 76.92,
+      ac_rate     REAL    NOT NULL DEFAULT 70.88,
+      nac_rate    REAL    NOT NULL DEFAULT 68.92,
+      min_wages   REAL    NOT NULL DEFAULT 781
+    )
+  `)
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS obhs_entries (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      train_no    TEXT    NOT NULL,
+      date        TEXT    NOT NULL,
+      month_year  TEXT    NOT NULL,
+      ehk_present INTEGER NOT NULL DEFAULT 1,
+      ac_short    INTEGER NOT NULL DEFAULT 0,
+      nac_short   INTEGER NOT NULL DEFAULT 0,
+      psi_pct     REAL    NOT NULL DEFAULT 0,
+      w_penalty   REAL    NOT NULL DEFAULT 0,
+      x_penalty   REAL    NOT NULL DEFAULT 0,
+      aa_penalty  REAL    NOT NULL DEFAULT 0,
+      ab_penalty  REAL    NOT NULL DEFAULT 0,
+      ac_penalty  REAL    NOT NULL DEFAULT 0,
+      ad_penalty  REAL    NOT NULL DEFAULT 0,
+      ae_penalty  REAL    NOT NULL DEFAULT 0,
+      af_penalty  REAL    NOT NULL DEFAULT 0,
+      created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(train_no, date)
+    )
+  `)
+
+  const { rows } = await db.execute('SELECT COUNT(*) as cnt FROM obhs_trains')
+  if (Number(rows[0].cnt) > 0) return
+
+  const TRAINS = [
+    ['12204/03', '["Wednesday","Saturday","Sunday"]',                              1, 10, 0, 63.92,  76.92, 70.88,  0    ],
+    ['22488/87', '["Monday","Tuesday","Wednesday","Thursday","Sunday"]',           1,  8, 0, 12.00,  76.92, 70.88,  0    ],
+    ['04652',    '["Wednesday","Friday","Sunday"]',                               1,  3, 2, 68.58,  76.92, 70.88, 68.92 ],
+    ['14616',    '["Saturday"]',                                                   1,  1, 3, 31.50,  76.92, 70.88, 68.92 ],
+    ['12484',    '["Sunday"]',                                                     1,  3, 2, 114.58, 76.92, 70.88, 68.92 ],
+    ['12422',    '["Monday"]',                                                     1,  1, 3, 63.67,  76.92, 70.88, 68.92 ],
+    ['04654',    '["Wednesday"]',                                                  1,  3, 2, 67.67,  76.92, 70.88, 68.92 ],
+    ['12054',    '["Monday","Tuesday","Wednesday","Friday","Saturday","Sunday"]',  1,  1, 4, 16.00,  76.92, 70.88, 68.92 ],
+    ['14680',    '["Daily"]',                                                      1,  1, 2, 65.67,  76.92, 70.88, 68.92 ],
+    ['14674/50', '["Daily"]',                                                      1,  3, 2, 70.92,  76.92, 70.88, 68.92 ],
+    ['14628',    '["Saturday"]',                                                   1,  0, 6, 75.00,  76.92,  0,    68.92 ],
+  ]
+
+  for (const [train_no, days, ehk_ws, ac_ws, nac_ws, journey_hrs, ehk_rate, ac_rate, nac_rate] of TRAINS) {
+    await db.execute({
+      sql:  'INSERT OR IGNORE INTO obhs_trains (train_no, days, ehk_ws, ac_ws, nac_ws, journey_hrs, ehk_rate, ac_rate, nac_rate) VALUES (?,?,?,?,?,?,?,?,?)',
+      args: [train_no, days, ehk_ws, ac_ws, nac_ws, journey_hrs, ehk_rate, ac_rate, nac_rate],
     })
   }
 }
