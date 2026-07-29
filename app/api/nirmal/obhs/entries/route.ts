@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
       args: [train_no,date,month_year,ehk_present,ac_short,nac_short,psi_pct,
              w_penalty,x_penalty,aa_penalty,ab_penalty,ac_penalty,ad_penalty,ae_penalty,af_penalty],
     })
-    const { rows } = await db.execute({ sql: 'SELECT * FROM nirmal_obhs_entries WHERE id=?', args: [lastInsertRowid] })
+    const { rows } = await db.execute({ sql: 'SELECT * FROM nirmal_obhs_entries WHERE id=?', args: [Number(lastInsertRowid)] })
     return NextResponse.json(rows[0], { status: 201 })
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e)
