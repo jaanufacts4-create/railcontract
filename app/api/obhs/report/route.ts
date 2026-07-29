@@ -48,7 +48,7 @@ function compute(e: Record<string, number>, t: Record<string, number>) {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const HEADER_FILL = (argb: string): ExcelJS.Fill =>
   ({ type: 'pattern', pattern: 'solid', fgColor: { argb } })
-const THIN: ExcelJS.Borders = {
+const THIN = {
   top: { style: 'thin' }, left: { style: 'thin' },
   bottom: { style: 'thin' }, right: { style: 'thin' },
 }
