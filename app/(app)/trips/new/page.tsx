@@ -1,5 +1,5 @@
 'use client'
-import { useState, useMemo, useEffect, useRef } from 'react'
+import { useState, useMemo, useEffect, useRef , Suspense} from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { coachCategory, PENALTY_LABELS } from '@/lib/types'
 import TodayPanel      from '@/components/TodayPanel'
@@ -24,7 +24,7 @@ function calcTotal(c: CriteriaRow) { return c[0] * 2 + c[1] + c[2] + c[3] + c[4]
 
 type Position = { position: number; coach_type: string }
 
-export default function NewTripPage() {
+function NewTripPage() {
   const router = useRouter()
   const [subTab, setSubTab] = useState<'entry' | 'wl'>('entry')
 
@@ -780,5 +780,13 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <label className="block text-xs text-gray-500 mb-1">{label}</label>
       {children}
     </div>
+  )
+}
+
+export default function Page() {
+  return (
+    <Suspense>
+      <NewTripPage />
+    </Suspense>
   )
 }

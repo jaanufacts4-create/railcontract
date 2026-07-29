@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState , Suspense} from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Save, ChevronLeft, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
@@ -24,7 +24,7 @@ const CRITERIA_COUNT = 4
 
 function today() { return new Date().toISOString().slice(0, 10) }
 
-export default function NewSecTripPage() {
+function NewSecTripPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [trains,               setTrains]               = useState<SecTrain[]>([])
@@ -542,5 +542,13 @@ export default function NewSecTripPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function Page() {
+  return (
+    <Suspense>
+      <NewSecTripPage />
+    </Suspense>
   )
 }
