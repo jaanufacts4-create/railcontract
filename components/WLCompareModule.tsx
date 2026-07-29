@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import Link from 'next/link'
 import { GitCompare, Loader2 } from 'lucide-react'
 
 type SheetWarning = { type: string; message: string; row?: string }
@@ -40,6 +41,24 @@ export default function WLCompareModule({ initialDate, onDateChange }: { initial
       display: 'inline-block', padding: '3px 10px', borderRadius: 99,
       fontSize: 12, fontWeight: 700, color, background: bg, marginRight: 4, marginBottom: 4,
     }}>{text}</span>
+  )
+
+  const linkPill = (text: string, color: string, bg: string, border: string) => (
+    <Link key={text} href={`/train-master?train=${encodeURIComponent(text)}`} title="Click to add in Train Master"
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 4,
+        padding: '3px 10px', borderRadius: 99,
+        fontSize: 12, fontWeight: 700, color, background: bg,
+        marginRight: 4, marginBottom: 4,
+        textDecoration: 'none', cursor: 'pointer',
+        border: `1.5px solid ${border}`,
+        transition: 'opacity .15s',
+      }}
+      onMouseEnter={e => (e.currentTarget as HTMLElement).style.opacity = '0.75'}
+      onMouseLeave={e => (e.currentTarget as HTMLElement).style.opacity = '1'}
+    >
+      🔗 {text}
+    </Link>
   )
 
   return (
@@ -121,7 +140,7 @@ export default function WLCompareModule({ initialDate, onDateChange }: { initial
                   ⚠ In WL but NOT in Schedule ({result.inWLOnly.length})
                 </p>
                 <div style={{ display: 'flex', flexWrap: 'wrap' }}>
-                  {result.inWLOnly.map(t => pill(t, '#92400E', 'rgba(245,158,11,.15)'))}
+                  {result.inWLOnly.map(t => linkPill(t, '#92400E', 'rgba(245,158,11,.15)', '#F59E0B'))}
                 </div>
               </div>
             )}
@@ -133,7 +152,7 @@ export default function WLCompareModule({ initialDate, onDateChange }: { initial
                   📋 Special Entries ({result.specialTrains.length})
                 </p>
                 <div style={{ display: 'flex', flexWrap: 'wrap' }}>
-                  {result.specialTrains.map(t => pill(t, '#5B21B6', 'rgba(139,92,246,.15)'))}
+                  {result.specialTrains.map(t => linkPill(t, '#5B21B6', 'rgba(139,92,246,.15)', '#8B5CF6'))}
                 </div>
               </div>
             )}

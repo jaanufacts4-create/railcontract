@@ -1,5 +1,6 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Plus, Minus, Save, Trash2, Train } from 'lucide-react'
 
 const MAX_POS = 24
@@ -26,7 +27,7 @@ const TYPE_META: Record<string, { label: string; color: string; bg: string }> = 
 
 type Pos = { position: number; coach_type: string }
 
-export default function TrainMasterPage() {
+function TrainMasterPage() {
   const [trains,    setTrains]    = useState<string[]>([])
   const [selected,  setSelected]  = useState<string>('')
   const [positions, setPositions] = useState<Pos[]>([])
@@ -35,6 +36,17 @@ export default function TrainMasterPage() {
   const [msg,       setMsg]       = useState('')
 
   useEffect(() => { loadTrains() }, [])
+
+  // Auto-add train from URL param (coming from WL Compare link)
+  const searchParams = useSearchParams()
+  useEffect(() => {
+    const t = searchParams.get('train')
+    if (!t) return
+    setSelected(t)
+    setPositions(Array.from({ length: 10 }, (_, i) => ({ position: i + 1, coach_type: 'NAC' })))
+    setMsg('Train pre-filled from WL Compare — set AC/NAC and save.')
+    setTimeout(() => setMsg(''), 4000)
+  }, [searchParams])
 
   async function loadTrains() {
     const data = await fetch('/api/train-master').then(r => r.json())
@@ -240,5 +252,13 @@ export default function TrainMasterPage() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function Page() {
+  return (
+    <Suspense>
+      <TrainMasterPage />
+    </Suspense>
   )
 }
