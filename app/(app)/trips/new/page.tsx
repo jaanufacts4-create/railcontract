@@ -57,6 +57,7 @@ function NewTripPage() {
   const [intPrevType,  setIntPrevType]  = useState<Record<number, string>>({})
 
   const [deployed,     setDeployed]     = useState(0)
+  const [panelKey,     setPanelKey]     = useState(0)
   const [penalties,    setPenalties]    = useState<Penalties>({})
   const [loading,      setLoading]      = useState(false)
   const [msg,          setMsg]          = useState('')
@@ -299,6 +300,7 @@ function NewTripPage() {
       setIntCriteria({}); setIntExtScores({}); setCompOverride({}); setIntPrevType({})
       setDeployed(0); setPenalties({}); setSchedWarn(null)
       setMsg('✅ Trip saved! Enter next trip or go to Trips list.')
+      setPanelKey(k => k + 1)
     } else {
       const body = await res.json().catch(() => ({}))
       const msg  = body.error ?? `Error ${res.status}`
@@ -767,7 +769,7 @@ function NewTripPage() {
 
     {/* ── Today's schedule panel — always visible ── */}
     <div className="shrink-0 sticky top-4 w-56">
-      <TodayPanel date={subTab === 'entry' ? date : wlDate} currentTrain={subTab === 'entry' ? trainNo.trim() || undefined : undefined} />
+      <TodayPanel date={subTab === 'entry' ? date : wlDate} currentTrain={subTab === 'entry' ? trainNo.trim() || undefined : undefined} refreshKey={panelKey} />
     </div>
     </div>
     </div>

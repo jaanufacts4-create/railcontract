@@ -10,7 +10,7 @@ type TrainStatus = {
 
 const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
 
-export default function TodayPanel({ date, currentTrain, scheduleApi = '/api/schedule' }: { date: string; currentTrain?: string; scheduleApi?: string }) {
+export default function TodayPanel({ date, currentTrain, scheduleApi = '/api/schedule', refreshKey = 0 }: { date: string; currentTrain?: string; scheduleApi?: string; refreshKey?: number }) {
   const [trains, setTrains] = useState<TrainStatus[]>([])
   const [loading, setLoading] = useState(false)
 
@@ -21,7 +21,7 @@ export default function TodayPanel({ date, currentTrain, scheduleApi = '/api/sch
       .then(r => r.json())
       .then(data => { setTrains(data); setLoading(false) })
       .catch(() => setLoading(false))
-  }, [date])
+  }, [date, refreshKey])
 
   if (!date) return null
 

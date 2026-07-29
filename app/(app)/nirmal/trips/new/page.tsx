@@ -195,6 +195,7 @@ function NirmalNewTripPage() {
       setPositions([]); setCriteria({}); setIntCriteria({}); setIntExtScores({})
       setCompOverride({}); setIntPrevType({}); setDeployed(0); setPenalties({}); setSchedWarn(null)
       setMsg('✅ Trip saved! Enter next trip or go to Trips list.')
+      setPanelKey(k => k + 1)
     } else {
       const body = await res.json().catch(() => ({}))
       const m = body.error ?? `Error ${res.status}`
@@ -486,7 +487,7 @@ function NirmalNewTripPage() {
 
     </div>
     <div className="shrink-0 sticky top-4 w-56">
-      <TodayPanel date={subTab === 'entry' ? date : wlDate} currentTrain={subTab === 'entry' ? trainNo.trim() || undefined : undefined} scheduleApi="/api/nirmal/schedule" />
+      <TodayPanel date={subTab === 'entry' ? date : wlDate} currentTrain={subTab === 'entry' ? trainNo.trim() || undefined : undefined} scheduleApi="/api/nirmal/schedule" refreshKey={panelKey} />
     </div>
     </div>
     </div>
