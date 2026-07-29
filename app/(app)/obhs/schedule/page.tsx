@@ -82,6 +82,32 @@ function fmtHrs(n: number) {
   return n.toFixed(2)
 }
 
+
+// ── Days helpers ─────────────────────────────────────────────────────────────
+const DAY_IDX: Record<string, number> = {
+  Sunday:0, Monday:1, Tuesday:2, Wednesday:3, Thursday:4, Friday:5, Saturday:6
+}
+const DAY_SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+
+function getRunDates(monthYear: string, daysJson: string): string[] {
+  const days: string[] = JSON.parse(daysJson)
+  const [y, m] = monthYear.split('-').map(Number)
+  const total = new Date(y, m, 0).getDate()
+  const all = Array.from({ length: total }, (_, i) =>
+    `${monthYear}-${String(i + 1).padStart(2, '0')}`)
+  if (days.includes('Daily')) return all
+  const allowed = new Set(days.map(d => DAY_IDX[d]))
+  return all.filter(d => { const dt = new Date(d + 'T00:00:00'); return allowed.has(dt.getDay()) })
+}
+
+function formatDays(daysJson: string): string {
+  try {
+    const days: string[] = JSON.parse(daysJson)
+    if (days.includes('Daily')) return 'Daily'
+    return days.map(d => DAY_SHORT[DAY_IDX[d]] ?? d).join(', ')
+  } catch { return daysJson }
+}
+
 const BLANK_FORM = {
   date: '', ehk_present: 1, ac_short: 0, nac_short: 0, psi_pct: 0,
   w_penalty: 0, x_penalty: 0,
@@ -356,6 +382,9 @@ export default function OBHSSchedulePage() {
                 <span style={{ fontSize: 12, color: 'var(--text-3)' }}>EHK: <strong>{train.ehk_ws}</strong></span>
                 <span style={{ fontSize: 12, color: '#3B82F6' }}>AC: <strong>{train.ac_ws}</strong></span>
                 <span style={{ fontSize: 12, color: '#22C55E' }}>NAC: <strong>{train.nac_ws}</strong></span>
+                <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                  Runs on: <strong style={{ color: 'var(--primary)' }}>{formatDays(train.days)}</strong>
+                </span>
                 <span style={{ fontSize: 12, color: 'var(--text-4)' }}>Rates (ex-GST): EHK ₹{train.ehk_rate} · AC ₹{train.ac_rate} · NAC ₹{train.nac_rate}</span>
               </div>
             </div>
@@ -403,8 +432,21 @@ export default function OBHSSchedulePage() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12, marginBottom: 16 }}>
                   <div>
                     <label style={{ fontSize: 11, color: 'var(--text-3)', display: 'block', marginBottom: 3 }}>Date</label>
-                    <input type="date" className="input" style={{ width: '100%' }}
-                      value={form.date} onChange={e => setForm(p => ({ ...p, date: e.target.value }))} />
+                    {(() => {
+                      const runDates = getRunDates(monthYear, train.days)
+                      return (
+                        <select className="input" style={{ width: '100%' }}
+                          value={form.date} onChange={e => setForm(p => ({ ...p, date: e.target.value }))}>
+                          <option value="">— Select date —</option>
+                          {runDates.map(d => {
+                            const dt = new Date(d + 'T00:00:00')
+                            const dayName = DAY_SHORT[dt.getDay()]
+                            const dd = d.slice(8)
+                            return <option key={d} value={d}>{dd} ({dayName})</option>
+                          })}
+                        </select>
+                      )
+                    })()}
                   </div>
                   <div>
                     <label style={{ fontSize: 11, color: 'var(--text-3)', display: 'block', marginBottom: 3 }}>EHK Present?</label>
