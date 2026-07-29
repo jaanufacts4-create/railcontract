@@ -1,5 +1,5 @@
 import OBHSScheduleModule from '@/components/OBHSScheduleModule'
 
 export default function Page() {
-  return <OBHSScheduleModule apiBase="/api/obhs" reportApi="/api/obhs/report" />
+  return <OBHSScheduleModule apiBase="/api/nirmal/obhs" reportApi="/api/nirmal/obhs/report" />
 }

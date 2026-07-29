@@ -7,7 +7,7 @@ import {
   ClipboardList, PlusCircle, Train, CalendarDays,
   Settings, ChevronLeft, ChevronRight, Building2, Layers,
   Sparkles, BarChart3, ChevronDown, ChevronUp,
-  Clock4, TrendingUp, FileSpreadsheet, LayoutDashboard, Receipt, Leaf,
+  TrendingUp, FileSpreadsheet, LayoutDashboard, Receipt, Leaf,
 } from 'lucide-react'
 
 const GROUPS = [
@@ -18,7 +18,6 @@ const GROUPS = [
     links: [
       { href: '/trips',        label: 'Trips - MCC',              icon: ClipboardList   },
       { href: '/schedule',     label: 'Schedule of Trains (MCC)', icon: CalendarDays    },
-      { href: '/obhs',          label: 'OBHS Hours',               icon: Clock4          },
       { href: '/obhs/schedule', label: 'OBHS Schedule Entry',     icon: FileSpreadsheet },
       { href: '/settings',     label: 'Settings',                 icon: Settings        },
       { href: '/reports',      label: 'Reports',                  icon: BarChart3       },
@@ -33,7 +32,7 @@ const GROUPS = [
       { href: '/nirmal/trips',     label: 'Trips',                    icon: ClipboardList },
       { href: '/nirmal/trips/new', label: 'New Trip',                 icon: PlusCircle    },
       { href: '/nirmal/schedule',  label: 'Schedule of Trains',       icon: CalendarDays  },
-      { href: '/nirmal/obhs',      label: 'OBHS Hours',               icon: Clock4        },
+      { href: '/nirmal/obhs/schedule', label: 'OBHS Schedule Entry',    icon: FileSpreadsheet },
       { href: '/nirmal/settings',  label: 'Settings',                 icon: Settings      },
       { href: '/nirmal/reports',   label: 'Reports',                  icon: BarChart3     },
       { href: '/nirmal/billing',   label: 'Billing Certificate',      icon: Receipt       },

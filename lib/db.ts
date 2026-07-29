@@ -17,6 +17,7 @@ let _secBillingMigrated = false
 let _nirmalMigrated     = false
 let _nirmalV2Migrated   = false
 let _obhsScheduleMigrated = false
+let _nirmalObhsMigrated    = false
 export async function ensureDB() {
   if (!_migrated) {
     await migrate()
@@ -54,6 +55,10 @@ export async function ensureDB() {
   if (!_obhsScheduleMigrated) {
     await migrateOBHSSchedule()
     _obhsScheduleMigrated = true
+  }
+  if (!_nirmalObhsMigrated) {
+    await migrateNirmalOBHS()
+    _nirmalObhsMigrated = true
   }
 }
 
@@ -683,4 +688,44 @@ async function migrateOBHSSchedule() {
       args: [train_no, days, ehk_ws, ac_ws, nac_ws, journey_hrs, ehk_rate, ac_rate, nac_rate],
     })
   }
+}
+
+async function migrateNirmalOBHS() {
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS nirmal_obhs_trains (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      train_no    TEXT    NOT NULL UNIQUE,
+      days        TEXT    NOT NULL DEFAULT '[]',
+      ehk_ws      INTEGER NOT NULL DEFAULT 1,
+      ac_ws       INTEGER NOT NULL DEFAULT 0,
+      nac_ws      INTEGER NOT NULL DEFAULT 0,
+      journey_hrs REAL    NOT NULL DEFAULT 0,
+      ehk_rate    REAL    NOT NULL DEFAULT 76.92,
+      ac_rate     REAL    NOT NULL DEFAULT 70.88,
+      nac_rate    REAL    NOT NULL DEFAULT 68.92,
+      min_wages   REAL    NOT NULL DEFAULT 781
+    )
+  `)
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS nirmal_obhs_entries (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      train_no    TEXT    NOT NULL,
+      date        TEXT    NOT NULL,
+      month_year  TEXT    NOT NULL,
+      ehk_present INTEGER NOT NULL DEFAULT 1,
+      ac_short    INTEGER NOT NULL DEFAULT 0,
+      nac_short   INTEGER NOT NULL DEFAULT 0,
+      psi_pct     REAL    NOT NULL DEFAULT 0,
+      w_penalty   REAL    NOT NULL DEFAULT 0,
+      x_penalty   REAL    NOT NULL DEFAULT 0,
+      aa_penalty  REAL    NOT NULL DEFAULT 0,
+      ab_penalty  REAL    NOT NULL DEFAULT 0,
+      ac_penalty  REAL    NOT NULL DEFAULT 0,
+      ad_penalty  REAL    NOT NULL DEFAULT 0,
+      ae_penalty  REAL    NOT NULL DEFAULT 0,
+      af_penalty  REAL    NOT NULL DEFAULT 0,
+      created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(train_no, date)
+    )
+  `)
 }
