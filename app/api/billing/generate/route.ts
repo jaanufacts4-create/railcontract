@@ -24,7 +24,9 @@ export async function POST(req: NextRequest) {
                       AND UPPER(tm.coach_type) IN ${AC_TYPES}  THEN 1 ELSE 0 END) as vb_coaches
       FROM trips t
       JOIN coach_scores cs ON cs.trip_id = t.id
-      LEFT JOIN train_master tm ON tm.train_no = t.train_no AND tm.position = cs.position
+      LEFT JOIN (SELECT train_no, position, MAX(coach_type) as coach_type
+                 FROM train_master GROUP BY train_no, position) tm
+             ON tm.train_no = t.train_no AND tm.position = cs.position
       WHERE t.month_year = ?
     `,
     args: [VB_TRAIN, VB_TRAIN, month_year],
