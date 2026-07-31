@@ -225,7 +225,7 @@ export async function GET() {
 function parseBillRow(r: Record<string, unknown>) {
   const gross   = Number(r.gross_amount) || 0
   const penalty = Number(r.penalty)      || 0
-  const net     = Number(r.net_amount)   || 0
+  const net     = penalty > 0 ? (Number(r.net_amount) || gross) : gross
   let breakdown: { label: string; amount: number }[] = []
   try { breakdown = JSON.parse(r.penalty_breakdown as string || '[]') } catch { /* ignore */ }
   return {

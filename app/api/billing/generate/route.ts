@@ -470,7 +470,7 @@ export async function POST(req: NextRequest) {
           VALUES (?, ?, ?, datetime('now'))
           ON CONFLICT(month_year) DO UPDATE SET
             gross_amount  = excluded.gross_amount,
-            net_amount    = CASE WHEN net_amount = 0 THEN excluded.net_amount ELSE net_amount - (gross_amount - excluded.gross_amount) END,
+            net_amount    = CASE WHEN penalty != 0 THEN excluded.gross_amount - penalty ELSE excluded.net_amount END,
             generated_at  = excluded.generated_at`,
     args: [month_year, totalSincePayment, net],
   })
