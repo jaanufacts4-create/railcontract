@@ -6,8 +6,8 @@ const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Satur
 const MONTHS = ['January','February','March','April','May','June',
                 'July','August','September','October','November','December']
 
-const AC_TYPES  = `('LWFCZAC','LWACCN','LWCBAC','LWACZAC')`
-const NAC_TYPES = `('GSLRD','LWSCN','LWS','LWSCZAC')`
+const AC_TYPES  = `('LWFCZAC','LWACCN','LWCBAC','LWACZAC','VB','AC')`
+const NAC_TYPES = `('GSLRD','LWSCN','LWS','LWSCZAC','NAC')`
 
 const HDR_BLUE   = 'FF1F4E79'
 const HDR_WHITE  = 'FFFFFFFF'

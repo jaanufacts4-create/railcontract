@@ -3,8 +3,8 @@ import { db, ensureDB } from '@/lib/db'
 import ExcelJS from 'exceljs'
 
 const VB_TRAIN  = '22488'
-const AC_TYPES  = "('LWFCZAC','LWACCN','LWCBAC','LWACZAC')"
-const GEN_TYPES = "('LWLRRM','LWGRD')"
+const AC_TYPES  = "('LWFCZAC','LWACCN','LWCBAC','LWACZAC','VB','AC')"
+const GEN_TYPES = "('LWLRRM','LWGRD','GEN')"
 
 export async function POST(req: NextRequest) {
   await ensureDB()

@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 import { db, ensureDB } from '@/lib/db'
 
-const AC_TYPES  = `('LWFCZAC','LWACCN','LWCBAC','LWACZAC')`
-const NAC_TYPES = `('GSLRD','LWSCN','LWS','LWSCZAC')`
+const AC_TYPES  = `('LWFCZAC','LWACCN','LWCBAC','LWACZAC','VB','AC')`
+const NAC_TYPES = `('GSLRD','LWSCN','LWS','LWSCZAC','NAC')`
 
 /** GET /api/trips?month_year=2026-03 */
 export async function GET(req: Request) {
