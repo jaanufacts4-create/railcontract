@@ -74,7 +74,8 @@ function BarChart({ data, filter, color }: { data: MonthRow[]; filter: number; c
         {visible.map((d, i) => {
           const x = i * 80 + 4; const barW = 22; const maxH = 120
           const grossH = (d.gross_amount / maxGross) * maxH
-          const netH   = (d.net_amount   / maxGross) * maxH
+          const effectiveNet = d.penalty > 0 ? d.net_amount : d.gross_amount
+          const netH   = (effectiveNet  / maxGross) * maxH
           const penH   = grossH - netH
           const grossY = maxH - grossH + 10
           const netY   = maxH - netH   + 10
