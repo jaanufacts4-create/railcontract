@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Download, Train, CheckCircle2, Clock, CalendarDays, BarChart3, ListFilter, TrendingUp, TrendingDown, IndianRupee, AlertCircle, Users, Zap, Edit2, Check, X, Database, ChevronDown, ChevronUp, Loader2, FileSpreadsheet } from 'lucide-react'
+import { Download, Train, CheckCircle2, Clock, CalendarDays, BarChart3, ListFilter, TrendingUp, TrendingDown, IndianRupee, AlertCircle, Users, Zap, Edit2, Check, X, Database, ChevronDown, ChevronUp, Loader2, FileSpreadsheet, Trash2 } from 'lucide-react'
 
 /* ─── Types ─────────────────────────────────────────── */
 type StatusRow   = { date: string; dow: string; train_no: string; ac: number; nac: number; done: boolean }
@@ -107,6 +107,7 @@ function ReportsContent() {
   const [billingLoading, setBillingLoading] = useState(false)
   const [billingGen,     setBillingGen]     = useState(false)
   const [obhsMonths,     setObhsMonths]     = useState<string[]>([])
+  const [removingObhs,   setRemovingObhs]   = useState(false)
   const [cumItems,       setCumItems]       = useState<CumItem[]>([])
   const [cumOpen,        setCumOpen]        = useState(false)
   const [cumEditing,     setCumEditing]     = useState<number|null>(null)
@@ -154,14 +155,16 @@ function ReportsContent() {
   const [loaLoading, setLoaLoading] = useState(false)
   const [loaEditing, setLoaEditing] = useState<number | null>(null)
   const [loaEditVal, setLoaEditVal] = useState('')
+  const [loaMonth,   setLoaMonth]   = useState('')  // '' = all-time
 
-  async function loadLOA() {
+  async function loadLOA(my?: string) {
     setLoaLoading(true)
-    const d = await fetch('/api/loa').then(r => r.json())
+    const url = my ? `/api/loa?month_year=${my}` : '/api/loa'
+    const d = await fetch(url).then(r => r.json())
     setLoaItems(d.items ?? [])
     setLoaLoading(false)
   }
-  useEffect(() => { if (mainTab === 'loa') loadLOA() }, [mainTab])
+  useEffect(() => { if (mainTab === 'loa') loadLOA(loaMonth || undefined) }, [mainTab])
 
   async function saveLOAEdit(item_no: number) {
     const qty = parseFloat(loaEditVal)
@@ -572,6 +575,23 @@ function ReportsContent() {
 
         return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {/* Month filter */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'flex-end' }}>
+              <label style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 600 }}>Filter by month:</label>
+              <input
+                type="month"
+                className="input"
+                value={loaMonth}
+                onChange={e => { setLoaMonth(e.target.value); loadLOA(e.target.value || undefined) }}
+                style={{ fontSize: 13, width: 160 }}
+              />
+              {loaMonth && (
+                <button
+                  onClick={() => { setLoaMonth(''); loadLOA() }}
+                  style={{ fontSize: 12, padding: '4px 10px', border: '1px solid var(--border-md)', borderRadius: 6, background: 'none', color: 'var(--text-3)', cursor: 'pointer' }}
+                >All-time</button>
+              )}
+            </div>
             {/* Summary cards */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
               {[
@@ -758,7 +778,23 @@ function ReportsContent() {
               </div>
               <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
                 {hasOBHS
-                  ? <><CheckCircle2 size={14} style={{ color: 'var(--success)' }} /><span style={{ color: 'var(--success)', fontWeight: 600 }}>OBHS data uploaded for {monthName}</span></>
+                  ? <><CheckCircle2 size={14} style={{ color: 'var(--success)' }} /><span style={{ color: 'var(--success)', fontWeight: 600 }}>OBHS data uploaded for {monthName}</span>
+                      <button
+                        onClick={async () => {
+                          if (!confirm(`Remove uploaded OBHS data for ${monthName}?`)) return
+                          setRemovingObhs(true)
+                          await fetch(`/api/obhs?month_year=${billingMonth}`, { method: 'DELETE' })
+                          const d = await fetch('/api/obhs').then(r => r.json())
+                          setObhsMonths((d.records ?? []).map((r: { month_year: string }) => r.month_year))
+                          setBillingPreview(null)
+                          setRemovingObhs(false)
+                        }}
+                        disabled={removingObhs}
+                        style={{ marginLeft: 4, padding: '2px 8px', fontSize: 11, border: '1px solid #EF4444', borderRadius: 5, background: 'none', color: '#EF4444', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                      >
+                        {removingObhs ? <Loader2 size={11} /> : <Trash2 size={11} />} Remove
+                      </button>
+                    </>
                   : <><AlertCircle  size={14} style={{ color: 'var(--warning)' }} /><span style={{ color: 'var(--warning)', fontWeight: 600 }}>OBHS data not uploaded for {monthName} — J22:J26 will be 0</span></>
                 }
               </div>
