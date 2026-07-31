@@ -5,14 +5,18 @@ const VB_TRAIN  = '22488'
 const AC_TYPES  = "('LWFCZAC','LWACCN','LWCBAC','LWACZAC','VB','AC')"
 const GEN_TYPES = "('LWLRRM','LWGRD','GEN')"
 
-export async function GET() {
+export async function GET(req: Request) {
   await ensureDB()
+  const { searchParams } = new URL(req.url)
+  const month_year = searchParams.get('month_year') // optional filter
 
   const { rows: loa } = await db.execute(
     'SELECT item_no, item_name, unit, rate_gst, loa_qty FROM loa_quantities ORDER BY item_no'
   )
 
-  // MCC totals (all time) using correct schema
+  // MCC totals — filtered by month if provided, otherwise all-time
+  const mccFilter = month_year ? 'WHERE t.month_year = ?' : ''
+  const mccArgs   = month_year ? [VB_TRAIN, VB_TRAIN, month_year] : [VB_TRAIN, VB_TRAIN]
   const { rows: mccRows } = await db.execute({
     sql: `
       SELECT
@@ -27,13 +31,17 @@ export async function GET() {
       FROM trips t
       JOIN coach_scores cs ON cs.trip_id = t.id
       LEFT JOIN train_master tm ON tm.train_no = t.train_no AND tm.position = cs.position
+      ${mccFilter}
     `,
-    args: [VB_TRAIN, VB_TRAIN],
+    args: mccArgs,
   })
 
-  const { rows: obhsRows } = await db.execute(
-    'SELECT SUM(ac_obhs_hrs) as ac_obhs, SUM(nac_obhs_hrs) as nac_obhs, SUM(vb_obhs_hrs) as vb_obhs, SUM(garibrath_obhs_hrs) as garibrath_obhs, SUM(ehk_hrs) as ehk FROM obhs_monthly'
-  )
+  const obhsFilter = month_year ? 'WHERE month_year = ?' : ''
+  const obhsArgs   = month_year ? [month_year] : []
+  const { rows: obhsRows } = await db.execute({
+    sql: `SELECT SUM(ac_obhs_hrs) as ac_obhs, SUM(nac_obhs_hrs) as nac_obhs, SUM(vb_obhs_hrs) as vb_obhs, SUM(garibrath_obhs_hrs) as garibrath_obhs, SUM(ehk_hrs) as ehk FROM obhs_monthly ${obhsFilter}`,
+    args: obhsArgs,
+  })
 
   const mcc  = mccRows[0]  ?? {}
   const obhs = obhsRows[0] ?? {}

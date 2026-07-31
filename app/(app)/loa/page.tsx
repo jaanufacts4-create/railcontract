@@ -34,15 +34,17 @@ const TD: React.CSSProperties = {
 }
 
 export default function LOAPage() {
-  const [items,   setItems]   = useState<LOAItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [editing, setEditing] = useState<number | null>(null)
-  const [editVal, setEditVal] = useState('')
+  const now = new Date()
+  const [items,     setItems]     = useState<LOAItem[]>([])
+  const [loading,   setLoading]   = useState(true)
+  const [editing,   setEditing]   = useState<number | null>(null)
+  const [editVal,   setEditVal]   = useState('')
+  const [monthYear, setMonthYear] = useState('')  // '' = all-time
 
-  async function load() {
+  async function load(my?: string) {
     setLoading(true)
-    const r = await fetch('/api/loa')
-    const d = await r.json()
+    const url = my ? `/api/loa?month_year=${my}` : '/api/loa'
+    const d = await fetch(url).then(r => r.json())
     setItems(d.items ?? [])
     setLoading(false)
   }
@@ -57,7 +59,7 @@ export default function LOAPage() {
       body: JSON.stringify({ item_no, loa_qty: qty }),
     })
     setEditing(null)
-    load()
+    load(monthYear || undefined)
   }
 
   const totalLOA  = items.reduce((s, i) => s + i.loa_qty * i.rate_gst, 0)
@@ -66,11 +68,29 @@ export default function LOAPage() {
 
   return (
     <div style={{ maxWidth: 1100 }}>
-      <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Quantity Consumed</h1>
-        <p style={{ fontSize: 13, color: 'var(--text-3)', marginTop: 4 }}>
-          Actual quantities consumed vs Letter of Award (LOA) limits
-        </p>
+      <div style={{ marginBottom: 20, display: 'flex', alignItems: 'flex-end', gap: 16, flexWrap: 'wrap' }}>
+        <div>
+          <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Quantity Consumed</h1>
+          <p style={{ fontSize: 13, color: 'var(--text-3)', marginTop: 4 }}>
+            Actual quantities consumed vs Letter of Award (LOA) limits
+          </p>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
+          <label style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 600 }}>Filter by month:</label>
+          <input
+            type="month"
+            className="input"
+            value={monthYear}
+            onChange={e => { setMonthYear(e.target.value); load(e.target.value || undefined) }}
+            style={{ fontSize: 13, width: 160 }}
+          />
+          {monthYear && (
+            <button
+              onClick={() => { setMonthYear(''); load() }}
+              style={{ fontSize: 12, padding: '4px 10px', border: '1px solid var(--border-md)', borderRadius: 6, background: 'none', color: 'var(--text-3)', cursor: 'pointer' }}
+            >All-time</button>
+          )}
+        </div>
       </div>
 
       {/* Summary cards */}

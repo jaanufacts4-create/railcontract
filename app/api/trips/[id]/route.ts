@@ -80,6 +80,12 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
   await ensureDB()
   const { id } = await params
-  await db.execute({ sql: 'DELETE FROM trips WHERE id=?', args: [Number(id)] })
+  const tripId = Number(id)
+  // Explicitly delete child rows (foreign key CASCADE may be inactive in libSQL)
+  await db.execute({ sql: 'DELETE FROM coach_scores     WHERE trip_id=?', args: [tripId] })
+  await db.execute({ sql: 'DELETE FROM manpower         WHERE trip_id=?', args: [tripId] })
+  await db.execute({ sql: 'DELETE FROM annex_penalties  WHERE trip_id=?', args: [tripId] })
+  await db.execute({ sql: 'DELETE FROM intensive_scores WHERE trip_id=?', args: [tripId] })
+  await db.execute({ sql: 'DELETE FROM trips            WHERE id=?',      args: [tripId] })
   return NextResponse.json({ ok: true })
 }

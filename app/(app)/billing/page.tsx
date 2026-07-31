@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { Download, CheckCircle, AlertCircle, Loader2, Database, Edit2, Check, X, ChevronDown, ChevronUp } from 'lucide-react'
+import { Download, CheckCircle, AlertCircle, Loader2, Database, Edit2, Check, X, ChevronDown, ChevronUp, Trash2 } from 'lucide-react'
 
 function fmt(n: number, dec = 0) {
   return Number(n).toLocaleString('en-IN', { maximumFractionDigits: dec })
@@ -31,7 +31,8 @@ export default function BillingPage() {
   const [preview,    setPreview]    = useState<Record<string, number> | null>(null)
   const [loading,    setLoading]    = useState(false)
   const [generating, setGenerating] = useState(false)
-  const [obhsMonths, setObhsMonths] = useState<string[]>([])
+  const [obhsMonths,   setObhsMonths]   = useState<string[]>([])
+  const [removingObhs, setRemovingObhs] = useState(false)
 
   const [cumItems,   setCumItems]   = useState<CumItem[]>([])
   const [cumOpen,    setCumOpen]    = useState(false)
@@ -204,10 +205,29 @@ export default function BillingPage() {
         </div>
 
         <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
-          {hasOBHS
-            ? <><CheckCircle size={14} style={{ color: 'var(--success)' }} /><span style={{ color: 'var(--success)', fontWeight: 600 }}>OBHS data uploaded for {monthName}</span></>
-            : <><AlertCircle size={14} style={{ color: 'var(--warning)' }} /><span style={{ color: 'var(--warning)', fontWeight: 600 }}>OBHS data not uploaded for {monthName} — J22:J26 will be 0</span></>
-          }
+          {hasOBHS ? (
+            <>
+              <CheckCircle size={14} style={{ color: 'var(--success)' }} />
+              <span style={{ color: 'var(--success)', fontWeight: 600 }}>OBHS data uploaded for {monthName}</span>
+              <button
+                onClick={async () => {
+                  if (!confirm(`Remove uploaded OBHS data for ${monthName}?`)) return
+                  setRemovingObhs(true)
+                  await fetch(`/api/obhs?month_year=${monthYear}`, { method: 'DELETE' })
+                  const d = await fetch('/api/obhs').then(r => r.json())
+                  setObhsMonths((d.records ?? []).map((r: { month_year: string }) => r.month_year))
+                  setPreview(null)
+                  setRemovingObhs(false)
+                }}
+                disabled={removingObhs}
+                style={{ marginLeft: 4, padding: '2px 8px', fontSize: 11, border: '1px solid #EF4444', borderRadius: 5, background: 'none', color: '#EF4444', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+              >
+                {removingObhs ? <Loader2 size={11} /> : <Trash2 size={11} />} Remove
+              </button>
+            </>
+          ) : (
+            <><AlertCircle size={14} style={{ color: 'var(--warning)' }} /><span style={{ color: 'var(--warning)', fontWeight: 600 }}>OBHS data not uploaded for {monthName} — J22:J26 will be 0</span></>
+          )}
         </div>
       </div>
 
