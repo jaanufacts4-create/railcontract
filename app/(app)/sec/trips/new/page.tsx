@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState , Suspense} from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { Save, ChevronLeft, AlertCircle } from 'lucide-react'
+import { useSearchParams } from 'next/navigation'
+import { Save, ChevronLeft, AlertCircle, Plus, Minus } from 'lucide-react'
 import Link from 'next/link'
 
 type SecTrain = { train_no: string; days: string[]; ac_count: number; nac_count: number; req_manpower: number }
@@ -25,7 +25,6 @@ const CRITERIA_COUNT = 4
 function today() { return new Date().toISOString().slice(0, 10) }
 
 function NewSecTripPage() {
-  const router = useRouter()
   const searchParams = useSearchParams()
   const [trains,               setTrains]               = useState<SecTrain[]>([])
   const [ratePerCoach,         setRatePerCoach]         = useState(322.49)
@@ -44,16 +43,20 @@ function NewSecTripPage() {
     return today()
   })
   const [trainNo,     setTrainNo]     = useState('')
-  const [acCount,     setAcCount]     = useState(0)
-  const [coachCount,  setCoachCount]  = useState(0)
+  // coachTypes drives everything — 'AC' | 'NAC' per coach slot
+  const [coachTypes,  setCoachTypes]  = useState<('AC'|'NAC')[]>([])
   const [reqMp,       setReqMp]       = useState(0)
   const [availMp,     setAvailMp]     = useState(0)
   const [washingLine, setWashingLine] = useState('')
 
+  // Derived counts
+  const coachCount = coachTypes.length
+  const acCount    = coachTypes.filter(t => t === 'AC').length
+
   // Interior: criteria[criterionIndex][coachIndex], default 3, max 3
   const [intCriteria, setIntCriteria] = useState<number[][]>([])
 
-  // Exterior: single value per coach, default 3, max 3
+  // Exterior
   const [isAcwp,     setIsAcwp]     = useState(true)
   const [extRatings, setExtRatings] = useState<number[]>([])
 
@@ -79,22 +82,24 @@ function NewSecTripPage() {
     setDayWarn(ok ? null : `⚠ Train ${tn} is not scheduled on ${tripDay}. Scheduled: ${t.days.join(', ')}`)
   }
 
+  function initArrays(n: number) {
+    setIntCriteria(Array.from({ length: CRITERIA_COUNT }, () => Array(n).fill(3)))
+    setExtRatings(Array(n).fill(3))
+  }
+
   function selectTrain(tn: string) {
     setTrainNo(tn)
     const t = trains.find(x => x.train_no === tn)
     if (t) {
-      const total = t.ac_count + t.nac_count
-      setAcCount(t.ac_count)
-      setCoachCount(total)
-      setReqMp(Math.round(total * 0.38))
-      initArrays(total)
+      const types: ('AC'|'NAC')[] = [
+        ...Array(t.ac_count).fill('AC' as const),
+        ...Array(t.nac_count).fill('NAC' as const),
+      ]
+      setCoachTypes(types)
+      setReqMp(Math.round(types.length * 0.38))
+      initArrays(types.length)
       checkDayWarn(tn, date, trains)
     }
-  }
-
-  function initArrays(n: number) {
-    setIntCriteria(Array.from({ length: CRITERIA_COUNT }, () => Array(n).fill(3)))
-    setExtRatings(Array(n).fill(3))
   }
 
   // Re-check day warning whenever date or trainNo changes
@@ -103,12 +108,12 @@ function NewSecTripPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date, trainNo, trains])
 
-  // Auto-calculate req manpower when coachCount changes manually
+  // Auto-calculate req manpower when coachCount changes
   useEffect(() => {
     if (coachCount > 0) setReqMp(Math.round(coachCount * 0.38))
   }, [coachCount])
 
-  // Resize when coachCount changes manually
+  // Resize arrays when coachCount changes (via +/-)
   useEffect(() => {
     if (coachCount === 0) return
     setIntCriteria(prev => {
@@ -124,20 +129,31 @@ function NewSecTripPage() {
       for (let i = 0; i < Math.min(prev.length, coachCount); i++) next[i] = prev[i]
       return next
     })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [coachCount])
 
+  // +/- coach handlers
+  function addCoach() {
+    setCoachTypes(prev => [...prev, 'NAC'])
+  }
+  function removeCoach() {
+    if (coachCount <= 1) return
+    setCoachTypes(prev => prev.slice(0, -1))
+  }
+  function setCoachType(idx: number, type: 'AC'|'NAC') {
+    setCoachTypes(prev => { const n = [...prev]; n[idx] = type; return n })
+  }
+
   // ── Calculations ─────────────────────────────────────────────────────────
-  // Interior: per-coach total = sum of 4 criteria values
   const intPerCoach = Array.from({ length: coachCount }, (_, i) =>
     intCriteria.reduce((s, row) => s + (row[i] ?? 0), 0)
   )
   const intOverall    = intPerCoach.reduce((s, v) => s + v, 0)
-  const intMaxRating  = coachCount * 12   // 4 × 3 × coaches
+  const intMaxRating  = coachCount * 12
   const intPctRating  = intMaxRating > 0 ? (intOverall / intMaxRating) * 100 : 100
   const intPctPenalty = 100 - intPctRating
   const intPenaltyA   = (intPctPenalty / 100) * coachCount * ratePerCoach
 
-  // Exterior: max 3 per coach
   const extOverall    = extRatings.reduce((s, v) => s + v, 0)
   const extMaxRating  = coachCount * 3
   const extPctRating  = extMaxRating > 0 ? (extOverall / extMaxRating) * 100 : 100
@@ -158,9 +174,9 @@ function NewSecTripPage() {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         date, train_no: trainNo, cleaning_type: 'Interior',
-        coach_count: coachCount, req_manpower: reqMp,
-        avail_manpower: availMp, washing_line: washingLine,
-        is_acwp: false,
+        coach_count: coachCount, ac_count: acCount,
+        req_manpower: reqMp, avail_manpower: availMp,
+        washing_line: washingLine, is_acwp: false,
         coach_criteria: intCriteria,
         annex_b: annexBObj,
       }),
@@ -177,9 +193,9 @@ function NewSecTripPage() {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         date, train_no: trainNo, cleaning_type: 'Exterior',
-        coach_count: coachCount, req_manpower: reqMp,
-        avail_manpower: availMp, washing_line: washingLine,
-        is_acwp: isAcwp,
+        coach_count: coachCount, ac_count: acCount,
+        req_manpower: reqMp, avail_manpower: availMp,
+        washing_line: washingLine, is_acwp: isAcwp,
         coach_ratings: !isAcwp ? extRatings : [],
         annex_b: {},
       }),
@@ -192,25 +208,16 @@ function NewSecTripPage() {
     }
 
     setSaving(false)
-    // Keep date as-is, only reset train-specific fields
-    setTrainNo(''); setAcCount(0); setCoachCount(0)
+    setTrainNo(''); setCoachTypes([])
     setReqMp(0); setAvailMp(0); setWashingLine('')
     setIntCriteria([]); setExtRatings([]); setAnnexB({}); setIsAcwp(true); setDayWarn(null)
     setSavedMsg(`✅ Trip saved for ${date}! Enter next trip or `)
     setTimeout(() => setSavedMsg(''), 8000)
   }
 
-  // Color for 0-3 inputs
-  const ratingColor3 = (r: number) => {
-    return r === 3 ? '#22C55E' : r === 2 ? '#84CC16' : r === 1 ? '#F59E0B' : '#EF4444'
-  }
-  // Color for 0-12 total
-  const ratingColor12 = (r: number) => {
-    const pct = (r / 12) * 100
-    return pct >= 86 ? '#22C55E' : pct >= 76 ? '#84CC16' : pct >= 66 ? '#F59E0B' : '#EF4444'
-  }
-  // Color for 0-3 total (exterior per coach)
-  const ratingColor3total = (r: number) => ratingColor3(r)
+  // Color helpers
+  const ratingColor3  = (r: number) => r === 3 ? '#22C55E' : r === 2 ? '#84CC16' : r === 1 ? '#F59E0B' : '#EF4444'
+  const ratingColor12 = (r: number) => { const p = (r/12)*100; return p>=86?'#22C55E':p>=76?'#84CC16':p>=66?'#F59E0B':'#EF4444' }
 
   const th: React.CSSProperties = {
     fontSize: 10, fontWeight: 700, color: 'var(--text-4)', textTransform: 'uppercase',
@@ -262,7 +269,38 @@ function NewSecTripPage() {
           </div>
           <div>
             <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.04em', display: 'block', marginBottom: 6 }}>Coach Count</label>
-            <input type="number" min={1} max={24} className="input" value={coachCount || ''} onChange={e => setCoachCount(Number(e.target.value))} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{
+                padding: '6px 14px', borderRadius: 8, background: 'var(--surface-2)',
+                border: '1.5px solid var(--border)', fontWeight: 700, fontSize: 16,
+                color: 'var(--text)', minWidth: 48, textAlign: 'center',
+              }}>
+                {coachCount || '—'}
+              </div>
+              {coachCount > 0 && (
+                <div style={{ display: 'flex', gap: 4 }}>
+                  <button type="button" onClick={addCoach} style={{
+                    width: 28, height: 28, borderRadius: 6, background: 'var(--primary)', border: 'none',
+                    color: '#fff', fontWeight: 700, fontSize: 16, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <Plus size={14} />
+                  </button>
+                  <button type="button" onClick={removeCoach} disabled={coachCount <= 1} style={{
+                    width: 28, height: 28, borderRadius: 6, background: 'var(--border-md)', border: 'none',
+                    color: 'var(--text-2)', fontWeight: 700, fontSize: 16, cursor: coachCount <= 1 ? 'not-allowed' : 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: coachCount <= 1 ? 0.4 : 1,
+                  }}>
+                    <Minus size={14} />
+                  </button>
+                </div>
+              )}
+              {coachCount > 0 && (
+                <span style={{ fontSize: 11, color: 'var(--text-4)' }}>
+                  {acCount}AC + {coachCount - acCount}NAC
+                </span>
+              )}
+            </div>
           </div>
           <div>
             <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.04em', display: 'block', marginBottom: 6 }}>Req. Manpower</label>
@@ -282,18 +320,10 @@ function NewSecTripPage() {
 
       {/* ── Day Mismatch Warning ── */}
       {dayWarn && (
-        <div style={{
-          padding: '12px 16px', borderRadius: 10,
-          background: '#FEFCE8', border: '1.5px solid #FDE047',
-          display: 'flex', flexDirection: 'column', gap: 4,
-        }}>
-          <p style={{ fontSize: 13, fontWeight: 700, color: '#92400E', margin: 0 }}>
-            ⚠ Schedule Mismatch
-          </p>
+        <div style={{ padding: '12px 16px', borderRadius: 10, background: '#FEFCE8', border: '1.5px solid #FDE047', display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <p style={{ fontSize: 13, fontWeight: 700, color: '#92400E', margin: 0 }}>⚠ Schedule Mismatch</p>
           <p style={{ fontSize: 12, color: '#92400E', margin: 0 }}>{dayWarn}</p>
-          <p style={{ fontSize: 10, color: '#A16207', margin: 0 }}>
-            This is a warning only — you can still save the entry.
-          </p>
+          <p style={{ fontSize: 10, color: '#A16207', margin: 0 }}>This is a warning only — you can still save the entry.</p>
         </div>
       )}
 
@@ -302,10 +332,28 @@ function NewSecTripPage() {
         <div className="card" style={{ padding: 20 }}>
           {/* Header row */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
-            <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.04em', margin: 0 }}>
-              Coach Proforma
-              <span style={{ fontWeight: 500, color: 'var(--text-4)', marginLeft: 6 }}>Interior: 4 criteria × max 3 = 12/coach · Exterior: max 3/coach</span>
-            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.04em', margin: 0 }}>
+                Coach Proforma
+                <span style={{ fontWeight: 500, color: 'var(--text-4)', marginLeft: 6 }}>Interior: 4 criteria × max 3 = 12/coach · Exterior: max 3/coach</span>
+              </p>
+              {/* + / - buttons in proforma header */}
+              <button type="button" onClick={addCoach} title="Add coach" style={{
+                display: 'inline-flex', alignItems: 'center', gap: 3,
+                padding: '3px 9px', borderRadius: 6, background: 'var(--primary)', border: 'none',
+                color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer',
+              }}>
+                <Plus size={12} /> Coach
+              </button>
+              <button type="button" onClick={removeCoach} disabled={coachCount <= 1} title="Remove last coach" style={{
+                display: 'inline-flex', alignItems: 'center', gap: 3,
+                padding: '3px 9px', borderRadius: 6, background: 'var(--border-md)', border: 'none',
+                color: 'var(--text-2)', fontWeight: 700, fontSize: 12,
+                cursor: coachCount <= 1 ? 'not-allowed' : 'pointer', opacity: coachCount <= 1 ? 0.4 : 1,
+              }}>
+                <Minus size={12} /> Coach
+              </button>
+            </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer' }}>
                 <input type="checkbox" checked={isAcwp} onChange={e => setIsAcwp(e.target.checked)} style={{ width: 15, height: 15 }} />
@@ -340,18 +388,33 @@ function NewSecTripPage() {
                   <th style={th}>% Rating</th>
                   <th style={th}>Penalty A</th>
                 </tr>
-                {/* Composition row */}
+                {/* Composition row — per-coach AC/NAC dropdown */}
                 <tr>
                   <td style={{ ...stickyLabel('var(--surface-2)', 'var(--text-4)'), fontSize: 10 }}>Composition</td>
-                  {Array.from({ length: coachCount }, (_, i) => (
-                    <td key={i} style={{
-                      ...td(i < acCount ? '#EFF6FF' : '#ECFDF5'),
-                      fontSize: 9, fontWeight: 700,
-                      color: i < acCount ? '#2563EB' : '#16A34A',
-                    }}>
-                      {i < acCount ? 'AC' : 'NAC'}
-                    </td>
-                  ))}
+                  {Array.from({ length: coachCount }, (_, i) => {
+                    const type = coachTypes[i] ?? 'NAC'
+                    const isAC = type === 'AC'
+                    return (
+                      <td key={i} style={{
+                        ...td(isAC ? '#EFF6FF' : '#ECFDF5'),
+                        padding: '2px 1px',
+                      }}>
+                        <select
+                          value={type}
+                          onChange={e => setCoachType(i, e.target.value as 'AC'|'NAC')}
+                          style={{
+                            fontSize: 9, fontWeight: 700, border: 'none',
+                            background: 'transparent', cursor: 'pointer', width: '100%',
+                            textAlign: 'center', color: isAC ? '#2563EB' : '#16A34A',
+                            outline: 'none',
+                          }}
+                        >
+                          <option value="AC">AC</option>
+                          <option value="NAC">NAC</option>
+                        </select>
+                      </td>
+                    )
+                  })}
                   <td style={td()} /><td style={td()} /><td style={td()} />
                 </tr>
               </thead>
@@ -385,14 +448,9 @@ function NewSecTripPage() {
                         />
                       </td>
                     ))}
-                    {/* Only show totals on last criterion row */}
                     {ci < CRITERIA_COUNT - 1
                       ? <><td style={td('#FEF3C7')} /><td style={td('#FEF3C7')} /><td style={td('#FEF3C7')} /></>
-                      : <>
-                          <td style={{ ...td('#FEF9C3', '2px solid #FDE68A'), fontWeight: 800, fontSize: 12, color: 'var(--text)', borderTop: 'none', padding: '5px 2px' }} rowSpan={1}/>
-                          <td style={td('#FEF3C7')} />
-                          <td style={td('#FEF3C7')} />
-                        </>
+                      : <><td style={{ ...td('#FEF9C3', '2px solid #FDE68A'), fontWeight: 800, fontSize: 12, color: 'var(--text)', padding: '5px 2px' }} /><td style={td('#FEF3C7')} /><td style={td('#FEF3C7')} /></>
                     }
                   </tr>
                 ))}
@@ -457,7 +515,7 @@ function NewSecTripPage() {
                   <td style={{ ...td('#DCFCE7', '2px solid #BBF7D0'), fontWeight: 700, fontSize: 12, color: 'var(--text)' }}>
                     {isAcwp ? 'NA' : extOverall}
                   </td>
-                  <td style={{ ...td('#DCFCE7', '2px solid #BBF7D0'), fontWeight: 700, fontSize: 11, color: isAcwp ? 'var(--text-4)' : ratingColor3total(extPctRating / 100 * 3) }}>
+                  <td style={{ ...td('#DCFCE7', '2px solid #BBF7D0'), fontWeight: 700, fontSize: 11, color: isAcwp ? 'var(--text-4)' : ratingColor3(extPctRating / 100 * 3) }}>
                     {isAcwp ? 'NA' : `${extPctRating.toFixed(2)}%`}
                   </td>
                   <td style={{ ...td('#DCFCE7', '2px solid #BBF7D0'), fontWeight: 700, fontSize: 11, color: extPenaltyA > 0 ? 'var(--danger)' : 'var(--success)' }}>
@@ -547,7 +605,7 @@ function NewSecTripPage() {
             </span>
           )}
           <Link href="/sec/trips" className="btn btn-secondary">Cancel</Link>
-          <button onClick={handleSave} disabled={saving || !trainNo || !date} className="btn btn-primary">
+          <button onClick={handleSave} disabled={saving || !trainNo || !date || coachCount === 0} className="btn btn-primary">
             <Save size={14} /> {saving ? 'Saving…' : 'Save Trip'}
           </button>
         </div>

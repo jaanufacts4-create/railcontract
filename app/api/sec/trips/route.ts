@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db, ensureDB } from '@/lib/db'
 
-
-
 /* ─── GET /api/sec/trips?month_year=YYYY-MM ──────────────────────── */
 export async function GET(req: Request) {
   await ensureDB()
@@ -28,15 +26,14 @@ export async function GET(req: Request) {
   const ratePerCoachExterior = cfgMap.sec_rate_per_coach_exterior ?? 144.28
 
   const trips = rows.map(r => {
-    const coaches      = Number(r.coach_count)
+    const coaches       = Number(r.coach_count)
     const overallRating = Number(r.overall_rating)
-    // Interior: 4 criteria × max 3 = 12/coach; Exterior: max 3/coach
-    const maxRating    = coaches * (r.cleaning_type === 'Interior' ? 12 : 3)
-    const pctRating    = maxRating > 0 ? (overallRating / maxRating) * 100 : 100
-    const pctPenalty   = 100 - pctRating
-    const rate         = r.cleaning_type === 'Interior' ? ratePerCoach : ratePerCoachExterior
-    const penaltyA     = r.is_acwp ? 0 : (pctPenalty / 100) * coaches * rate
-    const annexBTotal  = Number(r.annex_b_total)
+    const maxRating     = coaches * (r.cleaning_type === 'Interior' ? 12 : 3)
+    const pctRating     = maxRating > 0 ? (overallRating / maxRating) * 100 : 100
+    const pctPenalty    = 100 - pctRating
+    const rate          = r.cleaning_type === 'Interior' ? ratePerCoach : ratePerCoachExterior
+    const penaltyA      = r.is_acwp ? 0 : (pctPenalty / 100) * coaches * rate
+    const annexBTotal   = Number(r.annex_b_total)
     return {
       ...r,
       coaches,
@@ -57,16 +54,16 @@ export async function POST(req: Request) {
   await ensureDB()
   const body = await req.json()
   const {
-    date, train_no, cleaning_type, coach_count,
+    date, train_no, cleaning_type, coach_count, ac_count,
     req_manpower, avail_manpower, washing_line, is_acwp,
-    coach_criteria,  // number[][] for Interior: [crit1[],crit2[],crit3[],crit4[]] each 0-3
-    coach_ratings,   // number[] for Exterior: per-coach values 0-3
-    annex_b,         // Record<number, number>  slot→amount
+    coach_criteria,  // number[][] Interior: [crit1[], crit2[], crit3[], crit4[]]
+    coach_ratings,   // number[]   Exterior: per-coach values 0-3
+    annex_b,         // Record<number, number>
   } = body
 
   const month_year = date.slice(0, 7)
 
-  // Duplicate check — same date + train + cleaning type
+  // Duplicate check
   const dup = await db.execute({
     sql:  'SELECT id FROM sec_trips WHERE date=? AND train_no=? AND cleaning_type=?',
     args: [date, train_no, cleaning_type],
@@ -86,37 +83,45 @@ export async function POST(req: Request) {
   })
   const tripId = Number(lastInsertRowid)
 
-  // Insert coach ratings
+  // ── Batch-insert coach ratings (was sequential, now parallel) ────────────
+  const ratingStmts: { sql: string; args: (string | number)[] }[] = []
+
   if (coach_criteria?.length) {
-    // Interior: 4 criteria arrays, each with per-coach values 0-3
+    // Interior: 4 criteria arrays
     for (let crit = 0; crit < coach_criteria.length; crit++) {
       const arr = coach_criteria[crit] as number[]
       for (let i = 0; i < arr.length; i++) {
-        await db.execute({
+        ratingStmts.push({
           sql:  'INSERT INTO sec_coach_ratings (trip_id, coach_slot, criterion, rating) VALUES (?,?,?,?)',
           args: [tripId, i + 1, crit + 1, Math.min(3, Math.max(0, Number(arr[i]) || 0))],
         })
       }
     }
   } else if (coach_ratings?.length) {
-    // Exterior: single value per coach 0-3
+    // Exterior: single value per coach
     for (let i = 0; i < coach_ratings.length; i++) {
-      await db.execute({
+      ratingStmts.push({
         sql:  'INSERT INTO sec_coach_ratings (trip_id, coach_slot, criterion, rating) VALUES (?,?,?,?)',
         args: [tripId, i + 1, 1, Math.min(3, Math.max(0, Number(coach_ratings[i]) || 0))],
       })
     }
   }
 
-  // Insert Annexure B
+  // Run all rating inserts in parallel instead of one-by-one
+  if (ratingStmts.length > 0) {
+    await Promise.all(ratingStmts.map(s => db.execute(s)))
+  }
+
+  // ── Annex B (usually small, can stay sequential) ─────────────────────────
   if (annex_b) {
-    for (const [slot, amount] of Object.entries(annex_b)) {
-      if (Number(amount) > 0) {
-        await db.execute({
-          sql:  'INSERT INTO sec_annex_b (trip_id, penalty_slot, amount) VALUES (?,?,?)',
-          args: [tripId, Number(slot), Number(amount)],
-        })
-      }
+    const annexStmts = Object.entries(annex_b)
+      .filter(([, amount]) => Number(amount) > 0)
+      .map(([slot, amount]) => ({
+        sql:  'INSERT INTO sec_annex_b (trip_id, penalty_slot, amount) VALUES (?,?,?)',
+        args: [tripId, Number(slot), Number(amount)] as (string | number)[],
+      }))
+    if (annexStmts.length > 0) {
+      await Promise.all(annexStmts.map(s => db.execute(s)))
     }
   }
 
