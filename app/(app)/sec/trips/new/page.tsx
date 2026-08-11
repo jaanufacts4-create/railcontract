@@ -32,6 +32,7 @@ function NewSecTripPage() {
   const [ratePerCoachExterior, setRatePerCoachExterior] = useState(144.28)
   const [saving,               setSaving]               = useState(false)
   const [dayWarn,              setDayWarn]              = useState<string | null>(null)
+  const [savedMsg,             setSavedMsg]             = useState('')
 
   // Trip details
   const [date,        setDate]        = useState(() => {
@@ -191,7 +192,12 @@ function NewSecTripPage() {
     }
 
     setSaving(false)
-    router.push('/sec/trips')
+    // Keep date as-is, only reset train-specific fields
+    setTrainNo(''); setAcCount(0); setCoachCount(0)
+    setReqMp(0); setAvailMp(0); setWashingLine('')
+    setIntCriteria([]); setExtRatings([]); setAnnexB({}); setIsAcwp(true); setDayWarn(null)
+    setSavedMsg(`✅ Trip saved for ${date}! Enter next trip or `)
+    setTimeout(() => setSavedMsg(''), 8000)
   }
 
   // Color for 0-3 inputs
@@ -534,7 +540,12 @@ function NewSecTripPage() {
             <p style={{ fontSize: 20, fontWeight: 800, color: grandTotal > 0 ? 'var(--danger)' : 'var(--success)', margin: 0 }}>₹{grandTotal.toFixed(2)}</p>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center', flexWrap: 'wrap' }}>
+          {savedMsg && (
+            <span style={{ fontSize: 13, color: 'var(--success)', fontWeight: 600 }}>
+              {savedMsg}<Link href="/sec/trips" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>View Trips</Link>
+            </span>
+          )}
           <Link href="/sec/trips" className="btn btn-secondary">Cancel</Link>
           <button onClick={handleSave} disabled={saving || !trainNo || !date} className="btn btn-primary">
             <Save size={14} /> {saving ? 'Saving…' : 'Save Trip'}
