@@ -16,7 +16,11 @@ function fmtDate(d: string) { const [y,m,day] = d.split('-'); return `${day}-${m
 const pctColor = (p: number) => p === 100 ? '#22C55E' : p >= 86 ? '#84CC16' : p >= 76 ? '#F59E0B' : '#EF4444'
 
 export default function SecTripsPage() {
-  const [monthYear,  setMonthYear]  = useState(() => new Date().toISOString().slice(0, 7))
+  const [monthYear,  setMonthYear]  = useState(() => {
+    // Restore last used month so user doesn't have to re-select every visit
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('sec_last_month') : null
+    return saved ?? new Date().toISOString().slice(0, 7)
+  })
   const [trips,      setTrips]      = useState<TripRow[]>([])
   const [loading,    setLoading]    = useState(false)
   const [filter,     setFilter]     = useState('')
@@ -67,7 +71,10 @@ export default function SecTripsPage() {
           <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', letterSpacing: '-.02em', margin: 0 }}>Trips — Secondary</h1>
           <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '3px 0 0' }}>M/s Dynamic Services · Secondary based coaches</p>
         </div>
-        <input type="month" className="input" style={{ width: 155 }} value={monthYear} onChange={e => setMonthYear(e.target.value)} />
+        <input type="month" className="input" style={{ width: 155 }} value={monthYear} onChange={e => {
+          setMonthYear(e.target.value)
+          localStorage.setItem('sec_last_month', e.target.value)
+        }} />
         <input placeholder="Filter…" className="input" style={{ width: 160 }} value={filter} onChange={e => setFilter(e.target.value)} />
         <Link href={`/sec/trips/new?month=${monthYear}`} className="btn btn-primary"><Plus size={14} /> New Trip</Link>
       </div>

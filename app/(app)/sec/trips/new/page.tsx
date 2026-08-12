@@ -37,8 +37,16 @@ function NewSecTripPage() {
   const [date,        setDate]        = useState(() => {
     const m = searchParams.get('month')
     if (m) {
+      // Save to localStorage so trips list picks it up when we navigate back
+      if (typeof window !== 'undefined') localStorage.setItem('sec_last_month', m)
       const curMonth = new Date().toISOString().slice(0, 7)
       return m === curMonth ? today() : `${m}-01`
+    }
+    // Fallback: restore last used month from localStorage
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('sec_last_month') : null
+    if (saved) {
+      const curMonth = new Date().toISOString().slice(0, 7)
+      return saved === curMonth ? today() : `${saved}-01`
     }
     return today()
   })
@@ -169,40 +177,25 @@ function NewSecTripPage() {
 
     const annexBObj = Object.fromEntries(Object.entries(annexB).map(([k, v]) => [k, Number(v) || 0]))
 
-    // Interior trip
-    const res1 = await fetch('/api/sec/trips', {
+    // Single batch call — one DB connection, both Interior + Exterior saved together
+    const res = await fetch('/api/sec/trips/batch', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        date, train_no: trainNo, cleaning_type: 'Interior',
+        date, train_no: trainNo,
         coach_count: coachCount, ac_count: acCount,
         req_manpower: reqMp, avail_manpower: availMp,
-        washing_line: washingLine, is_acwp: false,
+        washing_line: washingLine,
+        is_acwp: isAcwp,
         coach_criteria: intCriteria,
+        coach_ratings: !isAcwp ? extRatings : [],
         annex_b: annexBObj,
       }),
     })
-    if (res1.status === 409) {
-      const body = await res1.json().catch(() => ({}))
-      alert(body.error ?? 'Duplicate entry exists.')
-      setSaving(false)
-      return
-    }
 
-    // Exterior trip
-    const res2 = await fetch('/api/sec/trips', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        date, train_no: trainNo, cleaning_type: 'Exterior',
-        coach_count: coachCount, ac_count: acCount,
-        req_manpower: reqMp, avail_manpower: availMp,
-        washing_line: washingLine, is_acwp: isAcwp,
-        coach_ratings: !isAcwp ? extRatings : [],
-        annex_b: {},
-      }),
-    })
-    if (res2.status === 409) {
-      const body = await res2.json().catch(() => ({}))
-      alert(body.error ?? 'Duplicate entry exists.')
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      if (res.status === 409) alert(body.error ?? 'Duplicate entry exists.')
+      else alert(body.error ?? `Error ${res.status}`)
       setSaving(false)
       return
     }
