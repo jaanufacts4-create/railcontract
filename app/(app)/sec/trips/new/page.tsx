@@ -178,6 +178,8 @@ function NewSecTripPage() {
 
   async function handleSave() {
     if (!trainNo || !date) return
+    if (!availMp) { alert('Avail. Manpower required.'); return }
+    if (!washingLine.trim()) { alert('Washing Line No. required.'); return }
     setSaving(true)
 
     const annexBObj = Object.fromEntries(Object.entries(annexB).map(([k, v]) => [k, Number(v) || 0]))
@@ -312,11 +314,12 @@ function NewSecTripPage() {
           <div>
             <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.04em', display: 'block', marginBottom: 6 }}>Avail. Manpower</label>
             <input type="number" min={0} className="input" value={availMp || ''} onChange={e => setAvailMp(Number(e.target.value))}
-              style={{ borderColor: availMp > 0 && availMp < reqMp ? 'var(--danger)' : undefined }} />
+              style={{ borderColor: !availMp || (availMp > 0 && availMp < reqMp) ? 'var(--danger)' : undefined }} />
           </div>
           <div>
             <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.04em', display: 'block', marginBottom: 6 }}>Washing Line No.</label>
-            <input type="text" className="input" placeholder="e.g. 5" value={washingLine} onChange={e => setWashingLine(e.target.value)} />
+            <input type="text" className="input" placeholder="e.g. 5" value={washingLine} onChange={e => setWashingLine(e.target.value)}
+              style={{ borderColor: !washingLine.trim() ? 'var(--danger)' : undefined }} />
           </div>
         </div>
       </div>
@@ -620,7 +623,7 @@ function NewSecTripPage() {
             </span>
           )}
           <Link href="/sec/trips" className="btn btn-secondary">Cancel</Link>
-          <button onClick={handleSave} disabled={saving || !trainNo || !date || coachCount === 0} className="btn btn-primary">
+          <button onClick={handleSave} disabled={saving || !trainNo || !date || coachCount === 0 || !availMp || !washingLine.trim()} className="btn btn-primary">
             <Save size={14} /> {saving ? 'Saving…' : 'Save Trip'}
           </button>
         </div>
