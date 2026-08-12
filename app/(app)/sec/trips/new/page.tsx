@@ -51,15 +51,18 @@ function NewSecTripPage() {
     return today()
   })
   const [trainNo,     setTrainNo]     = useState('')
-  // coachTypes drives everything — 'AC' | 'NAC' per coach slot
-  const [coachTypes,  setCoachTypes]  = useState<('AC'|'NAC')[]>([])
+  // coachTypes drives everything — 'AC' | 'NAC' | 'Blank' per coach slot
+  const [coachTypes,  setCoachTypes]  = useState<('AC'|'NAC'|'Blank')[]>([])
   const [reqMp,       setReqMp]       = useState(0)
   const [availMp,     setAvailMp]     = useState(0)
   const [washingLine, setWashingLine] = useState('')
 
   // Derived counts
-  const coachCount = coachTypes.length
-  const acCount    = coachTypes.filter(t => t === 'AC').length
+  const coachCount      = coachTypes.length
+  const blankCount      = coachTypes.filter(t => t === 'Blank').length
+  const effectiveCount  = coachCount - blankCount
+  const acCount         = coachTypes.filter(t => t === 'AC').length
+  const nacCount        = coachTypes.filter(t => t === 'NAC').length
 
   // Interior: criteria[criterionIndex][coachIndex], default 3, max 3
   const [intCriteria, setIntCriteria] = useState<number[][]>([])
@@ -148,25 +151,27 @@ function NewSecTripPage() {
     if (coachCount <= 1) return
     setCoachTypes(prev => prev.slice(0, -1))
   }
-  function setCoachType(idx: number, type: 'AC'|'NAC') {
+  function setCoachType(idx: number, type: 'AC'|'NAC'|'Blank') {
     setCoachTypes(prev => { const n = [...prev]; n[idx] = type; return n })
   }
 
   // ── Calculations ─────────────────────────────────────────────────────────
+  // Blank coaches: null in intPerCoach, excluded from totals + max rating
   const intPerCoach = Array.from({ length: coachCount }, (_, i) =>
-    intCriteria.reduce((s, row) => s + (row[i] ?? 0), 0)
+    coachTypes[i] === 'Blank' ? null : intCriteria.reduce((s, row) => s + (row[i] ?? 0), 0)
   )
-  const intOverall    = intPerCoach.reduce((s, v) => s + v, 0)
-  const intMaxRating  = coachCount * 12
+  const intOverall    = intPerCoach.reduce((s, v) => s + (v ?? 0), 0)
+  const intMaxRating  = effectiveCount * 12
   const intPctRating  = intMaxRating > 0 ? (intOverall / intMaxRating) * 100 : 100
   const intPctPenalty = 100 - intPctRating
-  const intPenaltyA   = (intPctPenalty / 100) * coachCount * ratePerCoach
+  const intPenaltyA   = (intPctPenalty / 100) * effectiveCount * ratePerCoach
 
-  const extOverall    = extRatings.reduce((s, v) => s + v, 0)
-  const extMaxRating  = coachCount * 3
+  // For exterior: skip blank coaches from sum/max
+  const extOverall    = extRatings.reduce((s, v, i) => coachTypes[i] === 'Blank' ? s : s + v, 0)
+  const extMaxRating  = effectiveCount * 3
   const extPctRating  = extMaxRating > 0 ? (extOverall / extMaxRating) * 100 : 100
   const extPctPenalty = 100 - extPctRating
-  const extPenaltyA   = isAcwp ? 0 : (extPctPenalty / 100) * coachCount * ratePerCoachExterior
+  const extPenaltyA   = isAcwp ? 0 : (extPctPenalty / 100) * effectiveCount * ratePerCoachExterior
 
   const penaltyBTotal = Object.values(annexB).reduce((s, v) => s + (Number(v) || 0), 0)
   const grandTotal    = intPenaltyA + extPenaltyA + penaltyBTotal
@@ -177,17 +182,22 @@ function NewSecTripPage() {
 
     const annexBObj = Object.fromEntries(Object.entries(annexB).map(([k, v]) => [k, Number(v) || 0]))
 
+    // Filter out Blank coaches — only send active coaches' data
+    const activeIndices = coachTypes.map((t, i) => t !== 'Blank' ? i : -1).filter(i => i >= 0)
+    const activeCriteria = intCriteria.map(row => activeIndices.map(i => row[i]))
+    const activeExtRatings = activeIndices.map(i => extRatings[i] ?? 3)
+
     // Single batch call — one DB connection, both Interior + Exterior saved together
     const res = await fetch('/api/sec/trips/batch', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         date, train_no: trainNo,
-        coach_count: coachCount, ac_count: acCount,
+        coach_count: effectiveCount, ac_count: acCount,
         req_manpower: reqMp, avail_manpower: availMp,
         washing_line: washingLine,
         is_acwp: isAcwp,
-        coach_criteria: intCriteria,
-        coach_ratings: !isAcwp ? extRatings : [],
+        coach_criteria: activeCriteria,
+        coach_ratings: !isAcwp ? activeExtRatings : [],
         annex_b: annexBObj,
       }),
     })
@@ -290,7 +300,7 @@ function NewSecTripPage() {
               )}
               {coachCount > 0 && (
                 <span style={{ fontSize: 11, color: 'var(--text-4)' }}>
-                  {acCount}AC + {coachCount - acCount}NAC
+                  {acCount}AC + {nacCount}NAC{blankCount > 0 ? ` + ${blankCount}B` : ''}
                 </span>
               )}
             </div>
@@ -381,29 +391,28 @@ function NewSecTripPage() {
                   <th style={th}>% Rating</th>
                   <th style={th}>Penalty A</th>
                 </tr>
-                {/* Composition row — per-coach AC/NAC dropdown */}
+                {/* Composition row — per-coach AC/NAC/Blank dropdown */}
                 <tr>
                   <td style={{ ...stickyLabel('var(--surface-2)', 'var(--text-4)'), fontSize: 10 }}>Composition</td>
                   {Array.from({ length: coachCount }, (_, i) => {
                     const type = coachTypes[i] ?? 'NAC'
-                    const isAC = type === 'AC'
+                    const isAC = type === 'AC'; const isBlank = type === 'Blank'
+                    const cellBg = isBlank ? '#F3F4F6' : isAC ? '#EFF6FF' : '#ECFDF5'
+                    const textColor = isBlank ? '#9CA3AF' : isAC ? '#2563EB' : '#16A34A'
                     return (
-                      <td key={i} style={{
-                        ...td(isAC ? '#EFF6FF' : '#ECFDF5'),
-                        padding: '2px 1px',
-                      }}>
+                      <td key={i} style={{ ...td(cellBg), padding: '2px 1px' }}>
                         <select
                           value={type}
-                          onChange={e => setCoachType(i, e.target.value as 'AC'|'NAC')}
+                          onChange={e => setCoachType(i, e.target.value as 'AC'|'NAC'|'Blank')}
                           style={{
                             fontSize: 9, fontWeight: 700, border: 'none',
                             background: 'transparent', cursor: 'pointer', width: '100%',
-                            textAlign: 'center', color: isAC ? '#2563EB' : '#16A34A',
-                            outline: 'none',
+                            textAlign: 'center', color: textColor, outline: 'none',
                           }}
                         >
                           <option value="AC">AC</option>
                           <option value="NAC">NAC</option>
+                          <option value="Blank">Blank</option>
                         </select>
                       </td>
                     )
@@ -420,27 +429,32 @@ function NewSecTripPage() {
                       Criterion {ci + 1}
                       <span style={{ fontSize: 9, fontWeight: 400, marginLeft: 4, color: '#B45309' }}>(max 3)</span>
                     </td>
-                    {row.map((r, i) => (
-                      <td key={i} style={{ ...td('#FFFBEB', ci === 0 ? '2px solid #FDE68A' : undefined), padding: '3px 2px' }}>
-                        <input
-                          type="number" min={0} max={3} value={r}
-                          onChange={e => {
-                            const v = Math.min(3, Math.max(0, Number(e.target.value)))
-                            setIntCriteria(prev => {
-                              const next = prev.map(r => [...r])
-                              next[ci][i] = v
-                              return next
-                            })
-                          }}
-                          style={{
-                            width: '100%', textAlign: 'center', padding: '4px 1px',
-                            borderRadius: 6, border: `1.5px solid ${ratingColor3(r)}`,
-                            background: ratingColor3(r) + '18',
-                            color: 'var(--text)', fontFamily: 'var(--font)', fontSize: 12, fontWeight: 700, outline: 'none',
-                          }}
-                        />
+                    {row.map((r, i) => {
+                      const isBlankCoach = coachTypes[i] === 'Blank'
+                      return (
+                      <td key={i} style={{ ...td(isBlankCoach ? '#F3F4F6' : '#FFFBEB', ci === 0 ? '2px solid #FDE68A' : undefined), padding: '3px 2px' }}>
+                        {isBlankCoach
+                          ? <div style={{ textAlign: 'center', color: '#D1D5DB', fontSize: 14, fontWeight: 700 }}>—</div>
+                          : <input
+                              type="number" min={0} max={3} value={r}
+                              onChange={e => {
+                                const v = Math.min(3, Math.max(0, Number(e.target.value)))
+                                setIntCriteria(prev => {
+                                  const next = prev.map(r => [...r])
+                                  next[ci][i] = v
+                                  return next
+                                })
+                              }}
+                              style={{
+                                width: '100%', textAlign: 'center', padding: '4px 1px',
+                                borderRadius: 6, border: `1.5px solid ${ratingColor3(r)}`,
+                                background: ratingColor3(r) + '18',
+                                color: 'var(--text)', fontFamily: 'var(--font)', fontSize: 12, fontWeight: 700, outline: 'none',
+                              }}
+                            />
+                        }
                       </td>
-                    ))}
+                    )})}
                     {ci < CRITERIA_COUNT - 1
                       ? <><td style={td('#FEF3C7')} /><td style={td('#FEF3C7')} /><td style={td('#FEF3C7')} /></>
                       : <><td style={{ ...td('#FEF9C3', '2px solid #FDE68A'), fontWeight: 800, fontSize: 12, color: 'var(--text)', padding: '5px 2px' }} /><td style={td('#FEF3C7')} /><td style={td('#FEF3C7')} /></>
@@ -455,15 +469,18 @@ function NewSecTripPage() {
                     <span style={{ fontSize: 9, fontWeight: 400, marginLeft: 4 }}>(max 12)</span>
                   </td>
                   {intPerCoach.map((total, i) => (
-                    <td key={i} style={{ ...td('#FEF9C3'), padding: '4px 2px' }}>
-                      <div style={{
-                        width: '100%', textAlign: 'center', padding: '3px 1px',
-                        borderRadius: 6, border: `1.5px solid ${ratingColor12(total)}`,
-                        background: ratingColor12(total) + '18',
-                        fontSize: 12, fontWeight: 800, color: ratingColor12(total),
-                      }}>
-                        {total}
-                      </div>
+                    <td key={i} style={{ ...td(total === null ? '#F3F4F6' : '#FEF9C3'), padding: '4px 2px' }}>
+                      {total === null
+                        ? <div style={{ textAlign: 'center', color: '#D1D5DB', fontSize: 14, fontWeight: 700 }}>—</div>
+                        : <div style={{
+                            width: '100%', textAlign: 'center', padding: '3px 1px',
+                            borderRadius: 6, border: `1.5px solid ${ratingColor12(total)}`,
+                            background: ratingColor12(total) + '18',
+                            fontSize: 12, fontWeight: 800, color: ratingColor12(total),
+                          }}>
+                            {total}
+                          </div>
+                      }
                     </td>
                   ))}
                   <td style={{ ...td('#FEF9C3'), fontWeight: 800, fontSize: 13, color: 'var(--text)' }}>{intOverall}</td>
@@ -487,23 +504,28 @@ function NewSecTripPage() {
                           ACWP
                         </td>
                       ))
-                    : extRatings.map((r, i) => (
-                        <td key={i} style={{ ...td('#F0FDF4', '2px solid #BBF7D0'), padding: '3px 2px' }}>
-                          <input
-                            type="number" min={0} max={3} value={r}
-                            onChange={e => {
-                              const v = Math.min(3, Math.max(0, Number(e.target.value)))
-                              setExtRatings(prev => { const next = [...prev]; next[i] = v; return next })
-                            }}
-                            style={{
-                              width: '100%', textAlign: 'center', padding: '4px 1px',
-                              borderRadius: 6, border: `1.5px solid ${ratingColor3(r)}`,
-                              background: ratingColor3(r) + '18',
-                              color: 'var(--text)', fontFamily: 'var(--font)', fontSize: 12, fontWeight: 700, outline: 'none',
-                            }}
-                          />
+                    : extRatings.map((r, i) => {
+                        const isBlankCoach = coachTypes[i] === 'Blank'
+                        return (
+                        <td key={i} style={{ ...td(isBlankCoach ? '#F3F4F6' : '#F0FDF4', '2px solid #BBF7D0'), padding: '3px 2px' }}>
+                          {isBlankCoach
+                            ? <div style={{ textAlign: 'center', color: '#D1D5DB', fontSize: 14, fontWeight: 700 }}>—</div>
+                            : <input
+                                type="number" min={0} max={3} value={r}
+                                onChange={e => {
+                                  const v = Math.min(3, Math.max(0, Number(e.target.value)))
+                                  setExtRatings(prev => { const next = [...prev]; next[i] = v; return next })
+                                }}
+                                style={{
+                                  width: '100%', textAlign: 'center', padding: '4px 1px',
+                                  borderRadius: 6, border: `1.5px solid ${ratingColor3(r)}`,
+                                  background: ratingColor3(r) + '18',
+                                  color: 'var(--text)', fontFamily: 'var(--font)', fontSize: 12, fontWeight: 700, outline: 'none',
+                                }}
+                              />
+                          }
                         </td>
-                      ))
+                      )})
                   }
                   <td style={{ ...td('#DCFCE7', '2px solid #BBF7D0'), fontWeight: 700, fontSize: 12, color: 'var(--text)' }}>
                     {isAcwp ? 'NA' : extOverall}

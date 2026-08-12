@@ -295,7 +295,8 @@ export async function GET(req: Request) {
         writeDataRow(dataRow, date, trainNo, extTrip)
         dayPenaltyA    += extTrip.penaltyA
         dayPenaltyB    += extTrip.penaltyBTotal
-        dayExtCoaches  += Number(extTrip.trip.coach_count)
+        // Only count exterior coaches when manually rated (not ACWP)
+        if (!Number(extTrip.trip.is_acwp)) dayExtCoaches += Number(extTrip.trip.coach_count)
         dataRow++
       }
       // Any extra trips (same type) written individually
@@ -306,7 +307,7 @@ export async function GET(req: Request) {
         dayPenaltyA   += td.penaltyA
         dayPenaltyB   += td.penaltyBTotal
         if (isInt) dayIntCoaches += Number(td.trip.coach_count)
-        else       dayExtCoaches += Number(td.trip.coach_count)
+        else if (!Number(td.trip.is_acwp)) dayExtCoaches += Number(td.trip.coach_count)
         dataRow++
       }
 
