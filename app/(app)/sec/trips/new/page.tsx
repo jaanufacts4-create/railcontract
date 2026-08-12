@@ -160,7 +160,7 @@ function NewSecTripPage() {
   const intPerCoach = Array.from({ length: coachCount }, (_, i) =>
     coachTypes[i] === 'Blank' ? null : intCriteria.reduce((s, row) => s + (row[i] ?? 0), 0)
   )
-  const intOverall    = intPerCoach.reduce((s, v) => s + (v ?? 0), 0)
+  const intOverall    = intPerCoach.reduce((s: number, v) => s + (v ?? 0), 0)
   const intMaxRating  = effectiveCount * 12
   const intPctRating  = intMaxRating > 0 ? (intOverall / intMaxRating) * 100 : 100
   const intPctPenalty = 100 - intPctRating
