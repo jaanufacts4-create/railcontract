@@ -19,6 +19,7 @@ let _nirmalV2Migrated   = false
 let _obhsScheduleMigrated = false
 let _nirmalObhsMigrated    = false
 let _laundryMigrated       = false
+let _inspectionMigrated    = false
 export async function ensureDB() {
   if (!_migrated) {
     await migrate()
@@ -64,6 +65,10 @@ export async function ensureDB() {
   if (!_laundryMigrated) {
     await migrateLaundry()
     _laundryMigrated = true
+  }
+  if (!_inspectionMigrated) {
+    await migrateInspections()
+    _inspectionMigrated = true
   }
 }
 
@@ -777,6 +782,32 @@ async function migrateLaundry() {
       packets                  INTEGER NOT NULL DEFAULT 0,
       created_at               TEXT    NOT NULL DEFAULT (datetime('now')),
       UNIQUE(date, depot)
+    )
+  `)
+}
+
+async function migrateInspections() {
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS inspections (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      date          TEXT    NOT NULL,
+      month_year    TEXT    NOT NULL,
+      depot         TEXT    NOT NULL DEFAULT 'ASR',
+      inspected_by  TEXT    NOT NULL,
+      designation   TEXT    NOT NULL,
+      created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
+    )
+  `)
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS inspection_items (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      inspection_id INTEGER NOT NULL REFERENCES inspections(id) ON DELETE CASCADE,
+      item_name     TEXT    NOT NULL,
+      lot_of        INTEGER NOT NULL DEFAULT 0,
+      items_checked INTEGER NOT NULL DEFAULT 0,
+      items_dirty   INTEGER NOT NULL DEFAULT 0,
+      penalty       INTEGER NOT NULL DEFAULT 200,
+      created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
     )
   `)
 }
