@@ -94,18 +94,18 @@ export default function DirtyFreshPage() {
   }
 
   // ── Style helpers ────────────────────────────────────────────
-  const cell = (bg: string, color: string, line: string, bold?: boolean): React.CSSProperties => ({
-    padding: '5px 8px', fontSize: 12, textAlign: 'right', color,
-    background: bg, fontWeight: bold ? 700 : 400,
+  const cell = (bg: string, color: string, line: string): React.CSSProperties => ({
+    padding: '5px 10px', fontSize: 12, textAlign: 'center', color,
+    background: bg, fontWeight: 700,
     border: `1px solid ${line}`,
   })
   const hdr = (bg: string, line: string): React.CSSProperties => ({
     fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em',
-    padding: '6px 8px', whiteSpace: 'nowrap', textAlign: 'right',
+    padding: '6px 8px', whiteSpace: 'nowrap', textAlign: 'center',
     color: '#FFFFFF', background: bg, border: `1px solid ${line}`,
   })
   const totCell = (bg: string, color: string, line: string): React.CSSProperties => ({
-    padding: '7px 8px', fontSize: 12, textAlign: 'right', fontWeight: 800,
+    padding: '7px 10px', fontSize: 12, textAlign: 'center', fontWeight: 800,
     color, background: bg, border: `1.5px solid ${line}`,
   })
 
@@ -191,14 +191,14 @@ export default function DirtyFreshPage() {
                       </td>
 
                       {/* ── Dirty cols ── */}
-                      <td style={cell(dBg, D_TEXT, D_LINE, true)}>{d ? num(d.bed_sheet_total)  : <span style={{ color: '#D97706', opacity: .4 }}>—</span>}</td>
+                      <td style={cell(dBg, D_TEXT, D_LINE)}>{d ? num(d.bed_sheet_total)  : <span style={{ color: '#D97706', opacity: .4 }}>—</span>}</td>
                       <td style={cell(dBg, D_TEXT, D_LINE)}>{d ? num(d.pillow_cover_total) : <span style={{ color: '#D97706', opacity: .4 }}>—</span>}</td>
                       <td style={cell(dBg, D_TEXT, D_LINE)}>{d ? num(d.face_towel)         : <span style={{ color: '#D97706', opacity: .4 }}>—</span>}</td>
                       <td style={cell(dBg, D_TEXT, D_LINE)}>{d ? num(d.blanket)            : <span style={{ color: '#D97706', opacity: .4 }}>—</span>}</td>
                       <td style={cell(dBg, D_TEXT, D_LINE)}>{d ? num(d.canvas_bag)         : <span style={{ color: '#D97706', opacity: .4 }}>—</span>}</td>
 
                       {/* ── Fresh cols ── */}
-                      <td style={cell(fBg, F_TEXT, F_LINE, true)}>{f ? num(f.bed_sheet_fresh)      : <span style={{ color: '#16A34A', opacity: .4 }}>—</span>}</td>
+                      <td style={cell(fBg, F_TEXT, F_LINE)}>{f ? num(f.bed_sheet_fresh)      : <span style={{ color: '#16A34A', opacity: .4 }}>—</span>}</td>
                       <td style={cell(fBg, f && f.bed_sheet_condemned > 0 ? C_TEXT : F_TEXT, C_LINE)}>{f ? num(f.bed_sheet_condemned)   : <span style={{ opacity: .4 }}>—</span>}</td>
                       <td style={cell(fBg, F_TEXT, F_LINE)}>{f ? num(f.pillow_cover_fresh)   : <span style={{ color: '#16A34A', opacity: .4 }}>—</span>}</td>
                       <td style={cell(fBg, f && f.pillow_cover_condemned > 0 ? C_TEXT : F_TEXT, C_LINE)}>{f ? num(f.pillow_cover_condemned): <span style={{ opacity: .4 }}>—</span>}</td>
@@ -208,7 +208,7 @@ export default function DirtyFreshPage() {
                       <td style={cell(fBg, f && f.blanket_condemned > 0 ? C_TEXT : F_TEXT, C_LINE)}>{f ? num(f.blanket_condemned)       : <span style={{ opacity: .4 }}>—</span>}</td>
                       <td style={cell(fBg, F_TEXT, F_LINE)}>{f ? num(f.canvas_bag_fresh)     : <span style={{ color: '#16A34A', opacity: .4 }}>—</span>}</td>
                       <td style={cell(fBg, f && f.canvas_bag_condemned > 0 ? C_TEXT : F_TEXT, C_LINE)}>{f ? num(f.canvas_bag_condemned)  : <span style={{ opacity: .4 }}>—</span>}</td>
-                      <td style={cell(fBg, P_TEXT, P_LINE, true)}>{f ? num(f.packets) : <span style={{ opacity: .4 }}>—</span>}</td>
+                      <td style={cell(fBg, P_TEXT, P_LINE)}>{f ? num(f.packets) : <span style={{ opacity: .4 }}>—</span>}</td>
 
                       {/* ── Actions ── */}
                       <td style={{ padding: '3px 6px', textAlign: 'center', background: 'var(--surface)', border: '1px solid var(--border-md)', whiteSpace: 'nowrap' }}>
