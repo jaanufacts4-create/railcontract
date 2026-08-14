@@ -51,7 +51,7 @@ export default function LaundryReportsPage() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingLeft: 4, marginBottom: 20, borderLeft: '3px solid #16A34A', paddingLeft: 14 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 20, borderLeft: '3px solid #16A34A', paddingLeft: 14 }}>
           {[
             { num: 1, name: 'Dirty Linen',          desc: 'Date-wise dirty linen dispatched per item type', color: '#B45309' },
             { num: 2, name: 'Fresh Linen',           desc: 'Date-wise washed linen received: Fresh + Condemned', color: '#166534' },
