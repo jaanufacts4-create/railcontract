@@ -7,7 +7,7 @@ import {
   ClipboardList, PlusCircle, Train, CalendarDays,
   Settings, ChevronLeft, ChevronRight, Building2, Layers,
   Sparkles, BarChart3, ChevronDown, ChevronUp,
-  TrendingUp, FileSpreadsheet, LayoutDashboard, Receipt, Leaf,
+  TrendingUp, FileSpreadsheet, LayoutDashboard, Receipt, Leaf, Shirt,
 } from 'lucide-react'
 
 const GROUPS = [
@@ -56,6 +56,14 @@ const GROUPS = [
     sub:   'Prime Cleaning Services',
     links: [] as { href: string; label: string; icon: React.ElementType }[],
   },
+  {
+    id:    'laundry',
+    label: 'Departmental Laundry',
+    sub:   'Laundry Management',
+    links: [
+      { href: '/laundry', label: 'Overview', icon: ClipboardList },
+    ],
+  },
 ]
 
 const GROUP_ICONS: Record<string, React.ElementType> = {
@@ -63,6 +71,7 @@ const GROUP_ICONS: Record<string, React.ElementType> = {
   nirmal:    Leaf,
   secondary: Building2,
   rpc:       Layers,
+  laundry:   Shirt,
 }
 
 export default function Sidebar() {
