@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2, Pencil } from 'lucide-react'
 import Link from 'next/link'
 
 type Entry = {
@@ -19,10 +19,11 @@ const ROW_COLS: (keyof Entry)[] = [
   'face_towel','bath_towel','blanket_cover','blanket','canvas_bag',
 ]
 
-function EntryRow({ e, onDel, td }: {
+function EntryRow({ e, onDel, td, editHref }: {
   e: Entry
   onDel: (id: number, date: string) => void
   td: (bold?: boolean) => React.CSSProperties
+  editHref: string
 }) {
   return (
     <tr>
@@ -31,7 +32,8 @@ function EntryRow({ e, onDel, td }: {
         const isPrimary = k === 'bed_sheet_total' || k === 'pillow_cover_total'
         return <td key={k} style={{ ...td(isPrimary), color: isPrimary ? 'var(--primary)' : undefined }}>{n(Number(e[k]))}</td>
       })}
-      <td style={{ ...td(), textAlign: 'center' }}>
+      <td style={{ ...td(), textAlign: 'center', whiteSpace: 'nowrap' }}>
+        <Link href={editHref} title="Edit" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 4, borderRadius: 6, display: 'inline-flex', marginRight: 2 }}><Pencil size={12} /></Link>
         <button onClick={() => onDel(e.id, e.date)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: 4, borderRadius: 6 }}>
           <Trash2 size={12} />
         </button>
@@ -205,12 +207,12 @@ export default function LaundryPage() {
               </thead>
               <tbody>
                 {/* ── Day 1-15 ── */}
-                {first15.map(e => <EntryRow key={e.id} e={e} onDel={del} td={td} />)}
+                {first15.map(e => <EntryRow key={e.id} e={e} onDel={del} td={td} editHref={tab === 'dirty' ? `/laundry/raw-data/${e.id}/edit` : `/laundry/fresh-data/${e.id}/edit`} />)}
                 {first15.length > 0 && (
                   <SubtotalRow label="1–15 Total" group={first15} keys={KEYS} sumGroup={sumGroup} />
                 )}
                 {/* ── Day 16-31 ── */}
-                {second16.map(e => <EntryRow key={e.id} e={e} onDel={del} td={td} />)}
+                {second16.map(e => <EntryRow key={e.id} e={e} onDel={del} td={td} editHref={tab === 'dirty' ? `/laundry/raw-data/${e.id}/edit` : `/laundry/fresh-data/${e.id}/edit`} />)}
                 {second16.length > 0 && (
                   <SubtotalRow label="16–31 Total" group={second16} keys={KEYS} sumGroup={sumGroup} />
                 )}
