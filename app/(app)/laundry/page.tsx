@@ -70,20 +70,23 @@ export default function LaundryPage() {
     const saved = typeof window !== 'undefined' ? localStorage.getItem('laundry_last_month') : null
     return saved ?? new Date().toISOString().slice(0, 7)
   })
+  const [tab, setTab] = useState<'dirty' | 'fresh'>('dirty')
   const [entries, setEntries] = useState<Entry[]>([])
   const [loading, setLoading] = useState(false)
 
   async function load() {
     setLoading(true)
-    const data = await fetch(`/api/laundry/raw-data?month_year=${monthYear}`).then(r => r.json())
+    const endpoint = tab === 'dirty' ? 'raw-data' : 'fresh-data'
+    const data = await fetch(`/api/laundry/${endpoint}?month_year=${monthYear}`).then(r => r.json())
     setEntries(data.entries ?? [])
     setLoading(false)
   }
-  useEffect(() => { load() }, [monthYear])
+  useEffect(() => { load() }, [monthYear, tab])
 
   async function del(id: number, date: string) {
     if (!confirm(`Delete entry for ${fmtDate(date)}?`)) return
-    await fetch(`/api/laundry/raw-data/${id}`, { method: 'DELETE' })
+    const endpoint = tab === 'dirty' ? 'raw-data' : 'fresh-data'
+    await fetch(`/api/laundry/${endpoint}/${id}`, { method: 'DELETE' })
     load()
   }
 
@@ -117,26 +120,45 @@ export default function LaundryPage() {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <div style={{ flex: 1 }}>
-          <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', letterSpacing: '-.02em', margin: 0 }}>Departmental Laundry</h1>
-          <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '3px 0 0' }}>Raw Data · ASR Depot · M/s Peyush Traders</p>
+          <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', letterSpacing: '-.02em', margin: 0 }}>Raw Data</h1>
+          <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '3px 0 0' }}>Departmental Laundry · ASR Depot · M/s Peyush Traders</p>
+        </div>
+        {/* Dirty / Fresh tab switcher */}
+        <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: '1.5px solid var(--border)' }}>
+          {(['dirty', 'fresh'] as const).map(t => (
+            <button key={t} onClick={() => setTab(t)} style={{
+              padding: '7px 18px', fontSize: 13, fontWeight: 700, border: 'none', cursor: 'pointer',
+              background: tab === t ? (t === 'dirty' ? '#FEF3C7' : '#DCFCE7') : 'var(--surface)',
+              color: tab === t ? (t === 'dirty' ? '#92400E' : '#166534') : 'var(--text-4)',
+              transition: 'background .12s, color .12s',
+            }}>
+              {t === 'dirty' ? '🔴 Dirty' : '🟢 Fresh'}
+            </button>
+          ))}
         </div>
         <input type="month" className="input" style={{ width: 155 }} value={monthYear} onChange={e => {
           setMonthYear(e.target.value)
           localStorage.setItem('laundry_last_month', e.target.value)
         }} />
-        <Link href={`/laundry/raw-data/new?month=${monthYear}`} className="btn btn-primary">
-          <Plus size={14} /> New Entry
+        <Link href={tab === 'dirty' ? `/laundry/raw-data/new?month=${monthYear}` : `/laundry/fresh-data/new?month=${monthYear}`}
+          className="btn btn-primary">
+          <Plus size={14} /> {tab === 'dirty' ? 'Dirty Linen Entry' : 'Fresh Linen Entry'}
         </Link>
       </div>
 
       {/* Stat chips */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
-        {[
-          { label: 'Days Entered',    value: entries.length,                          color: '#2563EB' },
-          { label: 'Bed Sheets',      value: tot('bed_sheet_total').toLocaleString('en-IN'),  color: '#7C3AED' },
-          { label: 'Pillow Covers',   value: tot('pillow_cover_total').toLocaleString('en-IN'), color: '#0EA5E9' },
-          { label: 'Total Items',     value: (tot('bed_sheet_total') + tot('pillow_cover_total') + tot('face_towel') + tot('bath_towel') + tot('blanket_cover') + tot('blanket') + tot('canvas_bag')).toLocaleString('en-IN'), color: '#16A34A' },
-        ].map(({ label, value, color }) => (
+        {(tab === 'dirty' ? [
+          { label: 'Days Entered',  value: entries.length,                                                color: '#2563EB' },
+          { label: 'Bed Sheets',    value: tot('bed_sheet_total').toLocaleString('en-IN'),                color: '#7C3AED' },
+          { label: 'Pillow Covers', value: tot('pillow_cover_total').toLocaleString('en-IN'),             color: '#0EA5E9' },
+          { label: 'Total Items',   value: (tot('bed_sheet_total') + tot('pillow_cover_total') + tot('face_towel') + tot('bath_towel') + tot('blanket_cover') + tot('blanket') + tot('canvas_bag')).toLocaleString('en-IN'), color: '#16A34A' },
+        ] : [
+          { label: 'Days Entered',  value: entries.length,                    color: '#2563EB' },
+          { label: 'BS Fresh',      value: tot('bed_sheet_fresh' as keyof Entry).toLocaleString('en-IN'),      color: '#16A34A' },
+          { label: 'PC Fresh',      value: tot('pillow_cover_fresh' as keyof Entry).toLocaleString('en-IN'),   color: '#0EA5E9' },
+          { label: 'Packets',       value: tot('packets' as keyof Entry).toLocaleString('en-IN'),              color: '#7C3AED' },
+        ]).map(({ label, value, color }) => (
           <div key={label} className="card" style={{ padding: '12px 16px' }}>
             <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--text-4)', margin: '0 0 4px' }}>{label}</p>
             <p style={{ fontSize: 20, fontWeight: 700, color, margin: 0 }}>{value}</p>
@@ -148,9 +170,10 @@ export default function LaundryPage() {
 
       {!loading && entries.length === 0 && (
         <div className="card" style={{ padding: 48, textAlign: 'center' }}>
-          <p style={{ fontSize: 14, color: 'var(--text-3)', fontWeight: 500, margin: 0 }}>No entries for {monthYear}</p>
-          <Link href={`/laundry/raw-data/new?month=${monthYear}`} className="btn btn-primary" style={{ marginTop: 12, display: 'inline-flex' }}>
-            <Plus size={14} /> Add First Entry
+          <p style={{ fontSize: 14, color: 'var(--text-3)', fontWeight: 500, margin: 0 }}>No {tab} entries for {monthYear}</p>
+          <Link href={tab === 'dirty' ? `/laundry/raw-data/new?month=${monthYear}` : `/laundry/fresh-data/new?month=${monthYear}`}
+            className="btn btn-primary" style={{ marginTop: 12, display: 'inline-flex' }}>
+            <Plus size={14} /> Add First {tab === 'dirty' ? 'Dirty' : 'Fresh'} Entry
           </Link>
         </div>
       )}

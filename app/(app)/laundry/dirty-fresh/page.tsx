@@ -187,6 +187,24 @@ export default function DirtyFreshPage() {
                   )
                 })}
               </tbody>
+              <tfoot>
+                <tr style={{ background: 'var(--surface-2)' }}>
+                  <td style={{ padding: '8px 12px', fontSize: 11, fontWeight: 800, color: 'var(--text-3)', borderTop: '2px solid var(--border)', whiteSpace: 'nowrap' }}>TOTAL</td>
+                  {/* Dirty totals */}
+                  {(['bed_sheet_total','pillow_cover_total','face_towel','blanket','canvas_bag'] as (keyof DirtyEntry)[]).map(k => (
+                    <td key={k} style={{ padding: '8px 8px', fontSize: 12, fontWeight: 800, textAlign: 'right', background: '#FEF3C7', color: '#92400E', borderTop: '2px solid #FDE68A' }}>
+                      {dirty.reduce((s, e) => s + Number(e[k] ?? 0), 0).toLocaleString('en-IN')}
+                    </td>
+                  ))}
+                  {/* Fresh totals */}
+                  {(['bed_sheet_fresh','bed_sheet_condemned','pillow_cover_fresh','pillow_cover_condemned','face_towel_fresh','face_towel_condemned','blanket_fresh','blanket_condemned','canvas_bag_fresh','canvas_bag_condemned','packets'] as (keyof FreshEntry)[]).map(k => (
+                    <td key={k} style={{ padding: '8px 8px', fontSize: 12, fontWeight: 800, textAlign: 'right', background: '#DCFCE7', color: '#166534', borderTop: '2px solid #BBF7D0' }}>
+                      {fresh.reduce((s, e) => s + Number(e[k] ?? 0), 0).toLocaleString('en-IN')}
+                    </td>
+                  ))}
+                  <td style={{ borderTop: '2px solid var(--border)', background: 'var(--surface-2)' }} />
+                </tr>
+              </tfoot>
             </table>
           </div>
         </div>
