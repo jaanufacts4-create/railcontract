@@ -129,7 +129,7 @@ export async function GET(req: Request) {
 
   let slNo = 1; let totalA = 0
 
-  for (const [, rows] of grouped) {
+  for (const [, rows] of Array.from(grouped)) {
     const first = rows[0]
     const startRow = ws.lastRow!.number + 1
 
@@ -271,7 +271,7 @@ export async function GET(req: Request) {
     ws.mergeCells(`E${rn}:I${rn}`)
     const bg = i % 2 === 0 ? 'FFFFFBEB' : 'FFFFFFFF'
 
-    const cells: [string, unknown, string][] = [
+    const cells: [string, ExcelJS.CellValue, string][] = [
       ['A', dSl++,              'center'],
       ['B', String(r.item_name),'left'  ],
       ['D', Number(r.qty),      'center'],
@@ -389,11 +389,11 @@ export async function GET(req: Request) {
   ws.addRow([])
   ws.mergeCells(`C${pvTotRn}:D${pvTotRn}`)
   ws.mergeCells(`F${pvTotRn}:J${pvTotRn}`)
-  ;[
-    ['C', 'TOTAL', 'center', 'FFB45309'],
+  ;([
+    ['C', 'TOTAL',      'center', 'FFB45309'],
     ['E', pvTotalDirty, 'center', 'FFB45309'],
     ['F', pvTotalNP,    'center', 'FFDC2626'],
-  ].forEach(([col, val, align, argb]) => {
+  ] as [string, ExcelJS.CellValue, string, string][]).forEach(([col, val, align, argb]) => {
     const c = ws.getCell(`${col}${pvTotRn}`)
     c.value = val
     applyBorder(c)
