@@ -737,6 +737,7 @@ async function migrateNirmalOBHS() {
 
 /** ─── Departmental Laundry ───────────────────────────────────────────────── */
 async function migrateLaundry() {
+  // Dirty linen dispatched
   await db.execute(`
     CREATE TABLE IF NOT EXISTS laundry_raw_data (
       id                  INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -753,6 +754,28 @@ async function migrateLaundry() {
       blanket             INTEGER NOT NULL DEFAULT 0,
       canvas_bag          INTEGER NOT NULL DEFAULT 0,
       created_at          TEXT    NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(date, depot)
+    )
+  `)
+  // Fresh (washed) linen received
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS laundry_fresh_data (
+      id                       INTEGER PRIMARY KEY AUTOINCREMENT,
+      date                     TEXT    NOT NULL,
+      month_year               TEXT    NOT NULL,
+      depot                    TEXT    NOT NULL DEFAULT 'ASR',
+      bed_sheet_fresh          INTEGER NOT NULL DEFAULT 0,
+      bed_sheet_condemned      INTEGER NOT NULL DEFAULT 0,
+      pillow_cover_fresh       INTEGER NOT NULL DEFAULT 0,
+      pillow_cover_condemned   INTEGER NOT NULL DEFAULT 0,
+      face_towel_fresh         INTEGER NOT NULL DEFAULT 0,
+      face_towel_condemned     INTEGER NOT NULL DEFAULT 0,
+      blanket_fresh            INTEGER NOT NULL DEFAULT 0,
+      blanket_condemned        INTEGER NOT NULL DEFAULT 0,
+      canvas_bag_fresh         INTEGER NOT NULL DEFAULT 0,
+      canvas_bag_condemned     INTEGER NOT NULL DEFAULT 0,
+      packets                  INTEGER NOT NULL DEFAULT 0,
+      created_at               TEXT    NOT NULL DEFAULT (datetime('now')),
       UNIQUE(date, depot)
     )
   `)
