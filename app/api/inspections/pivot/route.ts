@@ -26,9 +26,9 @@ export async function GET(req: Request) {
   }
 
   const pivot = PIVOT_ITEMS.map(item => ({
-    item,
-    units:    dirtyMap[item] ?? 0,
-    units_np: (dirtyMap[item] ?? 0) * 2,  // units against no payment
+    item_name:   item,
+    total_dirty: dirtyMap[item] ?? 0,
+    units_np:    (dirtyMap[item] ?? 0) * 2,
   }))
 
   return NextResponse.json({ pivot })

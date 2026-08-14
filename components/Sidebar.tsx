@@ -7,10 +7,14 @@ import {
   ClipboardList, PlusCircle, Train, CalendarDays,
   Settings, ChevronLeft, ChevronRight, Building2, Layers,
   Sparkles, BarChart3, ChevronDown, ChevronUp,
-  TrendingUp, FileSpreadsheet, LayoutDashboard, Receipt, Leaf, Shirt,
+  TrendingUp, FileSpreadsheet, LayoutDashboard, Receipt, Leaf, Shirt, AlertTriangle,
 } from 'lucide-react'
 
-const GROUPS = [
+type NavLink = { href: string; label: string; icon: React.ElementType }
+type SubGroup = { id: string; label: string; links: NavLink[] }
+type Group = { id: string; label: string; sub: string; links: NavLink[]; subGroups?: SubGroup[] }
+
+const GROUPS: Group[] = [
   {
     id:    'primary',
     label: 'Primary MCC/OBHS Bill',
@@ -54,22 +58,30 @@ const GROUPS = [
     id:    'rpc',
     label: 'RPC-IV / Secondary Bill',
     sub:   'Prime Cleaning Services',
-    links: [] as { href: string; label: string; icon: React.ElementType }[],
+    links: [] as NavLink[],
   },
   {
     id:    'laundry',
     label: 'Departmental Laundry',
     sub:   'M/s Peyush Traders',
     links: [
-      { href: '/laundry',                label: 'Raw Data',              icon: ClipboardList   },
-      { href: '/laundry/raw-data/new',   label: 'Dirty Linen Entry',     icon: PlusCircle      },
-      { href: '/laundry/fresh-data/new', label: 'Fresh Linen Entry',     icon: PlusCircle      },
-      { href: '/laundry/dirty-fresh',    label: 'Dirty–Fresh Register',  icon: FileSpreadsheet },
-      { href: '/laundry/inspections',       label: 'Inspections',           icon: ClipboardList   },
-      { href: '/laundry/inspection-notes', label: 'Inspection Notes',      icon: ClipboardList   },
-      { href: '/laundry/damaged-linen',    label: 'Damaged Linen',         icon: FileSpreadsheet },
-      { href: '/laundry/store-inspections',label: 'Store Inspections',     icon: ClipboardList   },
-      { href: '/laundry/reports',          label: 'Reports',               icon: BarChart3       },
+      { href: '/laundry',                label: 'Raw Data',             icon: ClipboardList   },
+      { href: '/laundry/raw-data/new',   label: 'Dirty Linen Entry',    icon: PlusCircle      },
+      { href: '/laundry/fresh-data/new', label: 'Fresh Linen Entry',    icon: PlusCircle      },
+      { href: '/laundry/dirty-fresh',    label: 'Dirty–Fresh Register', icon: FileSpreadsheet },
+      { href: '/laundry/reports',        label: 'Reports',              icon: BarChart3       },
+    ],
+    subGroups: [
+      {
+        id: 'penalties',
+        label: 'Penalties',
+        links: [
+          { href: '/laundry/inspections',       label: 'Inspection of Dirty Linen', icon: ClipboardList   },
+          { href: '/laundry/inspection-notes',  label: 'Inspection Notes',          icon: ClipboardList   },
+          { href: '/laundry/damaged-linen',     label: 'Damaged Linen',             icon: FileSpreadsheet },
+          { href: '/laundry/store-inspections', label: 'Store Inspections',         icon: AlertTriangle   },
+        ],
+      },
     ],
   },
 ]
@@ -89,12 +101,15 @@ export default function Sidebar() {
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(
     () => Object.fromEntries(GROUPS.map(g => [g.id, false]))
   )
+  const [openSubGroups, setOpenSubGroups] = useState<Record<string, boolean>>({ penalties: true })
 
   useEffect(() => {
     const s = localStorage.getItem('sb-collapsed')
     if (s === '1') setCollapsed(true)
     const og = localStorage.getItem('sb-open-groups')
     if (og) { try { setOpenGroups(JSON.parse(og)) } catch { /* ignore */ } }
+    const osg = localStorage.getItem('sb-open-subgroups')
+    if (osg) { try { setOpenSubGroups(JSON.parse(osg)) } catch { /* ignore */ } }
   }, [])
 
   function toggle() {
@@ -108,6 +123,14 @@ export default function Sidebar() {
     setOpenGroups(prev => {
       const next = { ...prev, [id]: !prev[id] }
       localStorage.setItem('sb-open-groups', JSON.stringify(next))
+      return next
+    })
+  }
+
+  function toggleSubGroup(id: string) {
+    setOpenSubGroups(prev => {
+      const next = { ...prev, [id]: !prev[id] }
+      localStorage.setItem('sb-open-subgroups', JSON.stringify(next))
       return next
     })
   }
@@ -232,7 +255,7 @@ export default function Sidebar() {
 
               {/* Links — hidden when group is collapsed (not when sidebar is collapsed) */}
               {(collapsed || isOpen) && (
-                group.links.length === 0 ? (
+                group.links.length === 0 && !group.subGroups?.length ? (
                   !collapsed && (
                     <div style={{ padding: '4px 16px 8px' }}>
                       <span style={{ fontSize: 11, color: 'var(--sb-label)', fontStyle: 'italic' }}>
@@ -241,57 +264,129 @@ export default function Sidebar() {
                     </div>
                   )
                 ) : (
-                  group.links.map(({ href, label, icon: Icon }) => {
-                    const active = path === href || path.startsWith(href + '/')
-                    return (
-                      <Link
-                        key={href}
-                        href={href}
-                        title={collapsed ? label : undefined}
-                        style={{
-                          display: 'flex', alignItems: 'center',
-                          gap: 10, padding: collapsed ? '8px 0' : '7px 12px',
-                          margin: '1px 8px',
-                          borderRadius: 9,
-                          background: active ? 'var(--sb-active-bg)' : 'transparent',
-                          color:      active ? 'var(--sb-active)' : 'var(--sb-text)',
-                          textDecoration: 'none',
-                          transition: 'background .12s, color .12s',
-                          overflow: 'hidden',
-                          justifyContent: collapsed ? 'center' : 'flex-start',
-                        }}
-                        onMouseEnter={e => {
-                          if (!active) {
-                            (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,.05)'
-                            ;(e.currentTarget as HTMLElement).style.color = 'var(--sb-text-hover)'
-                          }
-                        }}
-                        onMouseLeave={e => {
-                          if (!active) {
-                            (e.currentTarget as HTMLElement).style.background = 'transparent'
-                            ;(e.currentTarget as HTMLElement).style.color = 'var(--sb-text)'
-                          }
-                        }}
-                      >
-                        <Icon size={16} strokeWidth={active ? 2.2 : 1.8} style={{ flexShrink: 0 }} />
-                        {!collapsed && (
-                          <span style={{
-                            fontSize: 14, fontWeight: active ? 700 : 500,
-                            whiteSpace: 'nowrap', letterSpacing: '-.01em',
-                          }}>
-                            {label}
-                          </span>
-                        )}
-                        {!collapsed && active && (
-                          <div style={{
-                            marginLeft: 'auto', width: 5, height: 5,
-                            borderRadius: '50%', background: 'var(--sb-active)',
-                            flexShrink: 0,
-                          }} />
-                        )}
-                      </Link>
-                    )
-                  })
+                  <>
+                    {group.links.map(({ href, label, icon: Icon }) => {
+                      const active = path === href || path.startsWith(href + '/')
+                      return (
+                        <Link
+                          key={href}
+                          href={href}
+                          title={collapsed ? label : undefined}
+                          style={{
+                            display: 'flex', alignItems: 'center',
+                            gap: 10, padding: collapsed ? '8px 0' : '7px 12px',
+                            margin: '1px 8px',
+                            borderRadius: 9,
+                            background: active ? 'var(--sb-active-bg)' : 'transparent',
+                            color:      active ? 'var(--sb-active)' : 'var(--sb-text)',
+                            textDecoration: 'none',
+                            transition: 'background .12s, color .12s',
+                            overflow: 'hidden',
+                            justifyContent: collapsed ? 'center' : 'flex-start',
+                          }}
+                          onMouseEnter={e => {
+                            if (!active) {
+                              (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,.05)'
+                              ;(e.currentTarget as HTMLElement).style.color = 'var(--sb-text-hover)'
+                            }
+                          }}
+                          onMouseLeave={e => {
+                            if (!active) {
+                              (e.currentTarget as HTMLElement).style.background = 'transparent'
+                              ;(e.currentTarget as HTMLElement).style.color = 'var(--sb-text)'
+                            }
+                          }}
+                        >
+                          <Icon size={16} strokeWidth={active ? 2.2 : 1.8} style={{ flexShrink: 0 }} />
+                          {!collapsed && (
+                            <span style={{
+                              fontSize: 14, fontWeight: active ? 700 : 500,
+                              whiteSpace: 'nowrap', letterSpacing: '-.01em',
+                            }}>
+                              {label}
+                            </span>
+                          )}
+                          {!collapsed && active && (
+                            <div style={{
+                              marginLeft: 'auto', width: 5, height: 5,
+                              borderRadius: '50%', background: 'var(--sb-active)',
+                              flexShrink: 0,
+                            }} />
+                          )}
+                        </Link>
+                      )
+                    })}
+
+                    {/* Sub-groups (e.g. Penalties) */}
+                    {!collapsed && group.subGroups?.map(sg => {
+                      const sgOpen = openSubGroups[sg.id] !== false
+                      return (
+                        <div key={sg.id} style={{ margin: '4px 8px 2px' }}>
+                          <button
+                            onClick={() => toggleSubGroup(sg.id)}
+                            style={{
+                              width: '100%', background: 'rgba(255,255,255,.06)', border: 'none', cursor: 'pointer',
+                              padding: '5px 10px', display: 'flex', alignItems: 'center', gap: 6,
+                              borderRadius: 7, marginBottom: sgOpen ? 2 : 0,
+                            }}
+                          >
+                            <AlertTriangle size={9} style={{ color: '#F59E0B', flexShrink: 0 }} />
+                            <span style={{
+                              fontSize: 10, fontWeight: 700, letterSpacing: '.06em',
+                              textTransform: 'uppercase', color: '#F59E0B',
+                              whiteSpace: 'nowrap', flex: 1, textAlign: 'left',
+                            }}>
+                              {sg.label}
+                            </span>
+                            {sgOpen
+                              ? <ChevronUp   size={9} style={{ color: '#F59E0B', flexShrink: 0 }} />
+                              : <ChevronDown size={9} style={{ color: '#F59E0B', flexShrink: 0 }} />
+                            }
+                          </button>
+                          {sgOpen && sg.links.map(({ href, label, icon: Icon }) => {
+                            const active = path === href || path.startsWith(href + '/')
+                            return (
+                              <Link
+                                key={href}
+                                href={href}
+                                style={{
+                                  display: 'flex', alignItems: 'center',
+                                  gap: 9, padding: '6px 10px 6px 20px',
+                                  margin: '1px 0',
+                                  borderRadius: 8,
+                                  background: active ? 'var(--sb-active-bg)' : 'transparent',
+                                  color:      active ? 'var(--sb-active)' : 'var(--sb-text)',
+                                  textDecoration: 'none',
+                                  transition: 'background .12s, color .12s',
+                                  borderLeft: '2px solid rgba(245,158,11,.3)',
+                                }}
+                                onMouseEnter={e => {
+                                  if (!active) {
+                                    (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,.05)'
+                                    ;(e.currentTarget as HTMLElement).style.color = 'var(--sb-text-hover)'
+                                  }
+                                }}
+                                onMouseLeave={e => {
+                                  if (!active) {
+                                    (e.currentTarget as HTMLElement).style.background = 'transparent'
+                                    ;(e.currentTarget as HTMLElement).style.color = 'var(--sb-text)'
+                                  }
+                                }}
+                              >
+                                <Icon size={14} strokeWidth={active ? 2.2 : 1.8} style={{ flexShrink: 0 }} />
+                                <span style={{ fontSize: 13, fontWeight: active ? 700 : 500, whiteSpace: 'nowrap', letterSpacing: '-.01em' }}>
+                                  {label}
+                                </span>
+                                {active && (
+                                  <div style={{ marginLeft: 'auto', width: 5, height: 5, borderRadius: '50%', background: 'var(--sb-active)', flexShrink: 0 }} />
+                                )}
+                              </Link>
+                            )
+                          })}
+                        </div>
+                      )
+                    })}
+                  </>
                 )
               )}
             </div>

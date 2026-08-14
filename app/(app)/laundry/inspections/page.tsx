@@ -68,7 +68,7 @@ export default function InspectionsPage() {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <div style={{ flex: 1 }}>
-          <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', letterSpacing: '-.02em', margin: 0 }}>Inspections Register</h1>
+          <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', letterSpacing: '-.02em', margin: 0 }}>Inspection of Dirty Linen</h1>
           <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '3px 0 0' }}>ASR Depot · Departmental Laundry · M/s Peyush Traders</p>
         </div>
         <input type="month" className="input" style={{ width: 155 }} value={monthYear} onChange={e => {
@@ -125,8 +125,8 @@ export default function InspectionsPage() {
               <tbody>
                 {pivot.map((row, i) => (
                   <tr key={row.item_name} style={{ background: i % 2 === 1 ? '#FFF7ED' : '#FFFFFF' }}>
-                    <td style={{ padding: '6px 10px', border: '1px solid #E5E7EB', fontWeight: 600, color: '#111827' }}>{row.item_name}</td>
-                    <td style={{ padding: '6px 10px', border: '1px solid #E5E7EB', textAlign: 'center', fontWeight: 700, color: '#B45309' }}>{Number(row.total_dirty).toLocaleString('en-IN')}</td>
+                    <td style={{ padding: '6px 10px', border: '1px solid #E5E7EB', fontWeight: 700, color: '#111827', textAlign: 'center' }}>{row.item_name}</td>
+                    <td style={{ padding: '6px 10px', border: '1px solid #E5E7EB', textAlign: 'center', fontWeight: 800, color: '#B45309', fontSize: 13 }}>{Number(row.total_dirty).toLocaleString('en-IN')}</td>
                     <td style={{ padding: '6px 10px', border: '1px solid #FECACA', textAlign: 'center', fontWeight: 800, color: '#DC2626', fontSize: 13 }}>{Number(row.units_np).toLocaleString('en-IN')}</td>
                   </tr>
                 ))}
