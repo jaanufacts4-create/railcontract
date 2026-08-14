@@ -59,9 +59,10 @@ const GROUPS = [
   {
     id:    'laundry',
     label: 'Departmental Laundry',
-    sub:   'Laundry Management',
+    sub:   'M/s Peyush Traders',
     links: [
-      { href: '/laundry', label: 'Overview', icon: ClipboardList },
+      { href: '/laundry',              label: 'Raw Data',   icon: ClipboardList },
+      { href: '/laundry/raw-data/new', label: 'New Entry',  icon: PlusCircle    },
     ],
   },
 ]

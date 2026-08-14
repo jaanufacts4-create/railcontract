@@ -18,6 +18,7 @@ let _nirmalMigrated     = false
 let _nirmalV2Migrated   = false
 let _obhsScheduleMigrated = false
 let _nirmalObhsMigrated    = false
+let _laundryMigrated       = false
 export async function ensureDB() {
   if (!_migrated) {
     await migrate()
@@ -59,6 +60,10 @@ export async function ensureDB() {
   if (!_nirmalObhsMigrated) {
     await migrateNirmalOBHS()
     _nirmalObhsMigrated = true
+  }
+  if (!_laundryMigrated) {
+    await migrateLaundry()
+    _laundryMigrated = true
   }
 }
 
@@ -726,6 +731,29 @@ async function migrateNirmalOBHS() {
       af_penalty  REAL    NOT NULL DEFAULT 0,
       created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
       UNIQUE(train_no, date)
+    )
+  `)
+}
+
+/** ─── Departmental Laundry ───────────────────────────────────────────────── */
+async function migrateLaundry() {
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS laundry_raw_data (
+      id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+      date                TEXT    NOT NULL,
+      month_year          TEXT    NOT NULL,
+      depot               TEXT    NOT NULL DEFAULT 'ASR',
+      bed_sheet_normal    INTEGER NOT NULL DEFAULT 0,
+      bed_sheet_1ac       INTEGER NOT NULL DEFAULT 0,
+      pillow_cover_normal INTEGER NOT NULL DEFAULT 0,
+      pillow_cover_1ac    INTEGER NOT NULL DEFAULT 0,
+      face_towel          INTEGER NOT NULL DEFAULT 0,
+      bath_towel          INTEGER NOT NULL DEFAULT 0,
+      blanket_cover       INTEGER NOT NULL DEFAULT 0,
+      blanket             INTEGER NOT NULL DEFAULT 0,
+      canvas_bag          INTEGER NOT NULL DEFAULT 0,
+      created_at          TEXT    NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(date, depot)
     )
   `)
 }
