@@ -44,7 +44,7 @@ export async function GET(req: Request) {
 
   // ── Fetch all data in parallel ──
   const [inspRes, notesRes, damagedRes, storeRes] = await Promise.all([
-    db.execute({ sql: `SELECT i.*, ii.item_name, ii.lot_of, ii.items_checked, ii.items_dirty, ii.pct_dirty, ii.penalty FROM inspections i JOIN inspection_items ii ON ii.inspection_id=i.id WHERE i.month_year=? ORDER BY i.date, i.id, ii.id`, args: [month_year] }),
+    db.execute({ sql: `SELECT i.id, i.date, i.inspected_by, i.designation, ii.item_name, ii.lot_of, ii.items_checked, ii.items_dirty, ii.penalty FROM inspections i JOIN inspection_items ii ON ii.inspection_id=i.id WHERE i.month_year=? ORDER BY i.date, i.id, ii.id`, args: [month_year] }),
     db.execute({ sql: `SELECT * FROM inspection_notes WHERE month_year=? ORDER BY date, id`, args: [month_year] }),
     db.execute({ sql: `SELECT e.id, e.date, di.item_name, di.qty, di.rate, di.penalty FROM damaged_linen_entries e JOIN damaged_linen_items di ON di.entry_id=e.id WHERE e.month_year=? ORDER BY e.date, e.id, di.id`, args: [month_year] }),
     db.execute({ sql: `SELECT * FROM store_inspections WHERE month_year=? ORDER BY date, id`, args: [month_year] }),
@@ -88,7 +88,7 @@ export async function GET(req: Request) {
   hRow1.eachCell((cell, ci) => styleHdr(cell, HDR_BLUE))
 
   // Group inspection rows by inspection id
-  type InspRow = { sl_no: number; date: string; inspected_by: string; designation: string; item_name: string; lot_of: number; items_checked: number; items_dirty: number; pct_dirty: number; penalty: number; id: number }
+  type InspRow = { id: number; date: string; inspected_by: string; designation: string; item_name: string; lot_of: number; items_checked: number; items_dirty: number; penalty: number }
   const inspRows = inspRes.rows as unknown as InspRow[]
 
   // Group by id keeping insertion order
@@ -108,7 +108,8 @@ export async function GET(req: Request) {
     const startRow = ws1.lastRow!.number + 1
 
     rows.forEach((item, idx) => {
-      const pct = Number(item.pct_dirty)
+      const checked = Number(item.items_checked)
+      const pct = checked > 0 ? Math.round((Number(item.items_dirty) / checked) * 100) : 0
       const pen = Number(item.penalty)
       totalPenalty1 += pen
       pivotMap[item.item_name] = (pivotMap[item.item_name] ?? 0) + Number(item.items_dirty)
