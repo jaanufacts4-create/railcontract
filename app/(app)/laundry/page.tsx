@@ -13,6 +13,58 @@ type Entry = {
 function fmtDate(d: string) { const [y,m,day] = d.split('-'); return `${day}-${m}-${y}` }
 function n(v: number) { return v > 0 ? v.toLocaleString('en-IN') : '—' }
 
+const ROW_COLS: (keyof Entry)[] = [
+  'bed_sheet_normal','bed_sheet_1ac','bed_sheet_total',
+  'pillow_cover_normal','pillow_cover_1ac','pillow_cover_total',
+  'face_towel','bath_towel','blanket_cover','blanket','canvas_bag',
+]
+
+function EntryRow({ e, onDel, td }: {
+  e: Entry
+  onDel: (id: number, date: string) => void
+  td: (bold?: boolean) => React.CSSProperties
+}) {
+  return (
+    <tr>
+      <td style={{ ...td(true), textAlign: 'left', paddingLeft: 20, color: 'var(--text-3)' }}>{fmtDate(e.date)}</td>
+      {ROW_COLS.map(k => {
+        const isPrimary = k === 'bed_sheet_total' || k === 'pillow_cover_total'
+        return <td key={k} style={{ ...td(isPrimary), color: isPrimary ? 'var(--primary)' : undefined }}>{n(Number(e[k]))}</td>
+      })}
+      <td style={{ ...td(), textAlign: 'center' }}>
+        <button onClick={() => onDel(e.id, e.date)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: 4, borderRadius: 6 }}>
+          <Trash2 size={12} />
+        </button>
+      </td>
+    </tr>
+  )
+}
+
+function SubtotalRow({ label, group, keys, sumGroup }: {
+  label: string
+  group: Entry[]
+  keys: (keyof Entry)[]
+  sumGroup: (g: Entry[], k: keyof Entry) => number
+}) {
+  return (
+    <tr style={{ background: '#EFF6FF' }}>
+      <td style={{ padding: '7px 10px 7px 20px', fontSize: 11, fontWeight: 800, color: '#1D4ED8', borderBottom: '2px solid #BFDBFE', borderTop: '2px solid #BFDBFE', textAlign: 'left', whiteSpace: 'nowrap' }}>
+        {label}
+      </td>
+      {keys.map(k => {
+        const isPrimary = k === 'bed_sheet_total' || k === 'pillow_cover_total'
+        const v = sumGroup(group, k)
+        return (
+          <td key={k} style={{ padding: '7px 10px', fontSize: 12, fontWeight: 800, textAlign: 'right', color: isPrimary ? '#1D4ED8' : '#1e3a5f', borderBottom: '2px solid #BFDBFE', borderTop: '2px solid #BFDBFE' }}>
+            {v > 0 ? v.toLocaleString('en-IN') : '—'}
+          </td>
+        )
+      })}
+      <td style={{ borderBottom: '2px solid #BFDBFE', borderTop: '2px solid #BFDBFE' }} />
+    </tr>
+  )
+}
+
 export default function LaundryPage() {
   const [monthYear, setMonthYear] = useState(() => {
     const saved = typeof window !== 'undefined' ? localStorage.getItem('laundry_last_month') : null
@@ -35,7 +87,18 @@ export default function LaundryPage() {
     load()
   }
 
-  // Column totals
+  // Split into two halves
+  const first15  = entries.filter(e => Number(e.date.slice(8)) <= 15)
+  const second16 = entries.filter(e => Number(e.date.slice(8)) > 15)
+
+  const KEYS: (keyof Entry)[] = [
+    'bed_sheet_normal','bed_sheet_1ac','bed_sheet_total',
+    'pillow_cover_normal','pillow_cover_1ac','pillow_cover_total',
+    'face_towel','bath_towel','blanket_cover','blanket','canvas_bag',
+  ]
+  function sumGroup(group: Entry[], key: keyof Entry) {
+    return group.reduce((s, e) => s + Number(e[key]), 0)
+  }
   const tot = (key: keyof Entry) => entries.reduce((s, e) => s + Number(e[key]), 0)
 
   const th: React.CSSProperties = {
@@ -118,27 +181,16 @@ export default function LaundryPage() {
                 </tr>
               </thead>
               <tbody>
-                {entries.map(e => (
-                  <tr key={e.id}>
-                    <td style={{ ...td(true), textAlign: 'left', paddingLeft: 20, color: 'var(--text-3)' }}>{fmtDate(e.date)}</td>
-                    <td style={td()}>{n(e.bed_sheet_normal)}</td>
-                    <td style={td()}>{n(e.bed_sheet_1ac)}</td>
-                    <td style={{ ...td(true), color: 'var(--primary)' }}>{n(e.bed_sheet_total)}</td>
-                    <td style={td()}>{n(e.pillow_cover_normal)}</td>
-                    <td style={td()}>{n(e.pillow_cover_1ac)}</td>
-                    <td style={{ ...td(true), color: 'var(--primary)' }}>{n(e.pillow_cover_total)}</td>
-                    <td style={td()}>{n(e.face_towel)}</td>
-                    <td style={td()}>{n(e.bath_towel)}</td>
-                    <td style={td()}>{n(e.blanket_cover)}</td>
-                    <td style={td()}>{n(e.blanket)}</td>
-                    <td style={td()}>{n(e.canvas_bag)}</td>
-                    <td style={{ ...td(), textAlign: 'center' }}>
-                      <button onClick={() => del(e.id, e.date)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: 4, borderRadius: 6 }}>
-                        <Trash2 size={12} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {/* ── Day 1-15 ── */}
+                {first15.map(e => <EntryRow key={e.id} e={e} onDel={del} td={td} />)}
+                {first15.length > 0 && (
+                  <SubtotalRow label="1–15 Total" group={first15} keys={KEYS} sumGroup={sumGroup} />
+                )}
+                {/* ── Day 16-31 ── */}
+                {second16.map(e => <EntryRow key={e.id} e={e} onDel={del} td={td} />)}
+                {second16.length > 0 && (
+                  <SubtotalRow label="16–31 Total" group={second16} keys={KEYS} sumGroup={sumGroup} />
+                )}
               </tbody>
               <tfoot>
                 <tr style={{ background: 'var(--surface-2)' }}>

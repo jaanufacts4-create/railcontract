@@ -52,9 +52,14 @@ function NewLaundryEntryPage() {
     setVals(prev => ({ ...prev, [k]: Math.max(0, isNaN(v) ? 0 : v) }))
   }
 
-  const bedTotal      = vals.bed_sheet_normal    + vals.bed_sheet_1ac
-  const pillowTotal   = vals.pillow_cover_normal + vals.pillow_cover_1ac
-  const grandDirty    = bedTotal + pillowTotal + vals.face_towel + vals.bath_towel + vals.blanket_cover + vals.blanket + vals.canvas_bag
+  const bedTotal    = vals.bed_sheet_normal    + vals.bed_sheet_1ac
+  const pillowTotal = vals.pillow_cover_normal + vals.pillow_cover_1ac
+
+  function nextDay(d: string) {
+    const dt = new Date(d)
+    dt.setDate(dt.getDate() + 1)
+    return dt.toISOString().slice(0, 10)
+  }
 
   async function handleSave() {
     setSaving(true)
@@ -68,12 +73,14 @@ function NewLaundryEntryPage() {
       else alert(b.error ?? `Error ${res.status}`)
       setSaving(false); return
     }
+    const savedDate = date
+    const nd = nextDay(date)
     setSaving(false)
-    // save month for persistence
-    if (typeof window !== 'undefined') localStorage.setItem('laundry_last_month', date.slice(0, 7))
-    // reset form
+    if (typeof window !== 'undefined') localStorage.setItem('laundry_last_month', nd.slice(0, 7))
+    // advance date to next day, reset values
+    setDate(nd)
     setVals({ bed_sheet_normal: 0, bed_sheet_1ac: 0, pillow_cover_normal: 0, pillow_cover_1ac: 0, face_towel: 0, bath_towel: 0, blanket_cover: 0, blanket: 0, canvas_bag: 0 })
-    setSavedMsg(`✅ Entry saved for ${date}! `)
+    setSavedMsg(`✅ Saved for ${savedDate} — Now entering: ${nd}`)
     setTimeout(() => setSavedMsg(''), 6000)
   }
 
@@ -178,11 +185,6 @@ function NewLaundryEntryPage() {
           </div>
         </div>
 
-        {/* Grand Total */}
-        <div style={{ marginTop: 16, padding: '12px 16px', background: 'var(--primary)', borderRadius: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <p style={{ fontSize: 13, fontWeight: 700, color: '#fff', margin: 0 }}>Total Dirty Linen</p>
-          <p style={{ fontSize: 20, fontWeight: 800, color: '#fff', margin: 0 }}>{grandDirty.toLocaleString('en-IN')}</p>
-        </div>
       </div>
 
       {/* Save bar */}
