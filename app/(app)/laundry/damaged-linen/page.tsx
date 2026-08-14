@@ -90,7 +90,7 @@ export default function DamagedLinenPage() {
                 {entry.items.map((item,i)=>(
                   <tr key={i}>
                     <td style={{padding:'6px 10px',border:W,textAlign:'center',fontWeight:700,color:'#6B7280',fontSize:11}}>{i+1}</td>
-                    <td style={{padding:'6px 10px',border:W,fontWeight:600,color:'#111827'}}>{item.item_name}</td>
+                    <td style={{padding:'6px 10px',border:W,fontWeight:600,color:'var(--text)'}}>{item.item_name}</td>
                     <td style={{padding:'6px 10px',border:W,textAlign:'center',fontWeight:700,color:'#1D4ED8'}}>{item.qty}</td>
                     <td style={{padding:'6px 10px',border:W,textAlign:'center',color:'#92400E',fontWeight:600}}>₹{Number(item.rate).toFixed(2)}</td>
                     <td style={{padding:'6px 10px',border:W,textAlign:'center',fontWeight:800,color:'#DC2626'}}>₹{Math.round(Number(item.penalty)).toLocaleString('en-IN')}</td>

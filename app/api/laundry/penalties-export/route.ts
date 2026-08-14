@@ -12,26 +12,58 @@ function monthLabel(my: string) {
   return `${MONTH_NAMES[Number(m)] ?? m} - ${y}`
 }
 
-// Helper: style a header cell
-function styleHdr(cell: ExcelJS.Cell, bgArgb: string) {
-  cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 }
-  cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgArgb } }
-  cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }
-  cell.border = {
-    top:    { style: 'thin', color: { argb: 'FFCCCCCC' } },
-    bottom: { style: 'thin', color: { argb: 'FFCCCCCC' } },
-    left:   { style: 'thin', color: { argb: 'FFCCCCCC' } },
-    right:  { style: 'thin', color: { argb: 'FFCCCCCC' } },
-  }
+// Column layout (A–J = 10 cols):
+// A=Sl/SNo  B=Date  C=InspectedBy  D=Designation  E=ItemName/Item  F=LotOf/Qty  G=Checked  H=Dirty  I=%age  J=Penalty
+
+const COL_WIDTHS = [7, 14, 28, 14, 20, 10, 12, 12, 10, 14]
+
+const BLUE  = 'FF1D4ED8'
+const AMBER = 'FFB45309'
+const RED   = 'FF991B1B'
+const GREEN = 'FF065F46'
+
+function applyBorder(cell: ExcelJS.Cell) {
+  const thin = { style: 'thin' as const, color: { argb: 'FFD1D5DB' } }
+  cell.border = { top: thin, bottom: thin, left: thin, right: thin }
 }
 
-function styleBorder(cell: ExcelJS.Cell) {
-  cell.border = {
-    top:    { style: 'thin', color: { argb: 'FFD1D5DB' } },
-    bottom: { style: 'thin', color: { argb: 'FFD1D5DB' } },
-    left:   { style: 'thin', color: { argb: 'FFD1D5DB' } },
-    right:  { style: 'thin', color: { argb: 'FFD1D5DB' } },
-  }
+function hdrCell(cell: ExcelJS.Cell, argb: string) {
+  cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 9 }
+  cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: argb } }
+  cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }
+  applyBorder(cell)
+}
+
+function sectionTitle(ws: ExcelJS.Worksheet, text: string, argb: string) {
+  const r = ws.addRow([text])
+  const lastRow = r.number
+  ws.mergeCells(`A${lastRow}:J${lastRow}`)
+  const cell = ws.getCell(`A${lastRow}`)
+  cell.value = text
+  cell.font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } }
+  cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: argb } }
+  cell.alignment = { horizontal: 'center', vertical: 'middle' }
+  r.height = 22
+}
+
+function totalRow(ws: ExcelJS.Worksheet, label: string, amount: number, labelArgb: string, amtArgb: string) {
+  const rn = ws.lastRow!.number + 1
+  ws.addRow([])
+  const r = ws.getRow(rn)
+  ws.mergeCells(`A${rn}:I${rn}`)
+  const lbl = ws.getCell(`A${rn}`)
+  lbl.value = label
+  lbl.font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } }
+  lbl.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: labelArgb } }
+  lbl.alignment = { horizontal: 'right', vertical: 'middle' }
+  applyBorder(lbl)
+  const amt = ws.getCell(`J${rn}`)
+  amt.value = amount
+  amt.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } }
+  amt.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: amtArgb } }
+  amt.alignment = { horizontal: 'center', vertical: 'middle' }
+  applyBorder(amt)
+  r.height = 22
 }
 
 export async function GET(req: Request) {
@@ -42,322 +74,336 @@ export async function GET(req: Request) {
 
   const label = monthLabel(month_year)
 
-  // ── Fetch all data in parallel ──
-  const [inspRes, notesRes, damagedRes, storeRes] = await Promise.all([
+  const [inspRes, notesRes, damagedRes, damagedRatesRes, storeRes, pivotRes] = await Promise.all([
     db.execute({ sql: `SELECT i.id, i.date, i.inspected_by, i.designation, ii.item_name, ii.lot_of, ii.items_checked, ii.items_dirty, ii.penalty FROM inspections i JOIN inspection_items ii ON ii.inspection_id=i.id WHERE i.month_year=? ORDER BY i.date, i.id, ii.id`, args: [month_year] }),
     db.execute({ sql: `SELECT * FROM inspection_notes WHERE month_year=? ORDER BY date, id`, args: [month_year] }),
     db.execute({ sql: `SELECT e.id, e.date, di.item_name, di.qty, di.rate, di.penalty FROM damaged_linen_entries e JOIN damaged_linen_items di ON di.entry_id=e.id WHERE e.month_year=? ORDER BY e.date, e.id, di.id`, args: [month_year] }),
+    db.execute({ sql: `SELECT * FROM damaged_linen_rates ORDER BY item_name`, args: [] }),
     db.execute({ sql: `SELECT * FROM store_inspections WHERE month_year=? ORDER BY date, id`, args: [month_year] }),
+    db.execute({ sql: `SELECT ii.item_name, SUM(ii.items_dirty) as total_dirty FROM inspection_items ii JOIN inspections i ON ii.inspection_id=i.id WHERE i.month_year=? GROUP BY ii.item_name`, args: [month_year] }),
   ])
 
   const wb = new ExcelJS.Workbook()
   wb.creator = 'Rail Contract Billing'
   wb.created = new Date()
 
-  // ═══════════════════════════════════════════════════════
-  // Sheet 1 — Inspection of Dirty Linen
-  // ═══════════════════════════════════════════════════════
-  const ws1 = wb.addWorksheet('Inspection of Dirty Linen')
-  ws1.columns = [
-    { key: 'sl',        width: 7  },
-    { key: 'date',      width: 14 },
-    { key: 'insp_by',   width: 28 },
-    { key: 'desig',     width: 12 },
-    { key: 'item',      width: 18 },
-    { key: 'lot_of',    width: 10 },
-    { key: 'checked',   width: 10 },
-    { key: 'dirty',     width: 10 },
-    { key: 'pct',       width: 10 },
-    { key: 'penalty',   width: 12 },
-  ]
+  const ws = wb.addWorksheet('Penalties Register', {
+    pageSetup: {
+      paperSize: 9,          // A4
+      orientation: 'portrait',
+      fitToPage: true,
+      fitToWidth: 1,
+      fitToHeight: 0,
+      margins: { left: 0.5, right: 0.5, top: 0.75, bottom: 0.75, header: 0.3, footer: 0.3 },
+    },
+  })
 
-  // Title row
-  ws1.mergeCells('A1:J1')
-  const t1 = ws1.getCell('A1')
-  t1.value = `Inspection of Linen Supplied at ASR by Contractor M/s Peyush Traders for ${label}`
-  t1.font = { bold: true, size: 12, color: { argb: 'FF1F2937' } }
-  t1.alignment = { horizontal: 'center', vertical: 'middle' }
-  t1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDBEAFE' } }
-  ws1.getRow(1).height = 28
+  ws.columns = COL_WIDTHS.map(w => ({ width: w }))
 
+  // ── MAIN TITLE ────────────────────────────────────────────────────────────
+  ws.mergeCells('A1:J1')
+  const title = ws.getCell('A1')
+  title.value = `Inspection of Linen Supplied at ASR by Contractor M/s Peyush Traders for ${label}`
+  title.font = { bold: true, size: 12, color: { argb: 'FF1E3A8A' } }
+  title.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDBEAFE' } }
+  title.alignment = { horizontal: 'center', vertical: 'middle' }
+  ws.getRow(1).height = 28
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // SECTION A — Inspection of Dirty Linen
+  // ══════════════════════════════════════════════════════════════════════════
   // Header row
-  const HDR_BLUE = 'FF1D4ED8'
-  const hdrs1 = ['Sl. No.', 'Date', 'Inspected by', 'Designation', 'Items checked', 'Lot of', 'No of items checked', 'No of items found dirty', '%age dirty', 'Penalty(Rs)']
-  const hRow1 = ws1.addRow(hdrs1)
-  hRow1.height = 36
-  hRow1.eachCell((cell, ci) => styleHdr(cell, HDR_BLUE))
+  const hRow = ws.addRow(['Sl.\nNo.', 'Date', 'Inspected by', 'Designation', 'Items\nchecked', 'Lot of', 'No of items\nchecked', 'No of items\nfound dirty', '%age\ndirty', 'Penalty\n(Rs)'])
+  hRow.height = 36
+  hRow.eachCell((cell, ci) => hdrCell(cell, BLUE))
 
-  // Group inspection rows by inspection id
+  // Data
   type InspRow = { id: number; date: string; inspected_by: string; designation: string; item_name: string; lot_of: number; items_checked: number; items_dirty: number; penalty: number }
   const inspRows = inspRes.rows as unknown as InspRow[]
 
-  // Group by id keeping insertion order
   const grouped: Map<number, InspRow[]> = new Map()
   for (const r of inspRows) {
     if (!grouped.has(r.id)) grouped.set(r.id, [])
     grouped.get(r.id)!.push(r)
   }
 
-  let slNo = 1
-  let totalPenalty1 = 0
-  const pivotMap: Record<string, number> = {}
+  let slNo = 1; let totalA = 0
 
   for (const [, rows] of grouped) {
     const first = rows[0]
-    const rowCount = rows.length
-    const startRow = ws1.lastRow!.number + 1
+    const startRow = ws.lastRow!.number + 1
 
     rows.forEach((item, idx) => {
       const checked = Number(item.items_checked)
-      const pct = checked > 0 ? Math.round((Number(item.items_dirty) / checked) * 100) : 0
-      const pen = Number(item.penalty)
-      totalPenalty1 += pen
-      pivotMap[item.item_name] = (pivotMap[item.item_name] ?? 0) + Number(item.items_dirty)
+      const dirty   = Number(item.items_dirty)
+      const pct     = checked > 0 ? Math.round((dirty / checked) * 100) : 0
+      const pen     = Number(item.penalty)
+      totalA += pen
 
-      const r = ws1.addRow([
+      const r = ws.addRow([
         idx === 0 ? slNo : null,
         idx === 0 ? fmtDate(first.date) : null,
         idx === 0 ? first.inspected_by : null,
         first.designation,
         item.item_name,
         Number(item.lot_of),
-        Number(item.items_checked),
-        Number(item.items_dirty),
-        parseFloat(pct.toFixed(2)),
+        checked,
+        dirty,
+        pct,
         pen,
       ])
       const bg = slNo % 2 === 0 ? 'FFFFFBEB' : 'FFFFFFFF'
       r.eachCell((cell, ci) => {
-        styleBorder(cell)
-        cell.alignment = { horizontal: 'center', vertical: 'middle' }
+        applyBorder(cell)
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } }
-        if (ci === 3) cell.alignment = { horizontal: 'left', vertical: 'middle' }  // Inspected by left
-        if (ci === 5) cell.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 }  // Item name left
-        if (ci === 10) { cell.font = { bold: true, color: { argb: 'FFDC2626' } } }
+        cell.alignment = { horizontal: 'center', vertical: 'middle' }
+        if (ci === 3) cell.alignment = { horizontal: 'left', vertical: 'middle' }
+        if (ci === 5) { cell.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 }; cell.font = { bold: true } }
+        if (ci === 9) {
+          const pctColor = pct >= 25 ? 'FFDC2626' : pct >= 15 ? 'FFD97706' : 'FF16A34A'
+          cell.font = { bold: true, color: { argb: pctColor } }
+        }
+        if (ci === 10) cell.font = { bold: true, color: { argb: 'FFDC2626' } }
       })
     })
 
-    const endRow = ws1.lastRow!.number
-    // Merge cells for inspection-level fields (Sl.No, Date, Inspected By) if multi-item
-    if (rowCount > 1) {
-      ws1.mergeCells(`A${startRow}:A${endRow}`)
-      ws1.mergeCells(`B${startRow}:B${endRow}`)
-      ws1.mergeCells(`C${startRow}:C${endRow}`)
+    const endRow = ws.lastRow!.number
+    if (rows.length > 1) {
+      ws.mergeCells(`A${startRow}:A${endRow}`)
+      ws.mergeCells(`B${startRow}:B${endRow}`)
+      ws.mergeCells(`C${startRow}:C${endRow}`)
     }
-    // Re-apply alignment on merged cells
-    ws1.getCell(`A${startRow}`).alignment = { horizontal: 'center', vertical: 'middle' }
-    ws1.getCell(`B${startRow}`).alignment = { horizontal: 'center', vertical: 'middle' }
-    ws1.getCell(`C${startRow}`).alignment = { horizontal: 'left', vertical: 'middle' }
-
+    ws.getCell(`A${startRow}`).alignment = { horizontal: 'center', vertical: 'middle' }
+    ws.getCell(`B${startRow}`).alignment = { horizontal: 'center', vertical: 'middle' }
+    ws.getCell(`C${startRow}`).alignment = { horizontal: 'left', vertical: 'middle' }
     slNo++
   }
 
-  // Total row
-  if (grouped.size > 0) {
-    const totRow = ws1.addRow(['', '', '', '', 'TOTAL', '', '', '', '', totalPenalty1])
-    totRow.height = 22
-    totRow.eachCell((cell, ci) => {
-      cell.font = { bold: true, size: 11, color: ci === 10 ? { argb: 'FFDC2626' } : { argb: 'FF374151' } }
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } }
-      cell.alignment = { horizontal: 'center', vertical: 'middle' }
-      styleBorder(cell)
-    })
-    totRow.getCell(5).font = { bold: true }
-    ws1.mergeCells(`A${ws1.lastRow!.number}:D${ws1.lastRow!.number}`)
-  }
+  // TOTAL A
+  totalRow(ws, 'TOTAL A', totalA, 'FF1D4ED8', 'FF1D4ED8')
 
-  // ── Pivot Table ──
-  ws1.addRow([])
-  ws1.addRow([])
-  const pivotTitleRow = ws1.lastRow!.number
-  ws1.mergeCells(`A${pivotTitleRow}:J${pivotTitleRow}`)
-  const pt = ws1.getCell(`A${pivotTitleRow}`)
-  pt.value = 'Dirty Linen Summary — Units Against No Payment'
-  pt.font = { bold: true, size: 11, color: { argb: 'FF451A03' } }
-  pt.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF3C7' } }
-  pt.alignment = { horizontal: 'center', vertical: 'middle' }
-  ws1.getRow(pivotTitleRow).height = 22
+  // Spacer
+  ws.addRow([])
 
-  const pivotHdrRow = ws1.addRow(['', '', 'Items', '', 'Units (Dirty)', 'Units Against No Payment', '', '', '', ''])
-  ws1.mergeCells(`C${pivotHdrRow.number}:D${pivotHdrRow.number}`)
-  ws1.mergeCells(`F${pivotHdrRow.number}:J${pivotHdrRow.number}`)
-  ;['C','E','F'].forEach(col => {
-    const cell = ws1.getCell(`${col}${pivotHdrRow.number}`)
-    styleHdr(cell, 'FFB45309')
-  })
-  pivotHdrRow.height = 20
+  // ══════════════════════════════════════════════════════════════════════════
+  // SECTION B — Inspection Notes
+  // ══════════════════════════════════════════════════════════════════════════
+  sectionTitle(ws, 'Inspection Notes', 'FF7C3AED')
 
-  const PIVOT_ITEMS = ['Bed Sheet', 'Pillow Cover', 'Face Towel', 'Blanket']
-  for (const item of PIVOT_ITEMS) {
-    const units = pivotMap[item] ?? 0
-    const unitsNp = units * 2
-    const pr = ws1.addRow(['', '', item, '', units, unitsNp, '', '', '', ''])
-    ws1.mergeCells(`C${pr.number}:D${pr.number}`)
-    ws1.mergeCells(`F${pr.number}:J${pr.number}`)
-    pr.eachCell((cell, ci) => {
-      if (ci === 3) { cell.font = { bold: true }; cell.alignment = { horizontal: 'left', indent: 1, vertical: 'middle' }; styleBorder(cell) }
-      if (ci === 5) { cell.font = { bold: true, color: { argb: 'FFB45309' } }; cell.alignment = { horizontal: 'center', vertical: 'middle' }; styleBorder(cell) }
-      if (ci === 6) { cell.font = { bold: true, color: { argb: 'FFDC2626' } }; cell.alignment = { horizontal: 'center', vertical: 'middle' }; styleBorder(cell) }
-    })
-  }
+  // Notes header
+  const nhRow = ws.addRow(['S.\nNo.', 'Remarks / Observations', '', '', '', '', '', '', '', 'Penalty\n(Rs)'])
+  nhRow.height = 30
+  ws.mergeCells(`B${nhRow.number}:I${nhRow.number}`)
+  ;['A','B','J'].forEach(col => hdrCell(ws.getCell(`${col}${nhRow.number}`), 'FF7C3AED'))
 
-  // ═══════════════════════════════════════════════════════
-  // Sheet 2 — Inspection Notes
-  // ═══════════════════════════════════════════════════════
-  const ws2 = wb.addWorksheet('Inspection Notes')
-  ws2.columns = [
-    { key: 'sl',      width: 7  },
-    { key: 'date',    width: 14 },
-    { key: 'insp_by', width: 30 },
-    { key: 'remarks', width: 36 },
-    { key: 'tool',    width: 12 },
-    { key: 'clean',   width: 14 },
-    { key: 'wrap',    width: 14 },
-    { key: 'total',   width: 14 },
-  ]
+  let totalB = 0
+  const noteRows = notesRes.rows as Record<string, unknown>[]
 
-  ws2.mergeCells('A1:H1')
-  const t2 = ws2.getCell('A1')
-  t2.value = `Inspection Notes — ASR Depot — ${label}`
-  t2.font = { bold: true, size: 12 }; t2.alignment = { horizontal: 'center', vertical: 'middle' }
-  t2.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E7FF' } }
-  ws2.getRow(1).height = 28
-
-  const hdrs2 = ['Sl. No.', 'Date', 'Inspected By', 'Remarks', 'Tool Short (₹500/ea)', 'Cleanliness (₹1000)', 'Bedsheet Wrapping (₹250/ea)', 'Total Penalty (₹)']
-  const hRow2 = ws2.addRow(hdrs2)
-  hRow2.height = 36
-  hRow2.eachCell(cell => styleHdr(cell, 'FF7C3AED'))
-
-  let totalPenalty2 = 0
-  ;(notesRes.rows as Record<string, unknown>[]).forEach((r, i) => {
+  noteRows.forEach((r, i) => {
     const tool  = Number(r.tool_short_count) * 500
     const clean = Number(r.cleanliness_fail) * 1000
     const wrap  = Number(r.bedsheet_wrapping_qty) * 250
     const total = tool + clean + wrap
-    totalPenalty2 += total
-    const row = ws2.addRow([i + 1, fmtDate(String(r.date)), String(r.inspected_by), String(r.remarks ?? ''), tool, clean, wrap, total])
+    totalB += total
+
+    // Build description from stored remarks + breakdown
+    const parts: string[] = []
+    if (r.remarks) parts.push(String(r.remarks))
+    if (tool  > 0) parts.push(`Tool short: ${r.tool_short_count} × ₹500 = ₹${tool}`)
+    if (clean > 0) parts.push(`Cleanliness unsatisfactory: ₹1,000`)
+    if (wrap  > 0) parts.push(`Serviceable bedsheet used for wrapping: ${r.bedsheet_wrapping_qty} × ₹250 = ₹${wrap}`)
+    const desc = parts.join(' | ')
+
+    const rn = ws.lastRow!.number + 1
+    ws.addRow([])
+    const row = ws.getRow(rn)
+    ws.mergeCells(`B${rn}:I${rn}`)
+    const snCell  = ws.getCell(`A${rn}`)
+    const dscCell = ws.getCell(`B${rn}`)
+    const penCell = ws.getCell(`J${rn}`)
+
+    snCell.value  = i + 1
+    dscCell.value = desc
+    penCell.value = total
+
     const bg = i % 2 === 0 ? 'FFEEF2FF' : 'FFFFFFFF'
-    row.eachCell((cell, ci) => {
-      styleBorder(cell)
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } }
-      cell.alignment = { horizontal: ci <= 4 ? 'left' : 'center', vertical: 'middle', wrapText: ci === 4 }
-      if (ci === 8) cell.font = { bold: true, color: { argb: 'FFDC2626' } }
+    ;[snCell, dscCell, penCell].forEach(c => {
+      applyBorder(c)
+      c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } }
     })
-    row.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' }
-    row.getCell(2).alignment = { horizontal: 'center', vertical: 'middle' }
+    snCell.alignment  = { horizontal: 'center', vertical: 'middle' }
+    dscCell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true, indent: 1 }
+    penCell.alignment = { horizontal: 'center', vertical: 'middle' }
+    penCell.font = { bold: true, color: { argb: 'FFDC2626' } }
+    row.height = 36
   })
 
-  if (notesRes.rows.length > 0) {
-    const tr = ws2.addRow(['', '', '', 'TOTAL', '', '', '', totalPenalty2])
-    tr.height = 22
-    tr.eachCell((cell, ci) => {
-      cell.font = { bold: true, color: ci === 8 ? { argb: 'FFDC2626' } : { argb: 'FF374151' } }
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE9D5FF' } }
-      cell.alignment = { horizontal: 'center', vertical: 'middle' }
-      styleBorder(cell)
-    })
-  }
+  // TOTAL B
+  totalRow(ws, 'TOTAL B', totalB, 'FF7C3AED', 'FF7C3AED')
+  // TOTAL A+B
+  totalRow(ws, 'TOTAL   A + B', totalA + totalB, 'FF111827', 'FF111827')
 
-  // ═══════════════════════════════════════════════════════
-  // Sheet 3 — Damaged Linen
-  // ═══════════════════════════════════════════════════════
-  const ws3 = wb.addWorksheet('Damaged Linen')
-  ws3.columns = [
-    { key: 'sl',     width: 7  },
-    { key: 'date',   width: 14 },
-    { key: 'item',   width: 28 },
-    { key: 'qty',    width: 10 },
-    { key: 'rate',   width: 18 },
-    { key: 'penalty',width: 16 },
-  ]
+  // Spacer
+  ws.addRow([])
 
-  ws3.mergeCells('A1:F1')
-  const t3 = ws3.getCell('A1')
-  t3.value = `Penalty for Torn/Damaged Linen under Contractor Custody — ${label}`
-  t3.font = { bold: true, size: 12 }; t3.alignment = { horizontal: 'center', vertical: 'middle' }
-  t3.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF3C7' } }
-  ws3.getRow(1).height = 28
+  // ══════════════════════════════════════════════════════════════════════════
+  // SECTION — Penalty for Torn/Damaged Linen
+  // ══════════════════════════════════════════════════════════════════════════
+  sectionTitle(ws, 'Penalty for Torn/Damaged Linen Items under Contractor Custody', AMBER)
 
-  const hdrs3 = ['Sl. No.', 'Date', 'Item', 'Qty', 'Rate/Unit (@75% LPR)', 'Penalty (₹)']
-  const hRow3 = ws3.addRow(hdrs3)
-  hRow3.height = 32
-  hRow3.eachCell(cell => styleHdr(cell, 'FFB45309'))
+  const RATE_HDR = 'RATE/UNIT (75% of LPR as per Rly. Board Letter No. 2009/MC/165/6 Vol-I(I) Part I) Dt.'
 
-  let totalPenalty3 = 0; let sl3 = 1
-  ;(damagedRes.rows as Record<string, unknown>[]).forEach((r, i) => {
+  const dhRow = ws.addRow(['S.\nNo.', 'ITEM', '', 'Qty', RATE_HDR, '', '', '', '', 'Penalty\n(Rs)'])
+  dhRow.height = 40
+  ws.mergeCells(`B${dhRow.number}:C${dhRow.number}`)
+  ws.mergeCells(`E${dhRow.number}:I${dhRow.number}`)
+  ;['A','B','D','E','J'].forEach(col => hdrCell(ws.getCell(`${col}${dhRow.number}`), AMBER))
+
+  const damagedRows = damagedRes.rows as Record<string, unknown>[]
+  let totalDamaged = 0; let dSl = 1
+
+  damagedRows.forEach((r, i) => {
     const pen = Number(r.penalty)
-    totalPenalty3 += pen
-    const row = ws3.addRow([sl3++, fmtDate(String(r.date)), String(r.item_name), Number(r.qty), Number(r.rate), pen])
+    totalDamaged += pen
+    const rn = ws.lastRow!.number + 1
+    ws.addRow([])
+    ws.mergeCells(`B${rn}:C${rn}`)
+    ws.mergeCells(`E${rn}:I${rn}`)
     const bg = i % 2 === 0 ? 'FFFFFBEB' : 'FFFFFFFF'
-    row.eachCell((cell, ci) => {
-      styleBorder(cell)
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } }
-      cell.alignment = { horizontal: ci === 3 ? 'left' : 'center', vertical: 'middle' }
-      if (ci === 5) { cell.numFmt = '₹#,##0.00' }
-      if (ci === 6) { cell.font = { bold: true, color: { argb: 'FFDC2626' } }; cell.numFmt = '₹#,##0' }
+
+    const cells: [string, unknown, string][] = [
+      ['A', dSl++,              'center'],
+      ['B', String(r.item_name),'left'  ],
+      ['D', Number(r.qty),      'center'],
+      ['E', `₹${Number(r.rate).toFixed(2)}`,'center'],
+      ['J', pen,                'center'],
+    ]
+    cells.forEach(([col, val, align]) => {
+      const c = ws.getCell(`${col}${rn}`)
+      c.value = val
+      applyBorder(c)
+      c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } }
+      c.alignment = { horizontal: align as 'center'|'left', vertical: 'middle' }
+      if (col === 'J') c.font = { bold: true, color: { argb: 'FFDC2626' } }
+      if (col === 'B') c.font = { bold: true }
     })
+    ws.getRow(rn).height = 18
   })
 
-  if (damagedRes.rows.length > 0) {
-    const tr = ws3.addRow(['', '', '', '', 'TOTAL', totalPenalty3])
-    tr.height = 22
-    tr.eachCell((cell, ci) => {
-      cell.font = { bold: true, color: ci === 6 ? { argb: 'FFDC2626' } : { argb: 'FF374151' } }
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } }
-      cell.alignment = { horizontal: 'center', vertical: 'middle' }
-      styleBorder(cell)
-    })
+  // Damaged total
+  if (damagedRows.length > 0) {
+    totalRow(ws, 'Total', totalDamaged, 'FFB45309', 'FFB45309')
   }
 
-  // ═══════════════════════════════════════════════════════
-  // Sheet 4 — Store Inspections
-  // ═══════════════════════════════════════════════════════
-  const ws4 = wb.addWorksheet('Store Inspections')
-  ws4.columns = [
-    { key: 'sl',      width: 7  },
-    { key: 'date',    width: 14 },
-    { key: 'insp_by', width: 36 },
-    { key: 'amount',  width: 18 },
-  ]
+  // Spacer
+  ws.addRow([])
 
-  ws4.mergeCells('A1:D1')
-  const t4 = ws4.getCell('A1')
-  t4.value = `Store Inspections — Shortage of Chemicals & Cleanliness — ${label}`
-  t4.font = { bold: true, size: 12 }; t4.alignment = { horizontal: 'center', vertical: 'middle' }
-  t4.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFECFDF5' } }
-  ws4.getRow(1).height = 28
+  // ══════════════════════════════════════════════════════════════════════════
+  // SECTION — Store Inspections
+  // ══════════════════════════════════════════════════════════════════════════
+  sectionTitle(ws, 'Store Inspections, Shortage of Chemicals & Cleanliness', GREEN)
 
-  const hdrs4 = ['Sl. No.', 'Date', 'Inspected By', 'Amount (₹)']
-  const hRow4 = ws4.addRow(hdrs4)
-  hRow4.height = 30
-  hRow4.eachCell(cell => styleHdr(cell, 'FF065F46'))
+  // No sub-header needed — just rows: Date | Inspector | Amount
+  let totalStore = 0
+  const storeRows = storeRes.rows as Record<string, unknown>[]
 
-  let totalPenalty4 = 0; let sl4 = 1
-  ;(storeRes.rows as Record<string, unknown>[]).forEach((r, i) => {
+  storeRows.forEach((r, i) => {
     const amt = Number(r.amount)
-    totalPenalty4 += amt
-    const row = ws4.addRow([sl4++, fmtDate(String(r.date)), String(r.inspected_by), amt])
+    totalStore += amt
+    const rn = ws.lastRow!.number + 1
+    ws.addRow([])
+    ws.mergeCells(`A${rn}:B${rn}`)
+    ws.mergeCells(`C${rn}:I${rn}`)
     const bg = i % 2 === 0 ? 'FFECFDF5' : 'FFFFFFFF'
-    row.eachCell((cell, ci) => {
-      styleBorder(cell)
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } }
-      cell.alignment = { horizontal: ci <= 3 ? (ci === 1 || ci === 2 ? 'center' : 'left') : 'center', vertical: 'middle' }
-      if (ci === 4) { cell.font = { bold: true, color: { argb: 'FFDC2626' } }; cell.numFmt = '₹#,##0' }
+    ;([['A', fmtDate(String(r.date)), 'center'],
+       ['C', String(r.inspected_by),  'left'  ],
+       ['J', amt,                      'center']] as [string,unknown,string][]).forEach(([col, val, align]) => {
+      const c = ws.getCell(`${col}${rn}`)
+      c.value = val
+      applyBorder(c)
+      c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } }
+      c.alignment = { horizontal: align as 'center'|'left', vertical: 'middle' }
+      if (col === 'J') c.font = { bold: true, color: { argb: 'FFDC2626' } }
     })
+    ws.getRow(rn).height = 18
   })
 
-  if (storeRes.rows.length > 0) {
-    const tr = ws4.addRow(['', '', 'TOTAL', totalPenalty4])
-    tr.height = 22
-    tr.eachCell((cell, ci) => {
-      cell.font = { bold: true, color: ci === 4 ? { argb: 'FFDC2626' } : { argb: 'FF374151' } }
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD1FAE5' } }
-      cell.alignment = { horizontal: 'center', vertical: 'middle' }
-      styleBorder(cell)
-    })
+  if (storeRows.length > 0) {
+    totalRow(ws, 'Total', totalStore, 'FF065F46', 'FF065F46')
   }
 
-  // ── Serialize ──
+  // Spacer
+  ws.addRow([])
+  ws.addRow([])
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // SECTION — Dirty Linen Pivot
+  // ══════════════════════════════════════════════════════════════════════════
+  sectionTitle(ws, 'Dirty Linen — Units Against No Payment', AMBER)
+
+  const pvHRow = ws.addRow(['', '', 'Items', '', 'Units', 'Units against no payment', '', '', '', ''])
+  pvHRow.height = 22
+  ws.mergeCells(`C${pvHRow.number}:D${pvHRow.number}`)
+  ws.mergeCells(`F${pvHRow.number}:J${pvHRow.number}`)
+  ;['C','E','F'].forEach(col => hdrCell(ws.getCell(`${col}${pvHRow.number}`), AMBER))
+
+  const PIVOT_ITEMS = ['Bed Sheet', 'Pillow Cover', 'Face Towel', 'Blanket']
+  const pivotMap: Record<string, number> = {}
+  for (const r of pivotRes.rows) pivotMap[String(r.item_name)] = Number(r.total_dirty)
+
+  let pvTotalDirty = 0; let pvTotalNP = 0
+  PIVOT_ITEMS.forEach((item, i) => {
+    const units   = pivotMap[item] ?? 0
+    const unitsNP = units * 2
+    pvTotalDirty += units; pvTotalNP += unitsNP
+
+    const rn = ws.lastRow!.number + 1
+    ws.addRow([])
+    ws.mergeCells(`C${rn}:D${rn}`)
+    ws.mergeCells(`F${rn}:J${rn}`)
+    const bg = i % 2 === 0 ? 'FFFFFBEB' : 'FFFFFFFF'
+
+    const itemC = ws.getCell(`C${rn}`)
+    itemC.value = item; applyBorder(itemC)
+    itemC.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } }
+    itemC.font = { bold: true }
+    itemC.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 }
+
+    const uC = ws.getCell(`E${rn}`)
+    uC.value = units; applyBorder(uC)
+    uC.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } }
+    uC.font = { bold: true, color: { argb: 'FFB45309' } }
+    uC.alignment = { horizontal: 'center', vertical: 'middle' }
+
+    const npC = ws.getCell(`F${rn}`)
+    npC.value = unitsNP; applyBorder(npC)
+    npC.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } }
+    npC.font = { bold: true, color: { argb: 'FFDC2626' } }
+    npC.alignment = { horizontal: 'center', vertical: 'middle' }
+
+    ws.getRow(rn).height = 18
+  })
+
+  // Pivot total row
+  const pvTotRn = ws.lastRow!.number + 1
+  ws.addRow([])
+  ws.mergeCells(`C${pvTotRn}:D${pvTotRn}`)
+  ws.mergeCells(`F${pvTotRn}:J${pvTotRn}`)
+  ;[
+    ['C', 'TOTAL', 'center', 'FFB45309'],
+    ['E', pvTotalDirty, 'center', 'FFB45309'],
+    ['F', pvTotalNP,    'center', 'FFDC2626'],
+  ].forEach(([col, val, align, argb]) => {
+    const c = ws.getCell(`${col}${pvTotRn}`)
+    c.value = val
+    applyBorder(c)
+    c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } }
+    c.font = { bold: true, size: 11, color: { argb: argb as string } }
+    c.alignment = { horizontal: align as 'center', vertical: 'middle' }
+  })
+  ws.getRow(pvTotRn).height = 22
+
+  // ── Serialize ──────────────────────────────────────────────────────────────
   const buf = await wb.xlsx.writeBuffer()
   const fileName = `Penalties_${month_year}.xlsx`
   return new Response(buf as ArrayBuffer, {
