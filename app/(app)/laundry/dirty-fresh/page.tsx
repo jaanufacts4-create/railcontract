@@ -24,16 +24,41 @@ function num(n: number | null | undefined) {
   return v > 0 ? v.toLocaleString('en-IN') : '—'
 }
 function sum(arr: (DirtyEntry | FreshEntry)[], key: string) {
-  return arr.reduce((s, e) => s + Number((e as Record<string,unknown>)[key] ?? 0), 0)
+  return arr.reduce((s, e) => s + Number((e as Record<string, unknown>)[key] ?? 0), 0)
 }
+
+// ── Colour tokens ──────────────────────────────────────────────
+const D_BG      = '#FFF8E1'   // dirty cell bg
+const D_BG2     = '#FFFBEB'   // dirty cell bg alt row
+const D_HDR     = '#B45309'   // dirty header bg
+const D_LINE    = '#D97706'   // dirty grid line
+const D_TEXT    = '#451A03'   // dirty cell text
+const D_TOT_BG  = '#FEF3C7'
+const D_TOT_CLR = '#92400E'
+
+const F_BG      = '#F0FDF4'   // fresh cell bg
+const F_BG2     = '#DCFCE7'   // fresh cell bg alt row
+const F_HDR     = '#166534'   // fresh header bg
+const F_LINE    = '#16A34A'   // fresh grid line
+const F_TEXT    = '#052E16'   // fresh cell text
+const F_TOT_BG  = '#DCFCE7'
+const F_TOT_CLR = '#166534'
+
+const C_HDR     = '#991B1B'   // condemned header bg
+const C_LINE    = '#EF4444'   // condemned line
+const C_TEXT    = '#7F1D1D'   // condemned cell text
+
+const P_HDR     = '#5B21B6'   // packets header
+const P_LINE    = '#7C3AED'
+const P_TEXT    = '#3B0764'
 
 export default function DirtyFreshPage() {
   const [monthYear, setMonthYear] = useState(() => {
     const saved = typeof window !== 'undefined' ? localStorage.getItem('laundry_last_month') : null
     return saved ?? new Date().toISOString().slice(0, 7)
   })
-  const [dirty,   setDirty]   = useState<DirtyEntry[]>([])
-  const [fresh,   setFresh]   = useState<FreshEntry[]>([])
+  const [dirty, setDirty]   = useState<DirtyEntry[]>([])
+  const [fresh, setFresh]   = useState<FreshEntry[]>([])
   const [loading, setLoading] = useState(false)
 
   async function load() {
@@ -42,7 +67,7 @@ export default function DirtyFreshPage() {
       fetch(`/api/laundry/raw-data?month_year=${monthYear}`).then(r => r.json()).catch(() => ({ entries: [] })),
       fetch(`/api/laundry/fresh-data?month_year=${monthYear}`).then(r => r.json()).catch(() => ({ entries: [] })),
     ])
-    setDirty((d.entries ?? []).map((e: Record<string,unknown>) => ({
+    setDirty((d.entries ?? []).map((e: Record<string, unknown>) => ({
       ...e,
       bed_sheet_total:    Number(e.bed_sheet_total ?? 0),
       pillow_cover_total: Number(e.pillow_cover_total ?? 0),
@@ -68,17 +93,24 @@ export default function DirtyFreshPage() {
     await fetch(`/api/laundry/fresh-data/${id}`, { method: 'DELETE' }); load()
   }
 
-  const thBase: React.CSSProperties = { fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', padding: '6px 8px', whiteSpace: 'nowrap', textAlign: 'right' }
-  const thD: React.CSSProperties = { ...thBase, color: '#92400E', background: '#FFFBEB', borderBottom: '1.5px solid #FDE68A' }
-  const thF: React.CSSProperties = { ...thBase, color: '#166534', background: '#F0FDF4', borderBottom: '1.5px solid #BBF7D0' }
-  const tdBase: React.CSSProperties = { padding: '6px 8px', fontSize: 12, textAlign: 'right', borderBottom: '1px solid var(--border-md)' }
-  const tdD: React.CSSProperties = { ...tdBase, background: '#FFFBEB', color: '#451A03' }
-  const tdF: React.CSSProperties = { ...tdBase, background: '#F0FDF4', color: '#052E16' }
-  const tfD: React.CSSProperties = { ...tdBase, fontWeight: 800, background: '#FEF3C7', color: '#92400E', borderTop: '2.5px solid #FDE68A', borderBottom: 'none' }
-  const tfF: React.CSSProperties = { ...tdBase, fontWeight: 800, background: '#DCFCE7', color: '#166534', borderTop: '2.5px solid #BBF7D0', borderBottom: 'none' }
+  // ── Style helpers ────────────────────────────────────────────
+  const cell = (bg: string, color: string, line: string, bold?: boolean): React.CSSProperties => ({
+    padding: '5px 8px', fontSize: 12, textAlign: 'right', color,
+    background: bg, fontWeight: bold ? 700 : 400,
+    border: `1px solid ${line}`,
+  })
+  const hdr = (bg: string, line: string): React.CSSProperties => ({
+    fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em',
+    padding: '6px 8px', whiteSpace: 'nowrap', textAlign: 'right',
+    color: '#FFFFFF', background: bg, border: `1px solid ${line}`,
+  })
+  const totCell = (bg: string, color: string, line: string): React.CSSProperties => ({
+    padding: '7px 8px', fontSize: 12, textAlign: 'right', fontWeight: 800,
+    color, background: bg, border: `1.5px solid ${line}`,
+  })
 
-  const DIRTY_KEYS: (keyof DirtyEntry)[]   = ['bed_sheet_total','pillow_cover_total','face_towel','blanket','canvas_bag']
-  const FRESH_KEYS: (keyof FreshEntry)[]   = ['bed_sheet_fresh','bed_sheet_condemned','pillow_cover_fresh','pillow_cover_condemned','face_towel_fresh','face_towel_condemned','blanket_fresh','blanket_condemned','canvas_bag_fresh','canvas_bag_condemned','packets']
+  const DIRTY_KEYS: (keyof DirtyEntry)[] = ['bed_sheet_total', 'pillow_cover_total', 'face_towel', 'blanket', 'canvas_bag']
+  const FRESH_KEYS: (keyof FreshEntry)[] = ['bed_sheet_fresh', 'bed_sheet_condemned', 'pillow_cover_fresh', 'pillow_cover_condemned', 'face_towel_fresh', 'face_towel_condemned', 'blanket_fresh', 'blanket_condemned', 'canvas_bag_fresh', 'canvas_bag_condemned', 'packets']
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -117,68 +149,79 @@ export default function DirtyFreshPage() {
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', fontSize: 12, minWidth: '100%' }}>
               <thead>
+                {/* ── Row 1: group labels ── */}
                 <tr>
-                  <th rowSpan={2} style={{ padding: '8px 12px', fontSize: 11, fontWeight: 700, color: 'var(--text-3)', background: 'var(--surface-2)', borderBottom: '1.5px solid var(--border)', textAlign: 'left', whiteSpace: 'nowrap', verticalAlign: 'bottom' }}>Date</th>
-                  <th colSpan={5} style={{ padding: '6px 8px', fontSize: 10, fontWeight: 800, color: '#92400E', background: '#FEF3C7', borderBottom: '1px solid #FDE68A', textAlign: 'center', letterSpacing: '.04em', textTransform: 'uppercase' }}>🔴 Dirty Linen Dispatched</th>
-                  <th colSpan={11} style={{ padding: '6px 8px', fontSize: 10, fontWeight: 800, color: '#166534', background: '#DCFCE7', borderBottom: '1px solid #BBF7D0', textAlign: 'center', letterSpacing: '.04em', textTransform: 'uppercase' }}>🟢 Washed Linen Received</th>
-                  <th rowSpan={2} style={{ padding: '6px 8px', background: 'var(--surface-2)', borderBottom: '1.5px solid var(--border)', width: 72 }}></th>
+                  <th rowSpan={2} style={{ padding: '8px 12px', fontSize: 11, fontWeight: 700, color: 'var(--text)', background: 'var(--surface-2)', border: '1px solid var(--border)', textAlign: 'left', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>Date</th>
+                  <th colSpan={5} style={{ padding: '6px 10px', fontSize: 10, fontWeight: 800, color: '#FFF', background: D_HDR, border: `1.5px solid ${D_LINE}`, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '.05em' }}>🔴 Dirty Linen Dispatched</th>
+                  <th colSpan={11} style={{ padding: '6px 10px', fontSize: 10, fontWeight: 800, color: '#FFF', background: F_HDR, border: `1.5px solid ${F_LINE}`, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '.05em' }}>🟢 Washed Linen Received</th>
+                  <th rowSpan={2} style={{ padding: '6px 8px', background: 'var(--surface-2)', border: '1px solid var(--border)', width: 72 }}></th>
                 </tr>
+                {/* ── Row 2: column labels ── */}
                 <tr>
-                  <th style={thD}>Bed Sheet</th>
-                  <th style={thD}>P.Cover</th>
-                  <th style={thD}>Face Towel</th>
-                  <th style={thD}>Blanket</th>
-                  <th style={thD}>C.Bag</th>
-                  <th style={thF}>BS Fresh</th>
-                  <th style={{ ...thF, color: '#EF4444', background: '#FEF2F2', borderBottom: '1.5px solid #FECACA' }}>BS Condmd</th>
-                  <th style={thF}>PC Fresh</th>
-                  <th style={{ ...thF, color: '#EF4444', background: '#FEF2F2', borderBottom: '1.5px solid #FECACA' }}>PC Condmd</th>
-                  <th style={thF}>FT Fresh</th>
-                  <th style={{ ...thF, color: '#EF4444', background: '#FEF2F2', borderBottom: '1.5px solid #FECACA' }}>FT Condmd</th>
-                  <th style={thF}>Blkt Fresh</th>
-                  <th style={{ ...thF, color: '#EF4444', background: '#FEF2F2', borderBottom: '1.5px solid #FECACA' }}>Blkt Condmd</th>
-                  <th style={thF}>CB Fresh</th>
-                  <th style={{ ...thF, color: '#EF4444', background: '#FEF2F2', borderBottom: '1.5px solid #FECACA' }}>CB Condmd</th>
-                  <th style={{ ...thF, color: '#7C3AED', background: '#F5F3FF', borderBottom: '1.5px solid #DDD6FE' }}>Packets</th>
+                  <th style={hdr(D_HDR, D_LINE)}>Bed Sheet</th>
+                  <th style={hdr(D_HDR, D_LINE)}>P.Cover</th>
+                  <th style={hdr(D_HDR, D_LINE)}>Face Towel</th>
+                  <th style={hdr(D_HDR, D_LINE)}>Blanket</th>
+                  <th style={hdr(D_HDR, D_LINE)}>C.Bag</th>
+
+                  <th style={hdr(F_HDR, F_LINE)}>BS Fresh</th>
+                  <th style={hdr(C_HDR, C_LINE)}>BS Condmd</th>
+                  <th style={hdr(F_HDR, F_LINE)}>PC Fresh</th>
+                  <th style={hdr(C_HDR, C_LINE)}>PC Condmd</th>
+                  <th style={hdr(F_HDR, F_LINE)}>FT Fresh</th>
+                  <th style={hdr(C_HDR, C_LINE)}>FT Condmd</th>
+                  <th style={hdr(F_HDR, F_LINE)}>Blkt Fresh</th>
+                  <th style={hdr(C_HDR, C_LINE)}>Blkt Condmd</th>
+                  <th style={hdr(F_HDR, F_LINE)}>CB Fresh</th>
+                  <th style={hdr(C_HDR, C_LINE)}>CB Condmd</th>
+                  <th style={hdr(P_HDR, P_LINE)}>Packets</th>
                 </tr>
               </thead>
               <tbody>
-                {allDates.map(date => {
+                {allDates.map((date, idx) => {
                   const d = dirtyMap[date]
                   const f = freshMap[date]
+                  const alt = idx % 2 === 1
+                  const dBg = alt ? D_BG2 : D_BG
+                  const fBg = alt ? F_BG2 : F_BG
                   return (
                     <tr key={date}>
-                      <td style={{ padding: '6px 12px', fontWeight: 700, color: 'var(--text-2)', fontSize: 12, borderBottom: '1px solid var(--border-md)', background: 'var(--surface)', whiteSpace: 'nowrap' }}>{fmtDate(date)}</td>
-                      {/* Dirty cols */}
-                      <td style={{ ...tdD, fontWeight: 700 }}>{d ? num(d.bed_sheet_total)  : <span style={{ color: 'var(--text-4)' }}>—</span>}</td>
-                      <td style={tdD}>{d ? num(d.pillow_cover_total) : <span style={{ color: 'var(--text-4)' }}>—</span>}</td>
-                      <td style={tdD}>{d ? num(d.face_towel)         : <span style={{ color: 'var(--text-4)' }}>—</span>}</td>
-                      <td style={tdD}>{d ? num(d.blanket)            : <span style={{ color: 'var(--text-4)' }}>—</span>}</td>
-                      <td style={tdD}>{d ? num(d.canvas_bag)         : <span style={{ color: 'var(--text-4)' }}>—</span>}</td>
-                      {/* Fresh cols */}
-                      <td style={{ ...tdF, fontWeight: 700 }}>{f ? num(f.bed_sheet_fresh)         : <span style={{ color: 'var(--text-4)' }}>—</span>}</td>
-                      <td style={{ ...tdF, color: f && f.bed_sheet_condemned > 0 ? '#EF4444' : undefined }}>{f ? num(f.bed_sheet_condemned)    : '—'}</td>
-                      <td style={tdF}>{f ? num(f.pillow_cover_fresh)    : '—'}</td>
-                      <td style={{ ...tdF, color: f && f.pillow_cover_condemned > 0 ? '#EF4444' : undefined }}>{f ? num(f.pillow_cover_condemned) : '—'}</td>
-                      <td style={tdF}>{f ? num(f.face_towel_fresh)      : '—'}</td>
-                      <td style={{ ...tdF, color: f && f.face_towel_condemned > 0 ? '#EF4444' : undefined }}>{f ? num(f.face_towel_condemned)   : '—'}</td>
-                      <td style={tdF}>{f ? num(f.blanket_fresh)         : '—'}</td>
-                      <td style={{ ...tdF, color: f && f.blanket_condemned > 0 ? '#EF4444' : undefined }}>{f ? num(f.blanket_condemned)        : '—'}</td>
-                      <td style={tdF}>{f ? num(f.canvas_bag_fresh)      : '—'}</td>
-                      <td style={{ ...tdF, color: f && f.canvas_bag_condemned > 0 ? '#EF4444' : undefined }}>{f ? num(f.canvas_bag_condemned)   : '—'}</td>
-                      <td style={{ ...tdF, color: '#7C3AED', fontWeight: 700 }}>{f ? num(f.packets) : '—'}</td>
-                      {/* Actions */}
-                      <td style={{ padding: '4px 6px', textAlign: 'center', borderBottom: '1px solid var(--border-md)', background: 'var(--surface)', whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '5px 12px', fontWeight: 700, color: 'var(--text)', fontSize: 12, background: 'var(--surface)', border: '1px solid var(--border-md)', whiteSpace: 'nowrap' }}>
+                        {fmtDate(date)}
+                      </td>
+
+                      {/* ── Dirty cols ── */}
+                      <td style={cell(dBg, D_TEXT, D_LINE, true)}>{d ? num(d.bed_sheet_total)  : <span style={{ color: '#D97706', opacity: .4 }}>—</span>}</td>
+                      <td style={cell(dBg, D_TEXT, D_LINE)}>{d ? num(d.pillow_cover_total) : <span style={{ color: '#D97706', opacity: .4 }}>—</span>}</td>
+                      <td style={cell(dBg, D_TEXT, D_LINE)}>{d ? num(d.face_towel)         : <span style={{ color: '#D97706', opacity: .4 }}>—</span>}</td>
+                      <td style={cell(dBg, D_TEXT, D_LINE)}>{d ? num(d.blanket)            : <span style={{ color: '#D97706', opacity: .4 }}>—</span>}</td>
+                      <td style={cell(dBg, D_TEXT, D_LINE)}>{d ? num(d.canvas_bag)         : <span style={{ color: '#D97706', opacity: .4 }}>—</span>}</td>
+
+                      {/* ── Fresh cols ── */}
+                      <td style={cell(fBg, F_TEXT, F_LINE, true)}>{f ? num(f.bed_sheet_fresh)      : <span style={{ color: '#16A34A', opacity: .4 }}>—</span>}</td>
+                      <td style={cell(fBg, f && f.bed_sheet_condemned > 0 ? C_TEXT : F_TEXT, C_LINE)}>{f ? num(f.bed_sheet_condemned)   : <span style={{ opacity: .4 }}>—</span>}</td>
+                      <td style={cell(fBg, F_TEXT, F_LINE)}>{f ? num(f.pillow_cover_fresh)   : <span style={{ color: '#16A34A', opacity: .4 }}>—</span>}</td>
+                      <td style={cell(fBg, f && f.pillow_cover_condemned > 0 ? C_TEXT : F_TEXT, C_LINE)}>{f ? num(f.pillow_cover_condemned): <span style={{ opacity: .4 }}>—</span>}</td>
+                      <td style={cell(fBg, F_TEXT, F_LINE)}>{f ? num(f.face_towel_fresh)     : <span style={{ color: '#16A34A', opacity: .4 }}>—</span>}</td>
+                      <td style={cell(fBg, f && f.face_towel_condemned > 0 ? C_TEXT : F_TEXT, C_LINE)}>{f ? num(f.face_towel_condemned)  : <span style={{ opacity: .4 }}>—</span>}</td>
+                      <td style={cell(fBg, F_TEXT, F_LINE)}>{f ? num(f.blanket_fresh)        : <span style={{ color: '#16A34A', opacity: .4 }}>—</span>}</td>
+                      <td style={cell(fBg, f && f.blanket_condemned > 0 ? C_TEXT : F_TEXT, C_LINE)}>{f ? num(f.blanket_condemned)       : <span style={{ opacity: .4 }}>—</span>}</td>
+                      <td style={cell(fBg, F_TEXT, F_LINE)}>{f ? num(f.canvas_bag_fresh)     : <span style={{ color: '#16A34A', opacity: .4 }}>—</span>}</td>
+                      <td style={cell(fBg, f && f.canvas_bag_condemned > 0 ? C_TEXT : F_TEXT, C_LINE)}>{f ? num(f.canvas_bag_condemned)  : <span style={{ opacity: .4 }}>—</span>}</td>
+                      <td style={cell(fBg, P_TEXT, P_LINE, true)}>{f ? num(f.packets) : <span style={{ opacity: .4 }}>—</span>}</td>
+
+                      {/* ── Actions ── */}
+                      <td style={{ padding: '3px 6px', textAlign: 'center', background: 'var(--surface)', border: '1px solid var(--border-md)', whiteSpace: 'nowrap' }}>
                         {d && (
                           <>
-                            <Link href={`/laundry/raw-data/${d.id}/edit`} title="Edit dirty" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#92400E', padding: 3, borderRadius: 5, display: 'inline-flex' }}><Pencil size={11} /></Link>
-                            <button onClick={() => delDirty(d.id)} title="Delete dirty" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#B45309', padding: 3, borderRadius: 5 }}><Trash2 size={11} /></button>
+                            <Link href={`/laundry/raw-data/${d.id}/edit`} title="Edit dirty" style={{ background: 'none', border: 'none', cursor: 'pointer', color: D_LINE, padding: 3, borderRadius: 5, display: 'inline-flex' }}><Pencil size={11} /></Link>
+                            <button onClick={() => delDirty(d.id)} title="Delete dirty" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#B91C1C', padding: 3, borderRadius: 5 }}><Trash2 size={11} /></button>
                           </>
                         )}
                         {f && (
                           <>
-                            <Link href={`/laundry/fresh-data/${f.id}/edit`} title="Edit fresh" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#166534', padding: 3, borderRadius: 5, display: 'inline-flex' }}><Pencil size={11} /></Link>
-                            <button onClick={() => delFresh(f.id)} title="Delete fresh" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#166534', padding: 3, borderRadius: 5 }}><Trash2 size={11} /></button>
+                            <Link href={`/laundry/fresh-data/${f.id}/edit`} title="Edit fresh" style={{ background: 'none', border: 'none', cursor: 'pointer', color: F_LINE, padding: 3, borderRadius: 5, display: 'inline-flex' }}><Pencil size={11} /></Link>
+                            <button onClick={() => delFresh(f.id)} title="Delete fresh" style={{ background: 'none', border: 'none', cursor: 'pointer', color: F_LINE, padding: 3, borderRadius: 5 }}><Trash2 size={11} /></button>
                           </>
                         )}
                       </td>
@@ -188,14 +231,20 @@ export default function DirtyFreshPage() {
               </tbody>
               <tfoot>
                 <tr>
-                  <td style={{ padding: '8px 12px', fontSize: 11, fontWeight: 800, color: 'var(--text-3)', borderTop: '2.5px solid var(--border)', background: 'var(--surface-2)', whiteSpace: 'nowrap' }}>TOTAL</td>
+                  <td style={{ padding: '7px 12px', fontSize: 11, fontWeight: 800, color: 'var(--text)', background: 'var(--surface-2)', border: '1.5px solid var(--border)', whiteSpace: 'nowrap' }}>TOTAL</td>
                   {DIRTY_KEYS.map(k => (
-                    <td key={k} style={tfD}>{sum(dirty, k).toLocaleString('en-IN')}</td>
+                    <td key={k} style={totCell(D_TOT_BG, D_TOT_CLR, D_LINE)}>{sum(dirty, k).toLocaleString('en-IN')}</td>
                   ))}
-                  {FRESH_KEYS.map(k => (
-                    <td key={k} style={tfF}>{sum(fresh, k).toLocaleString('en-IN')}</td>
-                  ))}
-                  <td style={{ background: 'var(--surface-2)', borderTop: '2.5px solid var(--border)' }} />
+                  {FRESH_KEYS.map((k, i) => {
+                    const isC = k.endsWith('_condemned')
+                    const isP = k === 'packets'
+                    return (
+                      <td key={k} style={totCell(isP ? '#EDE9FE' : F_TOT_BG, isP ? P_TEXT : isC ? C_TEXT : F_TOT_CLR, isP ? P_LINE : isC ? C_LINE : F_LINE)}>
+                        {sum(fresh, k).toLocaleString('en-IN')}
+                      </td>
+                    )
+                  })}
+                  <td style={{ background: 'var(--surface-2)', border: '1.5px solid var(--border)' }} />
                 </tr>
               </tfoot>
             </table>
