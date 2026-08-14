@@ -317,7 +317,7 @@ export async function GET(req: Request) {
     const bg = i % 2 === 0 ? 'FFECFDF5' : 'FFFFFFFF'
     ;([['A', fmtDate(String(r.date)), 'center'],
        ['C', String(r.inspected_by),  'left'  ],
-       ['J', amt,                      'center']] as [string,unknown,string][]).forEach(([col, val, align]) => {
+       ['J', amt,                      'center']] as [string, ExcelJS.CellValue, string][]).forEach(([col, val, align]) => {
       const c = ws.getCell(`${col}${rn}`)
       c.value = val
       applyBorder(c)
