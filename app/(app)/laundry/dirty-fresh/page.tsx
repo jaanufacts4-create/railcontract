@@ -72,8 +72,8 @@ export default function DirtyFreshPage() {
   const thD: React.CSSProperties = { ...thBase, color: '#92400E', background: '#FFFBEB', borderBottom: '1.5px solid #FDE68A' }
   const thF: React.CSSProperties = { ...thBase, color: '#166534', background: '#F0FDF4', borderBottom: '1.5px solid #BBF7D0' }
   const tdBase: React.CSSProperties = { padding: '6px 8px', fontSize: 12, textAlign: 'right', borderBottom: '1px solid var(--border-md)' }
-  const tdD: React.CSSProperties = { ...tdBase, background: '#FFFBEB' }
-  const tdF: React.CSSProperties = { ...tdBase, background: '#F0FDF4' }
+  const tdD: React.CSSProperties = { ...tdBase, background: '#FFFBEB', color: '#451A03' }
+  const tdF: React.CSSProperties = { ...tdBase, background: '#F0FDF4', color: '#052E16' }
   const tfD: React.CSSProperties = { ...tdBase, fontWeight: 800, background: '#FEF3C7', color: '#92400E', borderTop: '2.5px solid #FDE68A', borderBottom: 'none' }
   const tfF: React.CSSProperties = { ...tdBase, fontWeight: 800, background: '#DCFCE7', color: '#166534', borderTop: '2.5px solid #BBF7D0', borderBottom: 'none' }
 
