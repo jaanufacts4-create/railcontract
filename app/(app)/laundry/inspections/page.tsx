@@ -13,6 +13,7 @@ type Inspection = {
   inspected_by: string; designation: string
   items: Item[]
 }
+type PivotRow = { item_name: string; total_dirty: number; units_np: number }
 
 function fmtDate(d: string) { const [y, m, day] = d.split('-'); return `${day}-${m}-${y}` }
 function n(v: number) { return Number(v).toLocaleString('en-IN') }
@@ -28,12 +29,17 @@ export default function InspectionsPage() {
     return s ?? new Date().toISOString().slice(0, 7)
   })
   const [inspections, setInspections] = useState<Inspection[]>([])
+  const [pivot, setPivot] = useState<PivotRow[]>([])
   const [loading, setLoading] = useState(false)
 
   async function load() {
     setLoading(true)
-    const data = await fetch(`/api/inspections?month_year=${monthYear}`).then(r => r.json()).catch(() => ({ inspections: [] }))
+    const [data, pivotData] = await Promise.all([
+      fetch(`/api/inspections?month_year=${monthYear}`).then(r => r.json()).catch(() => ({ inspections: [] })),
+      fetch(`/api/inspections/pivot?month_year=${monthYear}`).then(r => r.json()).catch(() => ({ pivot: [] })),
+    ])
     setInspections(data.inspections ?? [])
+    setPivot(pivotData.pivot ?? [])
     setLoading(false)
   }
   useEffect(() => { load() }, [monthYear])
@@ -97,6 +103,43 @@ export default function InspectionsPage() {
           <Link href="/laundry/inspections/new" className="btn btn-primary" style={{ marginTop: 12, display: 'inline-flex' }}>
             <Plus size={14} /> Add First Inspection
           </Link>
+        </div>
+      )}
+
+      {/* Dirty Linen Pivot Table */}
+      {!loading && pivot.length > 0 && (
+        <div className="card" style={{ overflow: 'hidden', padding: 0 }}>
+          <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)', background: '#451A03' }}>
+            <p style={{ fontSize: 13, fontWeight: 700, color: '#FEF3C7', margin: 0 }}>Dirty Linen Pivot — {monthYear}</p>
+            <p style={{ fontSize: 11, color: '#D97706', margin: '2px 0 0' }}>Units Against No Payment = Dirty × 2</p>
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: 12 }}>
+              <thead>
+                <tr>
+                  <th style={{ padding: '7px 10px', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: '#FFF', background: '#B45309', border: '1px solid #D97706', textAlign: 'left', minWidth: 200 }}>Item Name</th>
+                  <th style={{ padding: '7px 10px', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: '#FFF', background: '#B45309', border: '1px solid #D97706', textAlign: 'center', minWidth: 140 }}>Total Dirty (Units)</th>
+                  <th style={{ padding: '7px 10px', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: '#FFF', background: '#991B1B', border: '1px solid #EF4444', textAlign: 'center', minWidth: 200 }}>Units Against No Payment (×2)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pivot.map((row, i) => (
+                  <tr key={row.item_name} style={{ background: i % 2 === 1 ? '#FFF7ED' : '#FFFFFF' }}>
+                    <td style={{ padding: '6px 10px', border: '1px solid #E5E7EB', fontWeight: 600, color: '#111827' }}>{row.item_name}</td>
+                    <td style={{ padding: '6px 10px', border: '1px solid #E5E7EB', textAlign: 'center', fontWeight: 700, color: '#B45309' }}>{Number(row.total_dirty).toLocaleString('en-IN')}</td>
+                    <td style={{ padding: '6px 10px', border: '1px solid #FECACA', textAlign: 'center', fontWeight: 800, color: '#DC2626', fontSize: 13 }}>{Number(row.units_np).toLocaleString('en-IN')}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td style={{ padding: '7px 12px', fontWeight: 800, fontSize: 12, border: '1.5px solid #D97706', background: '#FEF3C7', color: '#92400E', textAlign: 'right' }}>TOTAL</td>
+                  <td style={{ padding: '7px 10px', fontWeight: 800, fontSize: 14, border: '1.5px solid #D97706', background: '#FEF3C7', color: '#B45309', textAlign: 'center' }}>{pivot.reduce((s, r) => s + Number(r.total_dirty), 0).toLocaleString('en-IN')}</td>
+                  <td style={{ padding: '7px 10px', fontWeight: 800, fontSize: 14, border: '1.5px solid #EF4444', background: '#FEF2F2', color: '#DC2626', textAlign: 'center' }}>{pivot.reduce((s, r) => s + Number(r.units_np), 0).toLocaleString('en-IN')}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
         </div>
       )}
 

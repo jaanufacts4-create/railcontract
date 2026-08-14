@@ -20,6 +20,7 @@ let _obhsScheduleMigrated = false
 let _nirmalObhsMigrated    = false
 let _laundryMigrated       = false
 let _inspectionMigrated    = false
+let _inspectionModulesMigrated = false
 export async function ensureDB() {
   if (!_migrated) {
     await migrate()
@@ -69,6 +70,10 @@ export async function ensureDB() {
   if (!_inspectionMigrated) {
     await migrateInspections()
     _inspectionMigrated = true
+  }
+  if (!_inspectionModulesMigrated) {
+    await migrateInspectionModules()
+    _inspectionModulesMigrated = true
   }
 }
 
@@ -808,6 +813,81 @@ async function migrateInspections() {
       items_dirty   INTEGER NOT NULL DEFAULT 0,
       penalty       INTEGER NOT NULL DEFAULT 200,
       created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
+    )
+  `)
+}
+
+async function migrateInspectionModules() {
+  // B. Inspection Notes
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS inspection_notes (
+      id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+      date                  TEXT    NOT NULL,
+      month_year            TEXT    NOT NULL,
+      depot                 TEXT    NOT NULL DEFAULT 'ASR',
+      inspected_by          TEXT    NOT NULL,
+      remarks               TEXT    NOT NULL DEFAULT '',
+      tool_short_count      INTEGER NOT NULL DEFAULT 0,
+      cleanliness_fail      INTEGER NOT NULL DEFAULT 0,
+      bedsheet_wrapping_qty INTEGER NOT NULL DEFAULT 0,
+      created_at            TEXT    NOT NULL DEFAULT (datetime('now'))
+    )
+  `)
+
+  // Damaged Linen - rate settings (one row per item, upserted)
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS damaged_linen_rates (
+      item_name   TEXT PRIMARY KEY,
+      rate        REAL NOT NULL DEFAULT 0
+    )
+  `)
+  // Seed default rates (2015 rates @ 75% LPR)
+  const defaults = [
+    ['Bedsheet Handloom',       231.75],
+    ['Bedsheet Polyvastra',     568.37],
+    ['Pillow Cover Handloom',    41.48],
+    ['Pillow Cover Polyvastra', 177.19],
+    ['Face Towel',               35.21],
+    ['Blanket',                 364.88],
+  ]
+  for (const [name, rate] of defaults) {
+    await db.execute({
+      sql:  `INSERT OR IGNORE INTO damaged_linen_rates (item_name, rate) VALUES (?, ?)`,
+      args: [name, rate],
+    })
+  }
+
+  // Damaged Linen entries
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS damaged_linen_entries (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      date       TEXT NOT NULL,
+      month_year TEXT NOT NULL,
+      depot      TEXT NOT NULL DEFAULT 'ASR',
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `)
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS damaged_linen_items (
+      id        INTEGER PRIMARY KEY AUTOINCREMENT,
+      entry_id  INTEGER NOT NULL REFERENCES damaged_linen_entries(id) ON DELETE CASCADE,
+      item_name TEXT    NOT NULL,
+      qty       INTEGER NOT NULL DEFAULT 0,
+      rate      REAL    NOT NULL DEFAULT 0,
+      penalty   REAL    NOT NULL DEFAULT 0
+    )
+  `)
+
+  // Store Inspections
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS store_inspections (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      date         TEXT NOT NULL,
+      month_year   TEXT NOT NULL,
+      depot        TEXT NOT NULL DEFAULT 'ASR',
+      inspected_by TEXT NOT NULL,
+      amount       REAL NOT NULL DEFAULT 0,
+      created_at   TEXT NOT NULL DEFAULT (datetime('now'))
     )
   `)
 }

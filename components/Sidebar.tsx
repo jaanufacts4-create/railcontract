@@ -65,8 +65,11 @@ const GROUPS = [
       { href: '/laundry/raw-data/new',   label: 'Dirty Linen Entry',     icon: PlusCircle      },
       { href: '/laundry/fresh-data/new', label: 'Fresh Linen Entry',     icon: PlusCircle      },
       { href: '/laundry/dirty-fresh',    label: 'Dirty–Fresh Register',  icon: FileSpreadsheet },
-      { href: '/laundry/inspections',    label: 'Inspections',           icon: ClipboardList   },
-      { href: '/laundry/reports',        label: 'Reports',               icon: BarChart3       },
+      { href: '/laundry/inspections',       label: 'Inspections',           icon: ClipboardList   },
+      { href: '/laundry/inspection-notes', label: 'Inspection Notes',      icon: ClipboardList   },
+      { href: '/laundry/damaged-linen',    label: 'Damaged Linen',         icon: FileSpreadsheet },
+      { href: '/laundry/store-inspections',label: 'Store Inspections',     icon: ClipboardList   },
+      { href: '/laundry/reports',          label: 'Reports',               icon: BarChart3       },
     ],
   },
 ]
