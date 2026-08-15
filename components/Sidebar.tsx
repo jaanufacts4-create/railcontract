@@ -70,6 +70,7 @@ const GROUPS: Group[] = [
       { href: '/laundry/fresh-data/new', label: 'Fresh Linen Entry',    icon: PlusCircle      },
       { href: '/laundry/dirty-fresh',    label: 'Dirty–Fresh Register', icon: FileSpreadsheet },
       { href: '/laundry/reports',        label: 'Reports',              icon: BarChart3       },
+      { href: '/laundry/settings',       label: 'Settings',             icon: Settings        },
     ],
     subGroups: [
       {

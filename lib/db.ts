@@ -24,6 +24,7 @@ let _inspectionModulesMigrated = false
 let _contractDocsMigrated  = false
 let _blobMigrated          = false
 let _pettyMigrated         = false
+let _laundrySettingsMigrated = false
 export async function ensureDB() {
   if (!_migrated) {
     await migrate()
@@ -89,6 +90,10 @@ export async function ensureDB() {
   if (!_pettyMigrated) {
     await migratePetty()
     _pettyMigrated = true
+  }
+  if (!_laundrySettingsMigrated) {
+    await migrateLaundrySettings()
+    _laundrySettingsMigrated = true
   }
 }
 
@@ -989,4 +994,42 @@ async function migrateBlobColumn() {
   try {
     await db.execute(`ALTER TABLE contract_documents ADD COLUMN file_url TEXT NOT NULL DEFAULT ''`)
   } catch { /* column already exists — ignore */ }
+}
+
+/** ─── Laundry Settings (contractor details, LOA qty, opening cumulative) ─── */
+async function migrateLaundrySettings() {
+  const DEFAULTS: [string, string][] = [
+    // Contractor details (used in Petty Bill header)
+    ['laundry_contractor_name',    'M/s Peyush Traders'],
+    ['laundry_contractor_address', ''],
+    ['laundry_work_name',          'Mechanized Washing of Linen Items at ASR & FZR Depot'],
+    ['laundry_contract_no',        ''],
+    ['laundry_agreement_no',       ''],
+    ['laundry_mb_no',              '128195'],
+    ['laundry_account_no',         ''],
+    ['laundry_ifsc_code',          ''],
+
+    // LOA quantities (as per Letter of Award)
+    ['laundry_loa_bedsheet',   '0'],
+    ['laundry_loa_pillow',     '0'],
+    ['laundry_loa_face_towel', '0'],
+    ['laundry_loa_blanket',    '0'],
+    ['laundry_loa_canvas_bag', '0'],
+    ['laundry_loa_craft_bag',  '0'],
+    ['laundry_loa_increase_pct', '0'],   // 0 / 10 / 15 / 25
+
+    // Opening cumulative quantities (pre-system data carry-forward)
+    ['laundry_open_bedsheet',   '0'],
+    ['laundry_open_pillow',     '0'],
+    ['laundry_open_face_towel', '0'],
+    ['laundry_open_blanket',    '0'],
+    ['laundry_open_canvas_bag', '0'],
+    ['laundry_open_craft_bag',  '0'],
+  ]
+  for (const [key, value] of DEFAULTS) {
+    await db.execute({
+      sql:  `INSERT OR IGNORE INTO config (key, value) VALUES (?, ?)`,
+      args: [key, value],
+    })
+  }
 }
