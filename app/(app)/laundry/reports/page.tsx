@@ -111,7 +111,39 @@ export default function LaundryReportsPage() {
         </Link>
       </div>
 
-      {/* Report 3 — Penalties */}
+      {/* Report 3 — Summary of Penalty */}
+      <div className="card" style={{ padding: 24, border: '2px solid #C55A11' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+          <AlertTriangle size={20} style={{ color: '#C55A11' }} />
+          <div>
+            <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Summary of Penalty</p>
+            <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '2px 0 0' }}>ASR & FZR Depot · Qty Table + Penalty Details · Landscape A4</p>
+          </div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingLeft: 14, marginBottom: 20, borderLeft: '3px solid #C55A11' }}>
+          {[
+            { name: 'Auto-filled from DB', desc: 'ASR washed (fresh register), no payment (pivot ×2), all penalty modules' },
+            { name: 'Manual FZR entry', desc: 'FZR washed & no payment entered by user on verify page' },
+            { name: 'Passenger Complaints', desc: 'Manual penalty entry for complaints — editable on verify page' },
+          ].map(({ name, desc }) => (
+            <div key={name} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+              <span style={{ fontSize: 10, fontWeight: 800, color: '#C55A11', background: '#FEF3C7', borderRadius: 4, padding: '2px 6px', whiteSpace: 'nowrap', marginTop: 2 }}>●</span>
+              <div>
+                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{name}</span>
+                <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '1px 0 0' }}>{desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+        <Link href={`/laundry/penalty-summary?month=${monthYear}`}
+          className="btn"
+          style={{ gap: 8, fontSize: 14, padding: '10px 24px', background: '#C55A11', color: '#FFF', border: 'none', borderRadius: 9, display: 'inline-flex', alignItems: 'center', fontFamily: 'var(--font)', fontWeight: 700, textDecoration: 'none' }}>
+          <AlertTriangle size={16} />
+          Open Summary of Penalty →
+        </Link>
+      </div>
+
+      {/* Report 4 — Penalties */}
       <div className="card" style={{ padding: 24, border: '2px solid #F59E0B' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
           <AlertTriangle size={20} style={{ color: '#D97706' }} />
