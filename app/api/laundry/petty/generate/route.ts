@@ -403,7 +403,7 @@ export async function POST(req: Request) {
     merge(r,10,r,12)
     const cl = ws.getCell(r,10)
     cl.value = val; cl.font = { name:'Arial', size:9, bold: !!bold }
-    cl.alignment = { horizontal:'right', vertical:'middle' }
+    cl.alignment = { horizontal:'left', vertical:'middle' }
     cl.numFmt = '#,##0.00'
   })
 
@@ -415,7 +415,7 @@ export async function POST(req: Request) {
   const netCell = ws.getCell(40,10)
   netCell.value = netAmt
   netCell.font = { name:'Arial', size:11, bold:true, color:{argb:'FF1F4E79'} }
-  netCell.alignment = { horizontal:'right', vertical:'middle' }
+  netCell.alignment = { horizontal:'left', vertical:'middle' }
   netCell.numFmt = '#,##0.00'
   netCell.border = bordM
 
