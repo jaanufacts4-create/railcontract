@@ -74,13 +74,14 @@ export async function GET(req: Request) {
 
   const label = monthLabel(month_year)
 
-  const [inspRes, notesRes, damagedRes, damagedRatesRes, storeRes, pivotRes] = await Promise.all([
+  const [inspRes, notesRes, damagedRes, damagedRatesRes, storeRes, pivotRes, freshRes] = await Promise.all([
     db.execute({ sql: `SELECT i.id, i.date, i.inspected_by, i.designation, ii.item_name, ii.lot_of, ii.items_checked, ii.items_dirty, ii.penalty FROM inspections i JOIN inspection_items ii ON ii.inspection_id=i.id WHERE i.month_year=? ORDER BY i.date, i.id, ii.id`, args: [month_year] }),
     db.execute({ sql: `SELECT * FROM inspection_notes WHERE month_year=? ORDER BY date, id`, args: [month_year] }),
     db.execute({ sql: `SELECT e.id, e.date, di.item_name, di.qty, di.rate, di.penalty FROM damaged_linen_entries e JOIN damaged_linen_items di ON di.entry_id=e.id WHERE e.month_year=? ORDER BY e.date, e.id, di.id`, args: [month_year] }),
     db.execute({ sql: `SELECT * FROM damaged_linen_rates ORDER BY item_name`, args: [] }),
     db.execute({ sql: `SELECT * FROM store_inspections WHERE month_year=? ORDER BY date, id`, args: [month_year] }),
     db.execute({ sql: `SELECT ii.item_name, SUM(ii.items_dirty) as total_dirty FROM inspection_items ii JOIN inspections i ON ii.inspection_id=i.id WHERE i.month_year=? GROUP BY ii.item_name`, args: [month_year] }),
+    db.execute({ sql: `SELECT COALESCE(SUM(bed_sheet_fresh),0) AS bedsheet, COALESCE(SUM(pillow_cover_fresh),0) AS pillow, COALESCE(SUM(face_towel_fresh),0) AS face_towel, COALESCE(SUM(blanket_fresh),0) AS blanket, COALESCE(SUM(canvas_bag_fresh),0) AS canvas_bag, COALESCE(SUM(packets),0) AS craft_bag FROM laundry_fresh_data WHERE month_year=?`, args: [month_year] }),
   ])
 
   const wb = new ExcelJS.Workbook()
@@ -402,6 +403,185 @@ export async function GET(req: Request) {
     c.alignment = { horizontal: align as 'center', vertical: 'middle' }
   })
   ws.getRow(pvTotRn).height = 22
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // SHEET 2 — Summary of Penalty
+  // ══════════════════════════════════════════════════════════════════════════
+  const [yr2, mo2] = month_year.split('-')
+  const monthNameFull = new Date(`${month_year}-01`).toLocaleString('en-IN', { month: 'long' })
+  const summaryTitle = `Summary - Mechanized washing of linen items at ASR & FZR Depot for the month ${monthNameFull}-${yr2} (M/s Peyush Traders)`
+
+  const ws2 = wb.addWorksheet('Summary of Penalty', {
+    pageSetup: {
+      paperSize: 9, orientation: 'landscape', fitToPage: true,
+      fitToWidth: 1, fitToHeight: 0,
+      margins: { left: 0.5, right: 0.5, top: 0.5, bottom: 0.5, header: 0.3, footer: 0.3 },
+    },
+  })
+
+  // Cols: A=SNo B=Description C=ASR_W D=FZR_W E=TotalA F=ASR_NP G=FZR_NP H=TotalB I=Net | J=SNo K=PenaltyDesc L=Amount
+  ws2.columns = [
+    { width: 6 }, { width: 34 }, { width: 13 }, { width: 13 }, { width: 13 },
+    { width: 13 }, { width: 13 }, { width: 13 }, { width: 15 },
+    { width: 5 }, { width: 52 }, { width: 14 },
+  ]
+
+  const NCOLS = 12
+
+  function s2cell(r: number, c: number) { return ws2.getCell(r, c) }
+  function s2val(r: number, c: number, v: ExcelJS.CellValue, fmt?: string) {
+    const cell = s2cell(r, c); cell.value = v; if (fmt) cell.numFmt = fmt
+  }
+  function s2style(r: number, c: number, opts: {
+    bold?: boolean; sz?: number; bg?: string; fg?: string
+    align?: ExcelJS.Alignment['horizontal']; wrap?: boolean; border?: boolean
+  }) {
+    const cell = s2cell(r, c)
+    if (opts.bold !== undefined || opts.sz !== undefined || opts.fg !== undefined)
+      cell.font = { ...((cell.font ?? {}) as ExcelJS.Font), bold: opts.bold, size: opts.sz, color: opts.fg ? { argb: opts.fg } : undefined }
+    if (opts.bg) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: opts.bg } }
+    if (opts.align || opts.wrap)
+      cell.alignment = { horizontal: opts.align ?? 'center', vertical: 'middle', wrapText: opts.wrap ?? false }
+    if (opts.border) {
+      const b = { style: 'thin' as const, color: { argb: 'FFB0B0B0' } }
+      cell.border = { top: b, left: b, bottom: b, right: b }
+    }
+  }
+  function s2merge(r: number, c1: number, c2: number) { ws2.mergeCells(r, c1, r, c2) }
+  function s2allborder(r: number, c1: number, c2: number) {
+    for (let c = c1; c <= c2; c++) s2style(r, c, { border: true })
+  }
+
+  // ASR washed from freshRes
+  const fr = freshRes.rows[0] ?? {}
+  const SUM_ITEMS = [
+    { key: 'bedsheet',   label: 'Bed Sheets',                    asr_w: Number(fr.bedsheet   ?? 0) },
+    { key: 'pillow',     label: 'Pillow Covers',                 asr_w: Number(fr.pillow     ?? 0) },
+    { key: 'face_towel', label: 'Face Towels',                   asr_w: Number(fr.face_towel ?? 0) },
+    { key: 'blanket',    label: 'Blankets',                      asr_w: Number(fr.blanket    ?? 0) },
+    { key: 'craft_bag',  label: 'Craft Paper Bag with Packaging',asr_w: Number(fr.craft_bag  ?? 0) },
+    { key: 'canvas_bag', label: 'Canvas Bag (new)',               asr_w: Number(fr.canvas_bag ?? 0) },
+  ]
+
+  // ASR no_pay from pivot
+  const NP_PIVOT_MAP: Record<string, string> = {
+    bedsheet: 'Bed Sheet', pillow: 'Pillow Cover', face_towel: 'Face Towel', blanket: 'Blanket',
+  }
+  function asrNoPay(key: string) {
+    const pivotName = NP_PIVOT_MAP[key]
+    if (!pivotName) return 0
+    return (pivotMap[pivotName] ?? 0) * 2
+  }
+
+  // Penalty values (already computed above)
+  const penInspection = totalA + totalB   // inspection items + notes (A+B from sheet 1)
+  const penStore      = totalStore
+  const penDamaged    = totalDamaged
+
+  const PENALTY_ROWS = [
+    { sno: 1, label: 'Penalty for poor quality of washed linen as found during sample check & Inspection notes.', amt: penInspection },
+    { sno: 2, label: 'Penalty of store check (shortage of chemicals & cleanliness).', amt: penStore },
+    { sno: 3, label: 'Penalty for Passenger Complaints (ASR).', amt: 0, manual: true },
+    { sno: 4, label: 'Penalty for torn / damaged linen items under contractor custody.', amt: penDamaged },
+  ]
+  const penTotal = penInspection + penStore + penDamaged  // complaints=0
+
+  // ── Row 1: Title ─────────────────────────────────────────────────────────
+  ws2.getRow(1).height = 26
+  s2merge(1, 1, NCOLS)
+  s2val(1, 1, summaryTitle)
+  s2style(1, 1, { bold: true, sz: 11, bg: 'FF1F4E79', fg: 'FFFFFFFF', align: 'center', border: true })
+
+  // ── Row 2: Header group labels ───────────────────────────────────────────
+  ws2.getRow(2).height = 20
+  ws2.mergeCells(2, 1, 3, 1)  // S.No spans 2 rows
+  s2val(2, 1, 'S.\nNo.')
+  ws2.mergeCells(2, 2, 3, 2)  // Description spans 2 rows
+  s2val(2, 2, 'Description of Work')
+  s2merge(2, 3, 5); s2val(2, 3, 'Nos. of Items Washed')
+  s2merge(2, 6, 8); s2val(2, 6, 'Items Against No Payment (Nos.)')
+  ws2.mergeCells(2, 9, 3, 9)  // Net spans 2 rows
+  s2val(2, 9, 'Net Payable\nQty (A−B)')
+  // Penalty table header
+  ws2.mergeCells(2, 10, 3, 10); s2val(2, 10, 'S.\nNo.')
+  ws2.mergeCells(2, 11, 3, 11); s2val(2, 11, 'Penalty')
+  ws2.mergeCells(2, 12, 3, 12); s2val(2, 12, 'Amount\n(₹)')
+  for (let c = 1; c <= 9; c++)  s2style(2, c, { bold: true, bg: 'FF1F4E79', fg: 'FFFFFFFF', align: 'center', border: true, wrap: true })
+  for (let c = 10; c <= 12; c++) s2style(2, c, { bold: true, bg: 'FFC55A11', fg: 'FFFFFFFF', align: 'center', border: true, wrap: true })
+
+  // ── Row 3: ASR / FZR / Total sub-headers ────────────────────────────────
+  ws2.getRow(3).height = 18
+  ;['ASR','FZR','Total (A)','ASR','FZR','Total (B)'].forEach((h, i) => { s2val(3, 3 + i, h) })
+  for (let c = 3; c <= 8; c++) s2style(3, c, { bold: true, bg: 'FF2E75B6', fg: 'FFFFFFFF', align: 'center', border: true })
+  // S.No and Description borders (merged from row 2)
+  s2style(2, 1, { bold: true, bg: 'FF1F4E79', fg: 'FFFFFFFF', align: 'center', border: true, wrap: true })
+  s2style(2, 2, { bold: true, bg: 'FF1F4E79', fg: 'FFFFFFFF', align: 'center', border: true, wrap: true })
+  s2style(3, 1, { border: true }); s2style(3, 2, { border: true })
+  s2style(3, 9, { border: true })
+  for (let c = 10; c <= 12; c++) s2style(3, c, { border: true })
+
+  // ── Rows 4-9: Item data ──────────────────────────────────────────────────
+  let totAsrW2 = 0, totFzrW2 = 0, totA2 = 0, totAsrNP2 = 0, totFzrNP2 = 0, totB2 = 0, totNet2 = 0
+  SUM_ITEMS.forEach(({ label, asr_w, key }, idx) => {
+    const row = 4 + idx
+    ws2.getRow(row).height = 18
+    const fzr_w  = 0       // manual — yellow highlight
+    const asr_np = asrNoPay(key)
+    const fzr_np = 0       // manual — yellow highlight
+    const tA     = asr_w + fzr_w
+    const tB     = asr_np + fzr_np
+    const net    = Math.max(0, tA - tB)
+    totAsrW2 += asr_w; totFzrW2 += fzr_w; totA2 += tA
+    totAsrNP2 += asr_np; totFzrNP2 += fzr_np; totB2 += tB; totNet2 += net
+
+    const bg = idx % 2 === 0 ? 'FFDEE3F0' : 'FFFFFFFF'
+    s2val(row, 1, idx + 1);     s2style(row, 1, { align: 'center', bg, border: true })
+    s2val(row, 2, label);       s2style(row, 2, { align: 'left', bg, border: true })
+    s2val(row, 3, asr_w, '#,##0'); s2style(row, 3, { align: 'center', bg, border: true })
+    s2val(row, 4, fzr_w, '#,##0'); s2style(row, 4, { align: 'center', bg: 'FFFFFF99', border: true })  // yellow = manual
+    s2val(row, 5, tA, '#,##0');  s2style(row, 5, { bold: true, align: 'center', bg, border: true })
+    s2val(row, 6, asr_np, '#,##0'); s2style(row, 6, { align: 'center', bg, border: true })
+    s2val(row, 7, fzr_np, '#,##0'); s2style(row, 7, { align: 'center', bg: 'FFFFFF99', border: true })  // yellow = manual
+    s2val(row, 8, tB, '#,##0');  s2style(row, 8, { bold: true, align: 'center', bg, border: true })
+    s2val(row, 9, net, '#,##0'); s2style(row, 9, { bold: true, align: 'center', fg: 'FF1F4E79', bg, border: true })
+
+    // Penalty rows (rows 4-7 have data; row 8 = total; row 9 = note)
+    if (idx < 4) {
+      const p = PENALTY_ROWS[idx]
+      s2val(row, 10, p.sno)
+      s2val(row, 11, p.label)
+      s2val(row, 12, p.amt, '#,##0.00')
+      s2style(row, 10, { align: 'center', bg: p.manual ? 'FFFFFF99' : 'FFFEF9C3', border: true })
+      s2style(row, 11, { align: 'left', bg: p.manual ? 'FFFFFF99' : 'FFFEF9C3', border: true, wrap: true })
+      s2style(row, 12, { bold: true, align: 'right', bg: p.manual ? 'FFFFFF99' : 'FFFEF9C3', border: true })
+    }
+    if (idx === 4) {
+      // Total penalty row
+      s2merge(row, 10, 11); s2val(row, 10, 'Total (excl. complaints)')
+      s2val(row, 12, penTotal, '#,##0.00')
+      s2style(row, 10, { bold: true, align: 'right', bg: 'FF7F1D1D', fg: 'FFFFFFFF', border: true })
+      s2style(row, 11, { bg: 'FF7F1D1D', border: true })
+      s2style(row, 12, { bold: true, align: 'right', bg: 'FF7F1D1D', fg: 'FFFFFFFF', border: true })
+    }
+    if (idx === 5) {
+      // Note row
+      s2merge(row, 10, 12)
+      s2val(row, 10, '⚠ Yellow cells = manual entry required (FZR data & Passenger Complaints)')
+      s2style(row, 10, { align: 'left', bg: 'FFFFF3CD', fg: 'FF92400E', border: true, wrap: true })
+      s2style(row, 11, { bg: 'FFFFF3CD', border: true })
+      s2style(row, 12, { bg: 'FFFFF3CD', border: true })
+      ws2.getRow(row).height = 26
+    }
+  })
+
+  // ── Row 10: Grand Total row ──────────────────────────────────────────────
+  ws2.getRow(10).height = 22
+  s2merge(10, 1, 2); s2val(10, 1, 'TOTAL')
+  s2val(10, 3, totAsrW2, '#,##0'); s2val(10, 4, totFzrW2, '#,##0'); s2val(10, 5, totA2, '#,##0')
+  s2val(10, 6, totAsrNP2, '#,##0'); s2val(10, 7, totFzrNP2, '#,##0'); s2val(10, 8, totB2, '#,##0')
+  s2val(10, 9, totNet2, '#,##0')
+  s2allborder(10, 1, 9)
+  for (let c = 1; c <= 9; c++) s2style(10, c, { bold: true, bg: 'FF1F4E79', fg: 'FFFFFFFF', align: 'center' })
 
   // ── Serialize ──────────────────────────────────────────────────────────────
   const buf = await wb.xlsx.writeBuffer()
