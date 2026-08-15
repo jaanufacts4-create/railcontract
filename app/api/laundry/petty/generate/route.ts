@@ -119,8 +119,8 @@ export async function POST(req: Request) {
     margins: { left: 0.4, right: 0.3, top: 0.5, bottom: 0.5, header: 0.3, footer: 0.3 },
   }
 
-  // Column widths (A-L) — L = SS2
-  const colW = [5, 28, 12, 12, 12, 8, 22, 14, 14, 14, 16, 14]
+  // Column widths (A-L): A=on-acct, B=since, C=upto, D=item, E=unit, F=rate-label, G=qty, H=since-pmt, I=upto-pmt, J-K=net, L=remarks
+  const colW = [10, 22, 12, 20, 7, 8, 10, 12, 12, 16, 14, 22]
   colW.forEach((w, i) => { ws.getColumn(i + 1).width = w })
 
   const thin  = { style: 'thin'   as const, color: { argb: 'FF000000' } }
@@ -257,7 +257,7 @@ export async function POST(req: Request) {
   rowH(21, 6)
 
   // ── Payment Table (Account I) ─────────────────────────────────────────────
-  rowH(22, 26); rowH(23, 20)
+  rowH(22, 26); rowH(23, 30)
   const accHdr: ExcelJS.FillPattern = { type:'pattern', pattern:'solid', fgColor:{argb:'FF2E4057'} }
   const accFont: Partial<ExcelJS.Font> = { name:'Arial', size:8, bold:true, color:{argb:'FFFFFFFF'} }
 
@@ -315,7 +315,7 @@ export async function POST(req: Request) {
   colNumDefs.forEach(([r,c,v]) => {
     const cl = ws.getCell(r, c)
     cl.value = v; cl.font = { name:'Arial', size:8, bold:true }
-    cl.alignment = { horizontal:'center', vertical:'middle' }
+    cl.alignment = { horizontal: c === 10 ? 'left' : 'center', vertical:'middle' }
     cl.border = bord
   })
 
@@ -343,7 +343,7 @@ export async function POST(req: Request) {
       [7,  item.ch,              'right'],
       [8,  item.since,           'right'],
       [9,  item.uptoPmt,         'right'],
-      [10, item.since,           'right'],  // net payable since (merged J-K)
+      [10, item.since,           'left'],   // net payable since (merged J-K)
     ]
     cols.forEach(([c, v, align]) => {
       const cl = ws.getCell(r, c)
@@ -372,7 +372,7 @@ export async function POST(req: Request) {
   function totCell(c: number, v: ExcelJS.CellValue) {
     const cl = ws.getCell(31, c)
     cl.value = v; cl.font = { name:'Arial', size:9, bold:true, color:{argb:'FF1F4E79'} }
-    cl.alignment = { horizontal:'right', vertical:'middle' }
+    cl.alignment = { horizontal: c === 10 ? 'left' : 'right', vertical:'middle' }
     if (typeof v === 'number') { cl.numFmt = '#,##0.00'; cl.border = bordM }
     else { cl.border = bord }
   }
