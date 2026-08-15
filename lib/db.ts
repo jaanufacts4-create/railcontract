@@ -21,6 +21,7 @@ let _nirmalObhsMigrated    = false
 let _laundryMigrated       = false
 let _inspectionMigrated    = false
 let _inspectionModulesMigrated = false
+let _contractDocsMigrated  = false
 export async function ensureDB() {
   if (!_migrated) {
     await migrate()
@@ -74,6 +75,10 @@ export async function ensureDB() {
   if (!_inspectionModulesMigrated) {
     await migrateInspectionModules()
     _inspectionModulesMigrated = true
+  }
+  if (!_contractDocsMigrated) {
+    await migrateContractDocs()
+    _contractDocsMigrated = true
   }
 }
 
@@ -888,6 +893,22 @@ async function migrateInspectionModules() {
       inspected_by TEXT NOT NULL,
       amount       REAL NOT NULL DEFAULT 0,
       created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `)
+}
+
+/** ─── Contract Documents ────────────────────────────────────────────────────── */
+async function migrateContractDocs() {
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS contract_documents (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      contract_id   TEXT    NOT NULL,
+      doc_type      TEXT    NOT NULL,
+      file_name     TEXT    NOT NULL,
+      file_size     INTEGER NOT NULL DEFAULT 0,
+      file_data     TEXT    NOT NULL,
+      uploaded_at   TEXT    NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(contract_id, doc_type)
     )
   `)
 }

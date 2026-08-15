@@ -7,7 +7,7 @@ import {
   ClipboardList, PlusCircle, Train, CalendarDays,
   Settings, ChevronLeft, ChevronRight, Building2, Layers,
   Sparkles, BarChart3, ChevronDown, ChevronUp,
-  TrendingUp, FileSpreadsheet, LayoutDashboard, Receipt, Leaf, Shirt, AlertTriangle,
+  TrendingUp, FileSpreadsheet, LayoutDashboard, Receipt, Leaf, Shirt, AlertTriangle, FolderOpen,
 } from 'lucide-react'
 
 type NavLink = { href: string; label: string; icon: React.ElementType }
@@ -172,11 +172,11 @@ export default function Sidebar() {
       {/* Nav */}
       <nav style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '12px 0' }}>
 
-        {/* ── Pinned: Dashboard (always visible) ── */}
+        {/* ── Pinned: Dashboard ── */}
         {(() => {
           const active = path === '/dashboard'
           return (
-            <div style={{ padding: '0 8px 8px', borderBottom: '1px solid var(--sb-border)', marginBottom: 8 }}>
+            <div style={{ padding: '0 8px 8px', borderBottom: '1px solid var(--sb-border)', marginBottom: 8, display: 'flex', flexDirection: 'column', gap: 2 }}>
               <Link
                 href="/dashboard"
                 title={collapsed ? 'Dashboard' : undefined}
@@ -213,6 +213,49 @@ export default function Sidebar() {
                   <div style={{ marginLeft: 'auto', width: 5, height: 5, borderRadius: '50%', background: 'var(--sb-active)', flexShrink: 0 }} />
                 )}
               </Link>
+
+              {/* Contract Documents — pinned below Dashboard */}
+              {(() => {
+                const docActive = path === '/documents'
+                return (
+                  <Link
+                    href="/documents"
+                    title={collapsed ? 'Contract Documents' : undefined}
+                    style={{
+                      display: 'flex', alignItems: 'center',
+                      gap: 10, padding: collapsed ? '8px 0' : '8px 12px',
+                      borderRadius: 9,
+                      background: docActive ? 'var(--sb-active-bg)' : 'transparent',
+                      color:      docActive ? 'var(--sb-active)' : 'var(--sb-text)',
+                      textDecoration: 'none',
+                      transition: 'background .12s, color .12s',
+                      justifyContent: collapsed ? 'center' : 'flex-start',
+                    }}
+                    onMouseEnter={e => {
+                      if (!docActive) {
+                        (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,.05)'
+                        ;(e.currentTarget as HTMLElement).style.color = 'var(--sb-text-hover)'
+                      }
+                    }}
+                    onMouseLeave={e => {
+                      if (!docActive) {
+                        (e.currentTarget as HTMLElement).style.background = 'transparent'
+                        ;(e.currentTarget as HTMLElement).style.color = 'var(--sb-text)'
+                      }
+                    }}
+                  >
+                    <FolderOpen size={16} strokeWidth={docActive ? 2.2 : 1.8} style={{ flexShrink: 0 }} />
+                    {!collapsed && (
+                      <span style={{ fontSize: 14, fontWeight: docActive ? 700 : 500, whiteSpace: 'nowrap', letterSpacing: '-.01em' }}>
+                        Contract Documents
+                      </span>
+                    )}
+                    {!collapsed && docActive && (
+                      <div style={{ marginLeft: 'auto', width: 5, height: 5, borderRadius: '50%', background: 'var(--sb-active)', flexShrink: 0 }} />
+                    )}
+                  </Link>
+                )
+              })()}
             </div>
           )
         })()}
