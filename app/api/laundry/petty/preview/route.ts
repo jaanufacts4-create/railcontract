@@ -116,7 +116,8 @@ export async function GET(req: Request) {
             COALESCE((SELECT SUM(ii.penalty) FROM inspection_items ii
                       JOIN inspections i ON ii.inspection_id = i.id
                       WHERE i.month_year = ?), 0)                          AS insp_penalty,
-            COALESCE((SELECT SUM(penalty) FROM inspection_notes WHERE month_year = ?), 0) AS notes_penalty,
+            COALESCE((SELECT SUM(tool_short_count * 500 + cleanliness_fail * 1000 + bedsheet_wrapping_qty * 250)
+                      FROM inspection_notes WHERE month_year = ?), 0)                      AS notes_penalty,
             COALESCE((SELECT SUM(di.penalty) FROM damaged_linen_items di
                       JOIN damaged_linen_entries de ON di.entry_id = de.id
                       WHERE de.month_year = ?), 0)                         AS dmg_penalty,
