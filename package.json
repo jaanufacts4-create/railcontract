@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@libsql/client": "^0.14.0",
+    "@vercel/blob": "^2.8.0",
     "bcryptjs": "^2.4.3",
     "exceljs": "^4.4.0",
     "lucide-react": "^1.26.0",
