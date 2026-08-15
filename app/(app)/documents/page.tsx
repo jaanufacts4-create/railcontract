@@ -17,7 +17,7 @@ const DOC_TYPES = [
   { id: 'other',     label: 'Other Docs'   },
 ]
 
-type DocMeta = { id: number; contract_id: string; doc_type: string; file_name: string; file_size: number; uploaded_at: string }
+type DocMeta = { id: number; contract_id: string; doc_type: string; file_name: string; file_size: number; file_url: string; uploaded_at: string }
 
 function fmtSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`
@@ -79,7 +79,7 @@ export default function DocumentsPage() {
   }
 
   function handleDownload(doc: DocMeta) {
-    window.open(`/api/contract-docs/${doc.id}`, '_blank')
+    window.open(doc.file_url || `/api/contract-docs/${doc.id}`, '_blank')
   }
 
   // Filter contracts by search
