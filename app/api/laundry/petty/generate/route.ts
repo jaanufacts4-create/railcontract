@@ -270,7 +270,7 @@ export async function POST(req: Request) {
   merge(22,7,23,7)   // Qty executed
   merge(22,8,22,9)   // "Payment on actual measurement" group label
   merge(22,10,23,11) // col 10-11 spans both rows
-  merge(22,12,23,12) // SS2 spans both rows
+  merge(22,12,23,12) // Remarks spans both rows
   // Row 23 sub-headers (separate cells — no merges needed for single cells)
 
   // ── NOW SET VALUES AND STYLES ─────────────────────────────────────────────
@@ -289,7 +289,7 @@ export async function POST(req: Request) {
   accCell(22, 7,  'Qty executed\n(since last cert)')
   accCell(22, 8,  'Payment on actual measurement')
   accCell(22, 10, 'Net Payable\nSince last cert')
-  accCell(22, 12, 'SS2')
+  accCell(22, 12, 'Remarks\n(with reason for delay in adjusting payment shown in column 1)')
 
   // Row 23 sub-headers (A B C unmerged, H I unmerged)
   accCell(23, 1, 'As per last\ncertificate')
@@ -319,7 +319,8 @@ export async function POST(req: Request) {
     cl.border = bord
   })
 
-  // Item rows 25-30
+  // Item rows 25-30 — ALL MERGES FIRST (including the L25:L30 remarks span)
+  merge(25,12,30,12)
   itemCalc.forEach((item, idx) => {
     const r = 25 + idx; rowH(r, 14)
     const isAlt = idx % 2 === 1
@@ -327,10 +328,10 @@ export async function POST(req: Request) {
 
     const asPerLast = n2(item.uptoPmt - item.since)
 
-    // ALL MERGES FIRST
+    // Per-row merge (J-K)
     merge(r,10,r,11)
 
-    // THEN values
+    // Values
     type ColDef = [number, ExcelJS.CellValue, ExcelJS.Alignment['horizontal']]
     const cols: ColDef[] = [
       [1,  asPerLast,            'right'],
@@ -342,8 +343,7 @@ export async function POST(req: Request) {
       [7,  item.ch,              'right'],
       [8,  item.since,           'right'],
       [9,  item.uptoPmt,         'right'],
-      [10, item.since,           'right'],   // net payable since (merged J-K)
-      [12, '-',                  'center'],  // SS2
+      [10, item.since,           'right'],  // net payable since (merged J-K)
     ]
     cols.forEach(([c, v, align]) => {
       const cl = ws.getCell(r, c)
@@ -355,6 +355,13 @@ export async function POST(req: Request) {
       if (typeof v === 'number') cl.numFmt = '#,##0.00'
     })
   })
+
+  // L25:L30 merged remarks cell
+  const remarksCl = ws.getCell(25, 12)
+  remarksCl.value = 'Bills and documents submitted late by Contractor'
+  remarksCl.font  = { name:'Arial', size:8, italic: true, color:{argb:'FF7F1D1D'} }
+  remarksCl.alignment = { horizontal:'center', vertical:'middle', wrapText:true }
+  remarksCl.border = bord
 
   // Total row 31
   rowH(31, 14)
@@ -376,6 +383,7 @@ export async function POST(req: Request) {
   cl31.font = { name:'Arial', size:9, bold:true }
   cl31.alignment = { horizontal:'right', vertical:'middle' }; cl31.border = bord
   totCell(10, sinceTotal)
+  ws.getCell(31,12).border = bord  // Remarks col — empty in total row
 
   rowH(32,5)
 
