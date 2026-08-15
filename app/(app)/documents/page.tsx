@@ -228,7 +228,7 @@ export default function DocumentsPage() {
                     >
                       {isUploading
                         ? <><Clock size={16} style={{ color: contract.color }} /><span style={{ fontSize: 11, fontWeight: 600, color: contract.color }}>Uploading…</span></>
-                        : <><Upload size={16} /><span style={{ fontSize: 11, fontWeight: 600 }}>Upload PDF</span><span style={{ fontSize: 10 }}>Max 20 MB</span></>
+                        : <><Upload size={16} /><span style={{ fontSize: 11, fontWeight: 600 }}>Upload PDF</span><span style={{ fontSize: 10 }}>Max 100 MB</span></>
                       }
                     </button>
                   )}

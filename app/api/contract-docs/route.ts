@@ -23,8 +23,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'contract_id, doc_type and file are required' }, { status: 400 })
   if (file.type !== 'application/pdf')
     return NextResponse.json({ error: 'Only PDF files are allowed' }, { status: 400 })
-  if (file.size > 20 * 1024 * 1024)
-    return NextResponse.json({ error: 'File too large (max 20 MB)' }, { status: 400 })
+  if (file.size > 100 * 1024 * 1024)
+    return NextResponse.json({ error: 'File too large (max 100 MB)' }, { status: 400 })
 
   const bytes  = await file.arrayBuffer()
   const base64 = Buffer.from(bytes).toString('base64')
