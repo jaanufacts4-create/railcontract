@@ -8,11 +8,13 @@ const CONTRACTS = [
   { id: 'dynamic', name: 'M/s Dynamic Services',        label: 'Secondary Bill',           color: '#7C3AED', bg: '#EDE9FE' },
   { id: 'rpc',     name: 'Prime Cleaning Services',     label: 'RPC-IV / Secondary Bill',  color: '#DC2626', bg: '#FEE2E2' },
   { id: 'peyush',  name: 'M/s Peyush Traders',          label: 'Departmental Laundry',     color: '#D97706', bg: '#FEF3C7' },
+  { id: 'other',   name: 'Other Docs',                  label: 'Miscellaneous Documents',  color: '#6B7280', bg: '#F3F4F6' },
 ]
 const DOC_TYPES = [
   { id: 'gem',       label: 'GEM Contract' },
   { id: 'tender',    label: 'Tender DOC'   },
   { id: 'agreement', label: 'Agreement'    },
+  { id: 'other',     label: 'Other Docs'   },
 ]
 
 type DocMeta = { id: number; contract_id: string; doc_type: string; file_name: string; file_size: number; uploaded_at: string }
@@ -147,15 +149,15 @@ export default function DocumentsPage() {
             {(() => {
               const uploaded = DOC_TYPES.filter(dt => getDoc(contract.id, dt.id)).length
               return (
-                <span style={{ fontSize: 11, fontWeight: 700, color: uploaded === 3 ? '#16A34A' : '#D97706', background: uploaded === 3 ? '#DCFCE7' : '#FEF3C7', borderRadius: 6, padding: '3px 10px' }}>
-                  {uploaded}/3
+                <span style={{ fontSize: 11, fontWeight: 700, color: uploaded === 4 ? '#16A34A' : '#D97706', background: uploaded === 4 ? '#DCFCE7' : '#FEF3C7', borderRadius: 6, padding: '3px 10px' }}>
+                  {uploaded}/4
                 </span>
               )
             })()}
           </div>
 
           {/* Doc type slots */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)' }}>
             {DOC_TYPES.map((dt, dti) => {
               const doc = getDoc(contract.id, dt.id)
               const key = `${contract.id}:${dt.id}`
@@ -165,7 +167,7 @@ export default function DocumentsPage() {
               return (
                 <div key={dt.id} style={{
                   padding: '16px 18px',
-                  borderRight: dti < 2 ? '1px solid var(--border)' : 'none',
+                  borderRight: dti < 3 ? '1px solid var(--border)' : 'none',
                   display: 'flex', flexDirection: 'column', gap: 10,
                 }}>
                   {/* Doc type label */}
