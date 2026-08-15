@@ -23,6 +23,7 @@ let _inspectionMigrated    = false
 let _inspectionModulesMigrated = false
 let _contractDocsMigrated  = false
 let _blobMigrated          = false
+let _pettyMigrated         = false
 export async function ensureDB() {
   if (!_migrated) {
     await migrate()
@@ -84,6 +85,10 @@ export async function ensureDB() {
   if (!_blobMigrated) {
     await migrateBlobColumn()
     _blobMigrated = true
+  }
+  if (!_pettyMigrated) {
+    await migratePetty()
+    _pettyMigrated = true
   }
 }
 
@@ -916,6 +921,67 @@ async function migrateContractDocs() {
       UNIQUE(contract_id, doc_type)
     )
   `)
+}
+
+/** ─── Petty Bills (Form E-1337) ─────────────────────────────────────────── */
+async function migratePetty() {
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS petty_bills (
+      id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+      month_year          TEXT    NOT NULL UNIQUE,
+      bill_no             INTEGER NOT NULL,
+      bill_date           TEXT    NOT NULL,
+      mb_no               TEXT    NOT NULL DEFAULT '',
+      mb_pages            TEXT    NOT NULL DEFAULT '',
+      work_from           TEXT    NOT NULL DEFAULT '',
+      work_to             TEXT    NOT NULL DEFAULT '',
+
+      bedsheet_washed     INTEGER NOT NULL DEFAULT 0,
+      pillow_washed       INTEGER NOT NULL DEFAULT 0,
+      face_towel_washed   INTEGER NOT NULL DEFAULT 0,
+      blanket_washed      INTEGER NOT NULL DEFAULT 0,
+      craft_bag_washed    INTEGER NOT NULL DEFAULT 0,
+      canvas_bag_washed   INTEGER NOT NULL DEFAULT 0,
+
+      bedsheet_no_pay     INTEGER NOT NULL DEFAULT 0,
+      pillow_no_pay       INTEGER NOT NULL DEFAULT 0,
+      face_towel_no_pay   INTEGER NOT NULL DEFAULT 0,
+      blanket_no_pay      INTEGER NOT NULL DEFAULT 0,
+      craft_bag_no_pay    INTEGER NOT NULL DEFAULT 0,
+      canvas_bag_no_pay   INTEGER NOT NULL DEFAULT 0,
+
+      bedsheet_upto_qty   INTEGER NOT NULL DEFAULT 0,
+      pillow_upto_qty     INTEGER NOT NULL DEFAULT 0,
+      face_towel_upto_qty INTEGER NOT NULL DEFAULT 0,
+      blanket_upto_qty    INTEGER NOT NULL DEFAULT 0,
+      craft_bag_upto_qty  INTEGER NOT NULL DEFAULT 0,
+      canvas_bag_upto_qty INTEGER NOT NULL DEFAULT 0,
+
+      penalty             REAL    NOT NULL DEFAULT 0,
+      conservancy_cess    REAL    NOT NULL DEFAULT 785,
+      created_at          TEXT    NOT NULL DEFAULT (datetime('now'))
+    )
+  `)
+
+  // Seed petty item rates into config (INSERT OR IGNORE — won't overwrite user changes)
+  const PETTY_RATES = [
+    ['petty_rate_bedsheet',   '6.66'],
+    ['petty_rate_pillow',     '2.99'],
+    ['petty_rate_face_towel', '2.99'],
+    ['petty_rate_blanket',    '28.30'],
+    ['petty_rate_craft_bag',  '2.90'],
+    ['petty_rate_canvas_bag', '490.00'],
+    ['petty_gst_pct',         '18'],
+    ['petty_tax_pct',         '2'],
+    ['petty_igst_pct',        '2'],
+    ['petty_conservancy',     '785'],
+  ]
+  for (const [key, value] of PETTY_RATES) {
+    await db.execute({
+      sql:  `INSERT OR IGNORE INTO config (key, value) VALUES (?, ?)`,
+      args: [key, value],
+    })
+  }
 }
 
 /** ─── Add file_url column (Vercel Blob migration) ────────────────────────── */

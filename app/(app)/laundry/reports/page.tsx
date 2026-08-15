@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
-import { Download, FileSpreadsheet, AlertTriangle } from 'lucide-react'
+import { Download, FileSpreadsheet, AlertTriangle, FileText } from 'lucide-react'
+import Link from 'next/link'
 
 export default function LaundryReportsPage() {
   const [monthYear, setMonthYear] = useState(() => {
@@ -78,7 +79,39 @@ export default function LaundryReportsPage() {
         </button>
       </div>
 
-      {/* Report 2 — Penalties */}
+      {/* Report 2 — Petty Bill */}
+      <div className="card" style={{ padding: 24, border: '2px solid #1F4E79' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+          <FileText size={20} style={{ color: '#1F4E79' }} />
+          <div>
+            <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Petty Bill — Form E-1337</p>
+            <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '2px 0 0' }}>M/s Peyush Traders · On Account Contract Certificate · Portrait A4</p>
+          </div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingLeft: 14, marginBottom: 20, borderLeft: '3px solid #1F4E79' }}>
+          {[
+            { name: 'Auto-filled from DB', desc: 'Total washed from dirty register, No payment from inspection pivot ×2' },
+            { name: 'Cumulative tracking', desc: 'Upto-date quantities auto-carried from previous bill' },
+            { name: '2-page E-1337 format', desc: 'Portrait A4, page break, all certifications included' },
+          ].map(({ name, desc }) => (
+            <div key={name} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+              <span style={{ fontSize: 10, fontWeight: 800, color: '#1F4E79', background: '#DBEAFE', borderRadius: 4, padding: '2px 6px', whiteSpace: 'nowrap', marginTop: 2 }}>●</span>
+              <div>
+                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{name}</span>
+                <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '1px 0 0' }}>{desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+        <Link href={`/laundry/petty?month=${monthYear}`}
+          className="btn"
+          style={{ gap: 8, fontSize: 14, padding: '10px 24px', background: '#1F4E79', color: '#FFF', border: 'none', borderRadius: 9, display: 'inline-flex', alignItems: 'center', fontFamily: 'var(--font)', fontWeight: 700, textDecoration: 'none' }}>
+          <FileText size={16} />
+          Open Petty Bill →
+        </Link>
+      </div>
+
+      {/* Report 3 — Penalties */}
       <div className="card" style={{ padding: 24, border: '2px solid #F59E0B' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
           <AlertTriangle size={20} style={{ color: '#D97706' }} />
