@@ -4,9 +4,10 @@ import { Download, FileSpreadsheet, FileText, AlertTriangle } from 'lucide-react
 import Link from 'next/link'
 
 const TABS = [
-  { id: 'laundry',   label: 'Laundry Register',       icon: FileSpreadsheet, color: '#16A34A' },
-  { id: 'petty',     label: 'Petty Bill — Form E-1337',icon: FileText,        color: '#1F4E79' },
-  { id: 'penalties', label: 'Penalties Register',      icon: AlertTriangle,   color: '#D97706' },
+  { id: 'laundry',   label: 'Laundry Register',        icon: FileSpreadsheet, color: '#16A34A' },
+  { id: 'petty',     label: 'Petty Bill — Form E-1337', icon: FileText,        color: '#1F4E79' },
+  { id: 'penalties', label: 'Penalties Register',       icon: AlertTriangle,   color: '#D97706' },
+  { id: 'summary',   label: 'Summary of Penalty',       icon: AlertTriangle,   color: '#C55A11' },
 ] as const
 
 type TabId = typeof TABS[number]['id']
@@ -140,7 +141,7 @@ export default function LaundryReportsPage() {
             <AlertTriangle size={18} style={{ color: '#D97706' }} />
             <div>
               <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Penalties Register</p>
-              <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '2px 0 0' }}>5 sheets — all penalty modules + Summary of Penalty</p>
+              <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '2px 0 0' }}>4 sheets — Inspections · Notes · Damaged · Store</p>
             </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 16, paddingLeft: 12, borderLeft: '3px solid #D97706' }}>
@@ -149,7 +150,6 @@ export default function LaundryReportsPage() {
               { n: 2, name: 'Inspection Notes',          desc: 'Tool short, cleanliness & wrapping penalties', c: '#7C3AED' },
               { n: 3, name: 'Damaged Linen',             desc: 'Torn/damaged items @75% LPR', c: '#D97706' },
               { n: 4, name: 'Store Inspections',         desc: 'Chemical shortage & cleanliness', c: '#065F46' },
-              { n: 5, name: 'Summary of Penalty',        desc: 'Qty table (ASR+FZR) + all 4 penalty totals · Portrait A4', c: '#C55A11' },
             ].map(({ n, name, desc, c }) => (
               <div key={n} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '3px 0' }}>
                 <span style={{ fontSize: 10, fontWeight: 800, color: c, background: c + '20', borderRadius: 3, padding: '1px 5px', marginTop: 2 }}>Sheet {n}</span>
@@ -167,11 +167,32 @@ export default function LaundryReportsPage() {
               <Download size={14} />
               {loading ? 'Generating…' : `Download — Penalties_${monthYear}.xlsx`}
             </button>
-            <Link href={`/laundry/penalty-summary?month=${monthYear}`}
-              style={{ fontSize: 13, color: '#C55A11', fontWeight: 600, textDecoration: 'underline' }}>
-              Edit FZR / Complaints data →
-            </Link>
           </div>
+        </div>
+      )}
+
+      {tab === 'summary' && (
+        <div className="card" style={{ padding: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+            <AlertTriangle size={18} style={{ color: '#C55A11' }} />
+            <div>
+              <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Summary of Penalty</p>
+              <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '2px 0 0' }}>Qty table (ASR + FZR) + all 4 penalty totals · Portrait A4</p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 20, paddingLeft: 12, borderLeft: '3px solid #C55A11' }}>
+            {[
+              'ASR washed quantities auto-filled from fresh register',
+              'FZR washed & Passenger Complaints — manual entry (yellow cells)',
+              'Penalty totals pulled from Inspections, Notes, Store & Damaged modules',
+            ].map(d => (
+              <p key={d} style={{ fontSize: 12, color: 'var(--text-3)', margin: '3px 0' }}>· {d}</p>
+            ))}
+          </div>
+          <Link href={`/laundry/penalty-summary?month=${monthYear}`}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '9px 20px', background: '#C55A11', color: '#fff', borderRadius: 9, fontFamily: 'var(--font)', fontWeight: 700, fontSize: 14, textDecoration: 'none' }}>
+            <AlertTriangle size={14} /> Open Summary of Penalty →
+          </Link>
         </div>
       )}
     </div>
