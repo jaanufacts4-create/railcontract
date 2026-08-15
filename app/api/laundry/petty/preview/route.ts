@@ -80,7 +80,7 @@ export async function GET(req: Request) {
     pillow:     Number(raw.pillow     ?? 0),
     face_towel: Number(raw.face_towel ?? 0),
     blanket:    Number(raw.blanket    ?? 0),
-    craft_bag:  craftBagWashed,
+    craft_bag:  Number(raw.craft_bag  ?? 0),
     canvas_bag: Number(raw.canvas_bag ?? 0),
   }
 
