@@ -1,185 +1,179 @@
 'use client'
 import { useState } from 'react'
-import { Download, FileSpreadsheet, AlertTriangle, FileText } from 'lucide-react'
+import { Download, FileSpreadsheet, FileText, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 
+const TABS = [
+  { id: 'laundry',   label: 'Laundry Register',       icon: FileSpreadsheet, color: '#16A34A' },
+  { id: 'petty',     label: 'Petty Bill — Form E-1337',icon: FileText,        color: '#1F4E79' },
+  { id: 'penalties', label: 'Penalties Register',      icon: AlertTriangle,   color: '#D97706' },
+] as const
+
+type TabId = typeof TABS[number]['id']
+
 export default function LaundryReportsPage() {
+  const [tab, setTab] = useState<TabId>('laundry')
   const [monthYear, setMonthYear] = useState(() => {
     const saved = typeof window !== 'undefined' ? localStorage.getItem('laundry_last_month') : null
     return saved ?? new Date().toISOString().slice(0, 7)
   })
-  const [downloading,  setDownloading]  = useState(false)
-  const [downloadingP, setDownloadingP] = useState(false)
+  const [loading, setLoading] = useState(false)
 
-  async function handleDownload(endpoint: string, fileName: string, setLoading: (v: boolean) => void) {
+  function saveMonth(v: string) {
+    setMonthYear(v)
+    if (typeof window !== 'undefined') localStorage.setItem('laundry_last_month', v)
+  }
+
+  async function download(endpoint: string, fileName: string) {
     setLoading(true)
     try {
       const res = await fetch(`${endpoint}?month_year=${monthYear}`)
       if (!res.ok) { alert('Export failed'); return }
       const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
+      const url  = URL.createObjectURL(blob)
+      const a    = document.createElement('a')
       a.href = url; a.download = fileName; a.click()
       URL.revokeObjectURL(url)
-    } finally {
-      setLoading(false)
-    }
+    } finally { setLoading(false) }
   }
 
+  const active = TABS.find(t => t.id === tab)!
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 640 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 680 }}>
+
+      {/* Header */}
       <div>
         <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', letterSpacing: '-.02em', margin: 0 }}>Laundry Reports</h1>
-        <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '3px 0 0' }}>ASR Depot · M/s Peyush Traders · Download Excel Workbooks</p>
+        <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '3px 0 0' }}>ASR Depot · M/s Peyush Traders</p>
       </div>
 
-      {/* Month picker */}
-      <div className="card" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
-        <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.04em' }}>Month</label>
-        <input
-          type="month" className="input" style={{ maxWidth: 200 }} value={monthYear}
-          onChange={e => { setMonthYear(e.target.value); if (typeof window !== 'undefined') localStorage.setItem('laundry_last_month', e.target.value) }}
-        />
-      </div>
-
-      {/* Report 1 — Laundry Data */}
-      <div className="card" style={{ padding: 24 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-          <FileSpreadsheet size={20} style={{ color: '#16A34A' }} />
-          <div>
-            <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Laundry Register</p>
-            <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '2px 0 0' }}>Dirty Linen · Fresh Linen · Dirty-Fresh Register</p>
-          </div>
+      {/* Month + Tabs row */}
+      <div className="card" style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.04em' }}>Month</label>
+          <input type="month" className="input" style={{ width: 155 }} value={monthYear} onChange={e => saveMonth(e.target.value)} />
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 20, borderLeft: '3px solid #16A34A', paddingLeft: 14 }}>
-          {[
-            { num: 1, name: 'Dirty Linen',          desc: 'Date-wise dirty linen dispatched per item type', color: '#B45309' },
-            { num: 2, name: 'Fresh Linen',           desc: 'Date-wise washed linen received: Fresh + Condemned', color: '#166534' },
-            { num: 3, name: 'Dirty-Fresh Register',  desc: 'Combined register — dirty & fresh side by side', color: '#7C3AED' },
-          ].map(({ num, name, desc, color }) => (
-            <div key={num} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-              <span style={{ fontSize: 10, fontWeight: 800, color, background: color + '20', borderRadius: 4, padding: '2px 6px', whiteSpace: 'nowrap', marginTop: 2 }}>Sheet {num}</span>
-              <div>
-                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{name}</span>
-                <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '1px 0 0' }}>{desc}</p>
-              </div>
-            </div>
+        <div style={{ display: 'flex', gap: 6, flex: 1, flexWrap: 'wrap' }}>
+          {TABS.map(({ id, label, icon: Icon, color }) => (
+            <button
+              key={id}
+              onClick={() => setTab(id)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 7, padding: '7px 14px',
+                borderRadius: 8, border: `1.5px solid ${tab === id ? color : 'var(--border)'}`,
+                background: tab === id ? color + '15' : 'var(--surface)',
+                color: tab === id ? color : 'var(--text-3)',
+                fontFamily: 'var(--font)', fontSize: 13, fontWeight: tab === id ? 700 : 500,
+                cursor: 'pointer', transition: 'all .15s',
+              }}
+            >
+              <Icon size={14} />
+              {label}
+            </button>
           ))}
         </div>
-
-        <button
-          onClick={() => handleDownload('/api/laundry/export', `Laundry_Report_${monthYear}.xlsx`, setDownloading)}
-          disabled={downloading || !monthYear}
-          className="btn btn-primary"
-          style={{ gap: 8, fontSize: 14, padding: '10px 24px' }}
-        >
-          <Download size={16} />
-          {downloading ? 'Generating Excel…' : `Download — Laundry_Report_${monthYear}.xlsx`}
-        </button>
       </div>
 
-      {/* Report 2 — Petty Bill */}
-      <div className="card" style={{ padding: 24, border: '2px solid #1F4E79' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-          <FileText size={20} style={{ color: '#1F4E79' }} />
-          <div>
-            <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Petty Bill — Form E-1337</p>
-            <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '2px 0 0' }}>M/s Peyush Traders · On Account Contract Certificate · Portrait A4</p>
+      {/* Tab Content */}
+      {tab === 'laundry' && (
+        <div className="card" style={{ padding: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+            <FileSpreadsheet size={18} style={{ color: '#16A34A' }} />
+            <div>
+              <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Laundry Register</p>
+              <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '2px 0 0' }}>3 sheets — Dirty Linen · Fresh Linen · Dirty-Fresh Register</p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 20, paddingLeft: 12, borderLeft: '3px solid #16A34A' }}>
+            {[
+              { n: 1, name: 'Dirty Linen', desc: 'Date-wise dirty linen dispatched per item type', c: '#B45309' },
+              { n: 2, name: 'Fresh Linen',  desc: 'Date-wise washed linen received: Fresh + Condemned', c: '#166534' },
+              { n: 3, name: 'Dirty-Fresh',  desc: 'Combined register — dirty & fresh side by side', c: '#7C3AED' },
+            ].map(({ n, name, desc, c }) => (
+              <div key={n} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '3px 0' }}>
+                <span style={{ fontSize: 10, fontWeight: 800, color: c, background: c + '20', borderRadius: 3, padding: '1px 5px', marginTop: 2 }}>Sheet {n}</span>
+                <div>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{name}</span>
+                  <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '1px 0 0' }}>{desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <button onClick={() => download('/api/laundry/export', `Laundry_Report_${monthYear}.xlsx`)}
+            disabled={loading || !monthYear} className="btn btn-primary" style={{ gap: 8 }}>
+            <Download size={14} />
+            {loading ? 'Generating…' : `Download — Laundry_Report_${monthYear}.xlsx`}
+          </button>
+        </div>
+      )}
+
+      {tab === 'petty' && (
+        <div className="card" style={{ padding: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+            <FileText size={18} style={{ color: '#1F4E79' }} />
+            <div>
+              <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Petty Bill — Form E-1337</p>
+              <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '2px 0 0' }}>On Account Contract Certificate · Portrait A4 · 2 pages</p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 20, paddingLeft: 12, borderLeft: '3px solid #1F4E79' }}>
+            {[
+              'Auto-filled from DB — total washed (fresh register), no payment (pivot ×2)',
+              'Cumulative upto-date quantities carried from previous bill',
+              'Editable bill details — verify before generating Excel',
+            ].map(d => (
+              <p key={d} style={{ fontSize: 12, color: 'var(--text-3)', margin: '3px 0' }}>· {d}</p>
+            ))}
+          </div>
+          <Link href={`/laundry/petty?month=${monthYear}`}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '9px 20px', background: '#1F4E79', color: '#fff', borderRadius: 9, fontFamily: 'var(--font)', fontWeight: 700, fontSize: 14, textDecoration: 'none' }}>
+            <FileText size={14} /> Open Petty Bill →
+          </Link>
+        </div>
+      )}
+
+      {tab === 'penalties' && (
+        <div className="card" style={{ padding: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+            <AlertTriangle size={18} style={{ color: '#D97706' }} />
+            <div>
+              <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Penalties Register</p>
+              <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '2px 0 0' }}>5 sheets — all penalty modules + Summary of Penalty</p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 16, paddingLeft: 12, borderLeft: '3px solid #D97706' }}>
+            {[
+              { n: 1, name: 'Inspection of Dirty Linen', desc: 'Register + pivot (dirty units & no-payment)', c: '#B45309' },
+              { n: 2, name: 'Inspection Notes',          desc: 'Tool short, cleanliness & wrapping penalties', c: '#7C3AED' },
+              { n: 3, name: 'Damaged Linen',             desc: 'Torn/damaged items @75% LPR', c: '#D97706' },
+              { n: 4, name: 'Store Inspections',         desc: 'Chemical shortage & cleanliness', c: '#065F46' },
+              { n: 5, name: 'Summary of Penalty',        desc: 'Qty table (ASR+FZR) + all 4 penalty totals · Portrait A4', c: '#C55A11' },
+            ].map(({ n, name, desc, c }) => (
+              <div key={n} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '3px 0' }}>
+                <span style={{ fontSize: 10, fontWeight: 800, color: c, background: c + '20', borderRadius: 3, padding: '1px 5px', marginTop: 2 }}>Sheet {n}</span>
+                <div>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{name}</span>
+                  <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '1px 0 0' }}>{desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+            <button onClick={() => download('/api/laundry/penalties-export', `Penalties_${monthYear}.xlsx`)}
+              disabled={loading || !monthYear} className="btn"
+              style={{ gap: 8, background: '#D97706', color: '#fff', border: 'none', padding: '9px 20px', borderRadius: 9, fontFamily: 'var(--font)', fontWeight: 700, fontSize: 14, cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}>
+              <Download size={14} />
+              {loading ? 'Generating…' : `Download — Penalties_${monthYear}.xlsx`}
+            </button>
+            <Link href={`/laundry/penalty-summary?month=${monthYear}`}
+              style={{ fontSize: 13, color: '#C55A11', fontWeight: 600, textDecoration: 'underline' }}>
+              Edit FZR / Complaints data →
+            </Link>
           </div>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingLeft: 14, marginBottom: 20, borderLeft: '3px solid #1F4E79' }}>
-          {[
-            { name: 'Auto-filled from DB', desc: 'Total washed from dirty register, No payment from inspection pivot ×2' },
-            { name: 'Cumulative tracking', desc: 'Upto-date quantities auto-carried from previous bill' },
-            { name: '2-page E-1337 format', desc: 'Portrait A4, page break, all certifications included' },
-          ].map(({ name, desc }) => (
-            <div key={name} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-              <span style={{ fontSize: 10, fontWeight: 800, color: '#1F4E79', background: '#DBEAFE', borderRadius: 4, padding: '2px 6px', whiteSpace: 'nowrap', marginTop: 2 }}>●</span>
-              <div>
-                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{name}</span>
-                <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '1px 0 0' }}>{desc}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-        <Link href={`/laundry/petty?month=${monthYear}`}
-          className="btn"
-          style={{ gap: 8, fontSize: 14, padding: '10px 24px', background: '#1F4E79', color: '#FFF', border: 'none', borderRadius: 9, display: 'inline-flex', alignItems: 'center', fontFamily: 'var(--font)', fontWeight: 700, textDecoration: 'none' }}>
-          <FileText size={16} />
-          Open Petty Bill →
-        </Link>
-      </div>
-
-      {/* Report 3 — Summary of Penalty */}
-      <div className="card" style={{ padding: 24, border: '2px solid #C55A11' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-          <AlertTriangle size={20} style={{ color: '#C55A11' }} />
-          <div>
-            <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Summary of Penalty</p>
-            <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '2px 0 0' }}>ASR & FZR Depot · Qty Table + Penalty Details · Landscape A4</p>
-          </div>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingLeft: 14, marginBottom: 20, borderLeft: '3px solid #C55A11' }}>
-          {[
-            { name: 'Auto-filled from DB', desc: 'ASR washed (fresh register), no payment (pivot ×2), all penalty modules' },
-            { name: 'Manual FZR entry', desc: 'FZR washed & no payment entered by user on verify page' },
-            { name: 'Passenger Complaints', desc: 'Manual penalty entry for complaints — editable on verify page' },
-          ].map(({ name, desc }) => (
-            <div key={name} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-              <span style={{ fontSize: 10, fontWeight: 800, color: '#C55A11', background: '#FEF3C7', borderRadius: 4, padding: '2px 6px', whiteSpace: 'nowrap', marginTop: 2 }}>●</span>
-              <div>
-                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{name}</span>
-                <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '1px 0 0' }}>{desc}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-        <Link href={`/laundry/penalty-summary?month=${monthYear}`}
-          className="btn"
-          style={{ gap: 8, fontSize: 14, padding: '10px 24px', background: '#C55A11', color: '#FFF', border: 'none', borderRadius: 9, display: 'inline-flex', alignItems: 'center', fontFamily: 'var(--font)', fontWeight: 700, textDecoration: 'none' }}>
-          <AlertTriangle size={16} />
-          Open Summary of Penalty →
-        </Link>
-      </div>
-
-      {/* Report 4 — Penalties */}
-      <div className="card" style={{ padding: 24, border: '2px solid #F59E0B' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-          <AlertTriangle size={20} style={{ color: '#D97706' }} />
-          <div>
-            <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Penalties Register</p>
-            <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '2px 0 0' }}>All 4 penalty modules in one workbook</p>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingLeft: 14, marginBottom: 20, borderLeft: '3px solid #F59E0B' }}>
-          {[
-            { num: 1, name: 'Inspection of Dirty Linen', desc: 'Register with pivot table (dirty units & units against no payment)', color: '#B45309' },
-            { num: 2, name: 'Inspection Notes',          desc: 'Tool short, cleanliness & bedsheet wrapping penalties', color: '#7C3AED' },
-            { num: 3, name: 'Damaged Linen',             desc: 'Torn/damaged linen penalties @75% LPR', color: '#D97706' },
-            { num: 4, name: 'Store Inspections',         desc: 'Shortage of chemicals & cleanliness', color: '#065F46' },
-          ].map(({ num, name, desc, color }) => (
-            <div key={num} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-              <span style={{ fontSize: 10, fontWeight: 800, color, background: color + '20', borderRadius: 4, padding: '2px 6px', whiteSpace: 'nowrap', marginTop: 2 }}>Sheet {num}</span>
-              <div>
-                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{name}</span>
-                <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '1px 0 0' }}>{desc}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <button
-          onClick={() => handleDownload('/api/laundry/penalties-export', `Penalties_${monthYear}.xlsx`, setDownloadingP)}
-          disabled={downloadingP || !monthYear}
-          className="btn"
-          style={{ gap: 8, fontSize: 14, padding: '10px 24px', background: '#F59E0B', color: '#FFF', border: 'none', borderRadius: 9, display: 'inline-flex', alignItems: 'center', cursor: 'pointer', fontFamily: 'var(--font)', fontWeight: 700 }}
-        >
-          <Download size={16} />
-          {downloadingP ? 'Generating Excel…' : `Download — Penalties_${monthYear}.xlsx`}
-        </button>
-      </div>
+      )}
     </div>
   )
 }
