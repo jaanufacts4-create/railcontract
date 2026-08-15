@@ -6,26 +6,9 @@ import Link from 'next/link'
 
 function today() { return new Date().toISOString().slice(0, 10) }
 
-type Field = {
-  key: string; label: string; sub?: string
-  normal?: string; normalKey?: string
-  ac?: string; acKey?: string
-  hasTotal?: boolean
-}
-
-const FIELDS: Field[] = [
-  { key: 'bed_sheet',    label: 'Bed Sheets',    hasTotal: true, normalKey: 'bed_sheet_normal',    normal: 'Normal',  acKey: 'bed_sheet_1ac',    ac: '1st AC' },
-  { key: 'pillow_cover', label: 'Pillow Covers',  hasTotal: true, normalKey: 'pillow_cover_normal', normal: 'Normal',  acKey: 'pillow_cover_1ac', ac: '1st AC' },
-  { key: 'face_towel',   label: 'Face Towel' },
-  { key: 'bath_towel',   label: 'Bath Towel' },
-  { key: 'blanket_cover',label: 'Blanket Cover' },
-  { key: 'blanket',      label: 'Blanket' },
-  { key: 'canvas_bag',   label: 'Canvas Bag' },
-]
-
 function NewLaundryEntryPage() {
   const searchParams = useSearchParams()
-  const [date,   setDate]   = useState(() => {
+  const [date, setDate] = useState(() => {
     const m = searchParams.get('month')
     if (m) {
       if (typeof window !== 'undefined') localStorage.setItem('laundry_last_month', m)
@@ -45,7 +28,7 @@ function NewLaundryEntryPage() {
     pillow_cover_normal: 0, pillow_cover_1ac: 0,
     face_towel: 0, bath_towel: 0, blanket_cover: 0, blanket: 0, canvas_bag: 0,
   })
-  const [saving,   setSaving]   = useState(false)
+  const [saving, setSaving]     = useState(false)
   const [savedMsg, setSavedMsg] = useState('')
 
   function set(k: string, v: number) {
@@ -56,8 +39,7 @@ function NewLaundryEntryPage() {
   const pillowTotal = vals.pillow_cover_normal + vals.pillow_cover_1ac
 
   function nextDay(d: string) {
-    const dt = new Date(d)
-    dt.setDate(dt.getDate() + 1)
+    const dt = new Date(d); dt.setDate(dt.getDate() + 1)
     return dt.toISOString().slice(0, 10)
   }
 
@@ -77,7 +59,6 @@ function NewLaundryEntryPage() {
     const nd = nextDay(date)
     setSaving(false)
     if (typeof window !== 'undefined') localStorage.setItem('laundry_last_month', nd.slice(0, 7))
-    // advance date to next day, reset values
     setDate(nd)
     setVals({ bed_sheet_normal: 0, bed_sheet_1ac: 0, pillow_cover_normal: 0, pillow_cover_1ac: 0, face_towel: 0, bath_towel: 0, blanket_cover: 0, blanket: 0, canvas_bag: 0 })
     setSavedMsg(`✅ Saved for ${savedDate} — Now entering: ${nd}`)
@@ -85,19 +66,46 @@ function NewLaundryEntryPage() {
   }
 
   const inp: React.CSSProperties = {
-    width: '100%', padding: '8px 10px', borderRadius: 8,
+    width: '100%', padding: '7px 10px', borderRadius: 7,
     border: '1.5px solid var(--border)', background: 'var(--surface)',
     color: 'var(--text)', fontFamily: 'var(--font)', fontSize: 14,
-    fontWeight: 600, textAlign: 'right' as const, outline: 'none',
+    fontWeight: 600, textAlign: 'right', outline: 'none',
+    boxSizing: 'border-box',
   }
-  const totalBox: React.CSSProperties = {
-    padding: '8px 10px', borderRadius: 8, background: 'var(--surface-2)',
-    border: '1.5px solid var(--border)', fontWeight: 800, fontSize: 14,
-    color: 'var(--primary)', textAlign: 'right' as const,
+  const totalCell: React.CSSProperties = {
+    padding: '7px 12px', borderRadius: 7,
+    background: '#FEF3C7', border: '1.5px solid #FCD34D',
+    fontWeight: 800, fontSize: 14, color: '#92400E',
+    textAlign: 'right', minWidth: 80,
+  }
+
+  // rows: dual-input rows (bed sheet, pillow cover) + single rows
+  const dualRows = [
+    { label: 'Bed Sheet',    normalKey: 'bed_sheet_normal',    acKey: 'bed_sheet_1ac',    total: bedTotal },
+    { label: 'Pillow Cover', normalKey: 'pillow_cover_normal', acKey: 'pillow_cover_1ac', total: pillowTotal },
+  ]
+  const singleRows = [
+    { label: 'Face Towel',    key: 'face_towel'    },
+    { label: 'Bath Towel',    key: 'bath_towel'    },
+    { label: 'Blanket Cover', key: 'blanket_cover' },
+    { label: 'Blanket',       key: 'blanket'       },
+    { label: 'Canvas Bag',    key: 'canvas_bag'    },
+  ]
+
+  const thStyle: React.CSSProperties = {
+    padding: '10px 14px', fontSize: 11, fontWeight: 700,
+    textTransform: 'uppercase', letterSpacing: '.05em',
+    color: '#fff', background: '#B45309', textAlign: 'center',
+    whiteSpace: 'nowrap',
+  }
+  const tdStyle: React.CSSProperties = {
+    padding: '10px 12px', borderBottom: '1px solid var(--border)',
+    verticalAlign: 'middle',
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 22, maxWidth: 700 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 22, maxWidth: 780 }}>
+
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <Link href="/laundry" style={{ color: 'var(--text-3)', display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }}>
@@ -118,80 +126,74 @@ function NewLaundryEntryPage() {
         }} />
       </div>
 
-      {/* Linen Items */}
-      <div className="card" style={{ padding: 20 }}>
-        <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.04em', margin: '0 0 16px' }}>
-          Dirty Linen Dispatched Quantities
-        </p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-
-          {/* Bed Sheets */}
-          <div style={{ background: 'var(--surface-2)', borderRadius: 10, padding: '14px 16px' }}>
-            <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', margin: '0 0 10px' }}>Bed Sheets</p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, alignItems: 'end' }}>
-              <div>
-                <label style={{ fontSize: 11, color: 'var(--text-4)', fontWeight: 600, display: 'block', marginBottom: 4 }}>Normal</label>
-                <input type="number" min={0} style={inp} value={vals.bed_sheet_normal || ''}
-                  onChange={e => set('bed_sheet_normal', Number(e.target.value))} />
-              </div>
-              <div>
-                <label style={{ fontSize: 11, color: 'var(--text-4)', fontWeight: 600, display: 'block', marginBottom: 4 }}>1st AC</label>
-                <input type="number" min={0} style={inp} value={vals.bed_sheet_1ac || ''}
-                  onChange={e => set('bed_sheet_1ac', Number(e.target.value))} />
-              </div>
-              <div>
-                <label style={{ fontSize: 11, color: 'var(--primary)', fontWeight: 700, display: 'block', marginBottom: 4 }}>Total (auto)</label>
-                <div style={totalBox}>{bedTotal.toLocaleString('en-IN')}</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Pillow Covers */}
-          <div style={{ background: 'var(--surface-2)', borderRadius: 10, padding: '14px 16px' }}>
-            <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', margin: '0 0 10px' }}>Pillow Covers</p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, alignItems: 'end' }}>
-              <div>
-                <label style={{ fontSize: 11, color: 'var(--text-4)', fontWeight: 600, display: 'block', marginBottom: 4 }}>Normal</label>
-                <input type="number" min={0} style={inp} value={vals.pillow_cover_normal || ''}
-                  onChange={e => set('pillow_cover_normal', Number(e.target.value))} />
-              </div>
-              <div>
-                <label style={{ fontSize: 11, color: 'var(--text-4)', fontWeight: 600, display: 'block', marginBottom: 4 }}>1st AC</label>
-                <input type="number" min={0} style={inp} value={vals.pillow_cover_1ac || ''}
-                  onChange={e => set('pillow_cover_1ac', Number(e.target.value))} />
-              </div>
-              <div>
-                <label style={{ fontSize: 11, color: 'var(--primary)', fontWeight: 700, display: 'block', marginBottom: 4 }}>Total (auto)</label>
-                <div style={totalBox}>{pillowTotal.toLocaleString('en-IN')}</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Single-value items */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            {[
-              { key: 'face_towel',    label: 'Face Towel' },
-              { key: 'bath_towel',    label: 'Bath Towel' },
-              { key: 'blanket_cover', label: 'Blanket Cover' },
-              { key: 'blanket',       label: 'Blanket' },
-              { key: 'canvas_bag',    label: 'Canvas Bag' },
-            ].map(({ key, label }) => (
-              <div key={key}>
-                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.04em', display: 'block', marginBottom: 5 }}>{label}</label>
-                <input type="number" min={0} style={inp} value={vals[key] || ''}
-                  onChange={e => set(key, Number(e.target.value))} />
-              </div>
-            ))}
-          </div>
+      {/* Table */}
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div style={{ padding: '14px 18px 10px', borderBottom: '1px solid var(--border)' }}>
+          <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.04em', margin: 0 }}>
+            Dirty Linen Dispatched Quantities
+          </p>
         </div>
 
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr>
+              <th style={{ ...thStyle, textAlign: 'left', background: '#78350F', width: '30%' }}>Item</th>
+              <th style={{ ...thStyle, width: '20%' }}>Normal</th>
+              <th style={{ ...thStyle, width: '20%' }}>1st AC</th>
+              <th style={{ ...thStyle, width: '15%', background: '#92400E' }}>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {/* Dual-input rows: Bed Sheet & Pillow Cover */}
+            {dualRows.map((row, i) => (
+              <tr key={row.label} style={{ background: i % 2 === 0 ? 'var(--surface)' : 'var(--surface-2)' }}>
+                <td style={{ ...tdStyle, fontWeight: 700, fontSize: 14, color: 'var(--text)', paddingLeft: 18 }}>
+                  {row.label}
+                </td>
+                <td style={{ ...tdStyle, textAlign: 'center' }}>
+                  <input type="number" min={0} style={inp}
+                    value={vals[row.normalKey] || ''}
+                    onChange={e => set(row.normalKey, Number(e.target.value))} />
+                </td>
+                <td style={{ ...tdStyle, textAlign: 'center' }}>
+                  <input type="number" min={0} style={inp}
+                    value={vals[row.acKey] || ''}
+                    onChange={e => set(row.acKey, Number(e.target.value))} />
+                </td>
+                <td style={{ ...tdStyle, textAlign: 'center' }}>
+                  <div style={totalCell}>{row.total.toLocaleString('en-IN')}</div>
+                </td>
+              </tr>
+            ))}
+
+            {/* Divider */}
+            <tr>
+              <td colSpan={4} style={{ padding: 0, background: 'var(--border)', height: 2 }} />
+            </tr>
+
+            {/* Single-value rows */}
+            {singleRows.map((row, i) => (
+              <tr key={row.key} style={{ background: (i + dualRows.length) % 2 === 0 ? 'var(--surface)' : 'var(--surface-2)' }}>
+                <td style={{ ...tdStyle, fontWeight: 700, fontSize: 14, color: 'var(--text)', paddingLeft: 18 }}>
+                  {row.label}
+                </td>
+                <td colSpan={2} style={{ ...tdStyle }}>
+                  <input type="number" min={0} style={{ ...inp, maxWidth: 200 }}
+                    value={vals[row.key] || ''}
+                    onChange={e => set(row.key, Number(e.target.value))} />
+                </td>
+                <td style={{ ...tdStyle, textAlign: 'center', fontSize: 13, color: 'var(--text-4)' }}>—</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       {/* Save bar */}
       <div className="card" style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12 }}>
         {savedMsg && (
-          <span style={{ fontSize: 13, color: 'var(--success)', fontWeight: 600 }}>
-            {savedMsg}<Link href="/laundry" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>View All</Link>
+          <span style={{ fontSize: 13, color: 'var(--success)', fontWeight: 600, flex: 1 }}>
+            {savedMsg} <Link href="/laundry" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>View All</Link>
           </span>
         )}
         <Link href="/laundry" className="btn btn-secondary">Cancel</Link>
