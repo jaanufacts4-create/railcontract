@@ -126,7 +126,7 @@ export async function POST(req: Request) {
   const bordM = { top: med,  left: med,  bottom: med,  right: med  }
 
   function cell(r: number, c: number) { return ws.getCell(r, c) }
-  function setVal(r: number, c: number, v: unknown, bold=false, sz=9, align: ExcelJS.Alignment['horizontal']='left', wrapText=false) {
+  function setVal(r: number, c: number, v: ExcelJS.CellValue, bold=false, sz=9, align: ExcelJS.Alignment['horizontal']='left', wrapText=false) {
     const cl = cell(r, c)
     cl.value = v
     cl.font  = { name: 'Arial', size: sz, bold }
@@ -212,15 +212,15 @@ export async function POST(req: Request) {
   rowH(14, 18);
   const hdrFill: ExcelJS.FillPattern = { type:'pattern', pattern:'solid', fgColor:{argb:'FF1F4E79'} }
   const hdrFont: Partial<ExcelJS.Font> = { name:'Arial', size:9, bold:true, color:{argb:'FFFFFFFF'} }
-  const hdrCells = [
+  const hdrCells: [number,number,number,number,string][] = [
     [14,1,14,1,'Sl\nNo'], [14,2,14,2,'Description of work / Washing of'],
     [14,3,14,3,'Total No of Items Washed'], [14,4,14,4,'Items against No Payment'],
     [14,5,14,5,'Total No of Items to be Charged'],
   ]
   hdrCells.forEach(([r1,c1,r2,c2,v]) => {
-    merge(r1 as number,c1 as number,r2 as number,c2 as number)
-    const cl = ws.getCell(r1 as number,c1 as number)
-    cl.value = v as string; cl.font = hdrFont; cl.fill = hdrFill
+    merge(r1,c1,r2,c2)
+    const cl = ws.getCell(r1,c1)
+    cl.value = v; cl.font = hdrFont; cl.fill = hdrFill
     cl.alignment = { horizontal:'center', vertical:'middle', wrapText:true }
     cl.border = bordM
   })
@@ -230,12 +230,15 @@ export async function POST(req: Request) {
     const r = 15 + idx; rowH(r, 14)
     const isAlt = idx % 2 === 1
     const fillBg: ExcelJS.FillPattern = { type:'pattern', pattern:'solid', fgColor:{argb: isAlt ? 'FFDAE8FC' : 'FFEBF5FB'} }
-    ;[[r,1,r,1,item.slNo],[r,2,r,2,item.label],[r,3,r,3,washed[item.key]??0],
-      [r,4,r,4,no_pay[item.key]??0],[r,5,r,5,charged[item.key]??0]].forEach(([r1,c1,r2,c2,v]) => {
-      merge(r1 as number,c1 as number,r2 as number,c2 as number)
-      const cl = ws.getCell(r1 as number,c1 as number)
-      cl.value = v as number|string
-      cl.font = { name:'Arial', size:9, bold: typeof v === 'number' && [3,4,5].includes(c1 as number) }
+    const itemSumCells: [number,number,number,number,ExcelJS.CellValue][] = [
+      [r,1,r,1,item.slNo],[r,2,r,2,item.label],[r,3,r,3,washed[item.key]??0],
+      [r,4,r,4,no_pay[item.key]??0],[r,5,r,5,charged[item.key]??0],
+    ]
+    itemSumCells.forEach(([r1,c1,r2,c2,v]) => {
+      merge(r1,c1,r2,c2)
+      const cl = ws.getCell(r1,c1)
+      cl.value = v
+      cl.font = { name:'Arial', size:9, bold: typeof v === 'number' && [3,4,5].includes(c1) }
       cl.fill = fillBg
       cl.alignment = { horizontal: c1===2 ? 'left' : 'center', vertical:'middle' }
       cl.border = bord
@@ -250,7 +253,7 @@ export async function POST(req: Request) {
   const accHdr: ExcelJS.FillPattern = { type:'pattern', pattern:'solid', fgColor:{argb:'FF2E4057'} }
   const accFont: Partial<ExcelJS.Font> = { name:'Arial', size:8, bold:true, color:{argb:'FFFFFFFF'} }
 
-  const accHeaders = [
+  const accHeaders: [number,number,number,number,string][] = [
     [22,1,23,3,'Total (On account payment)\nAs per last cert | Since last | Upto date'],
     [22,4,23,4,'Item of work'],
     [22,5,23,5,'Unit'],
@@ -260,19 +263,20 @@ export async function POST(req: Request) {
     [22,10,23,11,'Since last cert\nPayment'],
   ]
   accHeaders.forEach(([r1,c1,r2,c2,v]) => {
-    merge(r1 as number,c1 as number,r2 as number,c2 as number)
-    const cl = ws.getCell(r1 as number,c1 as number)
-    cl.value = v as string; cl.font = accFont; cl.fill = accHdr
+    merge(r1,c1,r2,c2)
+    const cl = ws.getCell(r1,c1)
+    cl.value = v; cl.font = accFont; cl.fill = accHdr
     cl.alignment = { horizontal:'center', vertical:'middle', wrapText:true }
     cl.border = bordM
   })
 
   // Column number row
   rowH(24, 11)
-  ;[['1-3',1,24,3],['4',4,24,4],['5',5,24,5],['6',6,24,6],['7',7,24,7],['8-9',8,24,9],['10',10,24,11]].forEach(([v,c1,r,c2]) => {
-    merge(r as number,c1 as number,r as number,c2 as number)
-    const cl = ws.getCell(r as number,c1 as number)
-    cl.value = v as string; cl.font = { name:'Arial', size:8, bold:true }
+  const colNums: [string,number,number,number][] = [['1-3',1,24,3],['4',4,24,4],['5',5,24,5],['6',6,24,6],['7',7,24,7],['8-9',8,24,9],['10',10,24,11]]
+  colNums.forEach(([v,c1,r,c2]) => {
+    merge(r,c1,r,c2)
+    const cl = ws.getCell(r,c1)
+    cl.value = v; cl.font = { name:'Arial', size:8, bold:true }
     cl.alignment = { horizontal:'center', vertical:'middle' }
     cl.border = bord
   })
@@ -283,7 +287,7 @@ export async function POST(req: Request) {
     const isAlt = idx % 2 === 1
     const fillBg: ExcelJS.FillPattern = { type:'pattern', pattern:'solid', fgColor:{argb: isAlt ? 'FFFFF3CD' : 'FFFFFDE7'} }
 
-    const rowData: [number,number,number,number, string|number, string][] = [
+    const rowData: [number,number,number,number, ExcelJS.CellValue, ExcelJS.Alignment['horizontal']][] = [
       [r,1,r,3,'-','center'],
       [r,4,r,4,item.label,'left'],
       [r,5,r,5,'Nos.','center'],
@@ -291,14 +295,14 @@ export async function POST(req: Request) {
       [r,7,r,7,item.ch,'right'],
       [r,8,r,9,item.uptoPmt,'right'],
       [r,10,r,11,item.since,'right'],
-    ] as [number,number,number,number, string|number, string][]
+    ]
     rowData.forEach(([r1,c1,r2,c2,v,align]) => {
       merge(r1,c1,r2,c2)
       const cl = ws.getCell(r1,c1)
-      cl.value = typeof v === 'number' ? v : v
+      cl.value = v
       cl.font = { name:'Arial', size:9, bold: typeof v === 'number' && v > 0 }
       cl.fill = fillBg
-      cl.alignment = { horizontal: align as ExcelJS.Alignment['horizontal'], vertical:'middle' }
+      cl.alignment = { horizontal: align, vertical:'middle' }
       cl.border = bord
       if (typeof v === 'number') cl.numFmt = '#,##0.00'
     })
