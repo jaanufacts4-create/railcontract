@@ -22,6 +22,7 @@ let _laundryMigrated       = false
 let _inspectionMigrated    = false
 let _inspectionModulesMigrated = false
 let _contractDocsMigrated  = false
+let _blobMigrated          = false
 export async function ensureDB() {
   if (!_migrated) {
     await migrate()
@@ -79,6 +80,10 @@ export async function ensureDB() {
   if (!_contractDocsMigrated) {
     await migrateContractDocs()
     _contractDocsMigrated = true
+  }
+  if (!_blobMigrated) {
+    await migrateBlobColumn()
+    _blobMigrated = true
   }
 }
 
@@ -906,9 +911,16 @@ async function migrateContractDocs() {
       doc_type      TEXT    NOT NULL,
       file_name     TEXT    NOT NULL,
       file_size     INTEGER NOT NULL DEFAULT 0,
-      file_data     TEXT    NOT NULL,
+      file_data     TEXT    NOT NULL DEFAULT '',
       uploaded_at   TEXT    NOT NULL DEFAULT (datetime('now')),
       UNIQUE(contract_id, doc_type)
     )
   `)
+}
+
+/** ─── Add file_url column (Vercel Blob migration) ────────────────────────── */
+async function migrateBlobColumn() {
+  try {
+    await db.execute(`ALTER TABLE contract_documents ADD COLUMN file_url TEXT NOT NULL DEFAULT ''`)
+  } catch { /* column already exists — ignore */ }
 }
