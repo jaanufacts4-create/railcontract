@@ -23,25 +23,19 @@ export async function GET(req: Request) {
     canvas_bag: cfg['petty_rate_canvas_bag'] ?? 490.00,
   }
 
-  // ── 2. Total Washed — from laundry_raw_data (dirty dispatched) ───────────
-  const { rows: rawRows } = await db.execute({
-    sql: `SELECT
-            COALESCE(SUM(bed_sheet_normal + bed_sheet_1ac), 0)         AS bedsheet,
-            COALESCE(SUM(pillow_cover_normal + pillow_cover_1ac), 0)   AS pillow,
-            COALESCE(SUM(face_towel), 0)                               AS face_towel,
-            COALESCE(SUM(blanket), 0)                                  AS blanket,
-            COALESCE(SUM(canvas_bag), 0)                               AS canvas_bag
-          FROM laundry_raw_data WHERE month_year = ?`,
-    args: [month_year],
-  })
-  const raw = rawRows[0] ?? {}
-
-  // ── 3. Craft Paper Bag (packets) — from laundry_fresh_data ───────────────
+  // ── 2. Total Washed — from laundry_fresh_data (washed linen received) ─────
   const { rows: freshRows } = await db.execute({
-    sql:  `SELECT COALESCE(SUM(packets), 0) AS craft_bag FROM laundry_fresh_data WHERE month_year = ?`,
+    sql: `SELECT
+            COALESCE(SUM(bed_sheet_fresh),    0) AS bedsheet,
+            COALESCE(SUM(pillow_cover_fresh), 0) AS pillow,
+            COALESCE(SUM(face_towel_fresh),   0) AS face_towel,
+            COALESCE(SUM(blanket_fresh),      0) AS blanket,
+            COALESCE(SUM(canvas_bag_fresh),   0) AS canvas_bag,
+            COALESCE(SUM(packets),            0) AS craft_bag
+          FROM laundry_fresh_data WHERE month_year = ?`,
     args: [month_year],
   })
-  const craftBagWashed = Number(freshRows[0]?.craft_bag ?? 0)
+  const raw = freshRows[0] ?? {}
 
   // ── 4. No Payment — from inspection pivot (units_np = total_dirty × 2) ───
   const PIVOT_ITEMS = ['Bed Sheet', 'Pillow Cover', 'Face Towel', 'Blanket']
