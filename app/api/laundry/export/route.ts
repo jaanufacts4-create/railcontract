@@ -95,7 +95,9 @@ export async function GET(req: Request) {
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: AMBER } }
     cell.alignment = { horizontal: 'center', vertical: 'middle' }
   })
-  ws1.getRow(3).height = 16
+  ws1.getRow(sub1.number).height = 16
+
+  const dStart = sub1.number + 1   // first data row (right after sub-header)
 
   dirty.forEach((r, i) => {
     const bst = Number(r.bed_sheet_normal) + Number(r.bed_sheet_1ac)
@@ -115,8 +117,7 @@ export async function GET(req: Request) {
   })
 
   // Total row (manual sum for grouped sheet)
-  const dStart = 4
-  const dEnd = 3 + dirty.length
+  const dEnd = ws1.lastRow!.number   // last data row (dynamic, no off-by-one)
   if (dirty.length > 0) {
     const tot = ws1.addRow([
       'TOTAL',
@@ -183,7 +184,9 @@ export async function GET(req: Request) {
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: GREEN } }
     cell.alignment = { horizontal: 'center', vertical: 'middle' }
   })
-  ws2.getRow(3).height = 16
+  ws2.getRow(sub2.number).height = 16
+
+  const fStart = sub2.number + 1   // first data row
 
   fresh.forEach((r, i) => {
     const row = ws2.addRow([
@@ -200,8 +203,7 @@ export async function GET(req: Request) {
     row.getCell(1).alignment = { horizontal: 'center' }
   })
 
-  const fStart = 4
-  const fEnd = 3 + fresh.length
+  const fEnd = ws2.lastRow!.number  // last data row (dynamic)
   if (fresh.length > 0) {
     const tot = ws2.addRow([
       'TOTAL',
@@ -265,7 +267,7 @@ export async function GET(req: Request) {
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: isAmber ? 'FFB45309' : 'FF166534' } }
     cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }
   })
-  ws3.getRow(3).height = 22
+  ws3.getRow(sub3.number).height = 22
 
   // Merge dirty+fresh by date
   const dirtyMap: Record<string, typeof dirty[0]> = {}
@@ -306,8 +308,8 @@ export async function GET(req: Request) {
     row.getCell(1).alignment = { horizontal: 'center' }
   })
 
-  const r3start = 4
-  const r3end = 3 + allDates.length
+  const r3start = sub3.number + 1       // first data row (dynamic)
+  const r3end   = ws3.lastRow!.number  // last data row (dynamic)
   if (allDates.length > 0) {
     const tot = ws3.addRow([
       'TOTAL',
