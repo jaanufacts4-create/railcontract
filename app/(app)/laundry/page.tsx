@@ -3,24 +3,46 @@ import { useEffect, useState } from 'react'
 import { Plus, Trash2, Pencil } from 'lucide-react'
 import Link from 'next/link'
 
-type Entry = {
-  id: number; date: string
-  bed_sheet_normal: number; bed_sheet_1ac: number; bed_sheet_total: number
-  pillow_cover_normal: number; pillow_cover_1ac: number; pillow_cover_total: number
-  face_towel: number; bath_towel: number; blanket_cover: number; blanket: number; canvas_bag: number
-}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Entry = Record<string, any> & { id: number; date: string }
 
 function fmtDate(d: string) { const [y,m,day] = d.split('-'); return `${day}-${m}-${y}` }
-function n(v: number) { return v > 0 ? v.toLocaleString('en-IN') : '—' }
+function safe(v: unknown): number { const n = Number(v); return isNaN(n) ? 0 : n }
+function fmt(v: number) { return v > 0 ? v.toLocaleString('en-IN') : '—' }
 
-const ROW_COLS: (keyof Entry)[] = [
-  'bed_sheet_normal','bed_sheet_1ac','bed_sheet_total',
-  'pillow_cover_normal','pillow_cover_1ac','pillow_cover_total',
-  'face_towel','bath_towel','blanket_cover','blanket','canvas_bag',
+type ColDef = { key: string; label: string; sub?: string; primary?: boolean }
+
+const DIRTY_COLS: ColDef[] = [
+  { key: 'bed_sheet_normal',    label: 'B.Sheet',  sub: 'Normal' },
+  { key: 'bed_sheet_1ac',       label: 'B.Sheet',  sub: '1st AC' },
+  { key: 'bed_sheet_total',     label: 'B.Sheet',  sub: 'Total',  primary: true },
+  { key: 'pillow_cover_normal', label: 'P.Cover',  sub: 'Normal' },
+  { key: 'pillow_cover_1ac',    label: 'P.Cover',  sub: '1st AC' },
+  { key: 'pillow_cover_total',  label: 'P.Cover',  sub: 'Total',  primary: true },
+  { key: 'face_towel',          label: 'Face',     sub: 'Towel' },
+  { key: 'bath_towel',          label: 'Bath',     sub: 'Towel' },
+  { key: 'blanket_cover',       label: 'Blanket',  sub: 'Cover' },
+  { key: 'blanket',             label: 'Blanket' },
+  { key: 'canvas_bag',          label: 'Canvas',   sub: 'Bag' },
 ]
 
-function EntryRow({ e, onDel, td, editHref }: {
+const FRESH_COLS: ColDef[] = [
+  { key: 'bed_sheet_fresh',        label: 'B.Sheet',  sub: 'Fresh',     primary: true },
+  { key: 'bed_sheet_condemned',    label: 'B.Sheet',  sub: 'Condemned' },
+  { key: 'pillow_cover_fresh',     label: 'P.Cover',  sub: 'Fresh',     primary: true },
+  { key: 'pillow_cover_condemned', label: 'P.Cover',  sub: 'Condemned' },
+  { key: 'face_towel_fresh',       label: 'Face',     sub: 'Fresh' },
+  { key: 'face_towel_condemned',   label: 'Face',     sub: 'Condemned' },
+  { key: 'blanket_fresh',          label: 'Blanket',  sub: 'Fresh' },
+  { key: 'blanket_condemned',      label: 'Blanket',  sub: 'Condemned' },
+  { key: 'canvas_bag_fresh',       label: 'Canvas',   sub: 'Fresh' },
+  { key: 'canvas_bag_condemned',   label: 'Canvas',   sub: 'Condemned' },
+  { key: 'packets',                label: 'Packets',  primary: true },
+]
+
+function EntryRow({ e, cols, onDel, td, editHref }: {
   e: Entry
+  cols: ColDef[]
   onDel: (id: number, date: string) => void
   td: (bold?: boolean) => React.CSSProperties
   editHref: string
@@ -28,10 +50,11 @@ function EntryRow({ e, onDel, td, editHref }: {
   return (
     <tr>
       <td style={{ ...td(true), textAlign: 'left', paddingLeft: 20, color: 'var(--text-3)' }}>{fmtDate(e.date)}</td>
-      {ROW_COLS.map(k => {
-        const isPrimary = k === 'bed_sheet_total' || k === 'pillow_cover_total'
-        return <td key={k} style={{ ...td(isPrimary), color: isPrimary ? 'var(--primary)' : undefined }}>{n(Number(e[k]))}</td>
-      })}
+      {cols.map(col => (
+        <td key={col.key} style={{ ...td(col.primary), color: col.primary ? 'var(--primary)' : undefined }}>
+          {fmt(safe(e[col.key]))}
+        </td>
+      ))}
       <td style={{ ...td(), textAlign: 'center', whiteSpace: 'nowrap' }}>
         <Link href={editHref} title="Edit" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 4, borderRadius: 6, display: 'inline-flex', marginRight: 2 }}><Pencil size={12} /></Link>
         <button onClick={() => onDel(e.id, e.date)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: 4, borderRadius: 6 }}>
@@ -42,23 +65,21 @@ function EntryRow({ e, onDel, td, editHref }: {
   )
 }
 
-function SubtotalRow({ label, group, keys, sumGroup }: {
+function SubtotalRow({ label, group, cols }: {
   label: string
   group: Entry[]
-  keys: (keyof Entry)[]
-  sumGroup: (g: Entry[], k: keyof Entry) => number
+  cols: ColDef[]
 }) {
   return (
     <tr style={{ background: '#EFF6FF' }}>
       <td style={{ padding: '7px 10px 7px 20px', fontSize: 11, fontWeight: 800, color: '#1D4ED8', borderBottom: '2px solid #BFDBFE', borderTop: '2px solid #BFDBFE', textAlign: 'left', whiteSpace: 'nowrap' }}>
         {label}
       </td>
-      {keys.map(k => {
-        const isPrimary = k === 'bed_sheet_total' || k === 'pillow_cover_total'
-        const v = sumGroup(group, k)
+      {cols.map(col => {
+        const v = group.reduce((s, e) => s + safe(e[col.key]), 0)
         return (
-          <td key={k} style={{ padding: '7px 10px', fontSize: 12, fontWeight: 800, textAlign: 'right', color: isPrimary ? '#1D4ED8' : '#1e3a5f', borderBottom: '2px solid #BFDBFE', borderTop: '2px solid #BFDBFE' }}>
-            {v > 0 ? v.toLocaleString('en-IN') : '—'}
+          <td key={col.key} style={{ padding: '7px 10px', fontSize: 12, fontWeight: 800, textAlign: 'right', color: col.primary ? '#1D4ED8' : '#1e3a5f', borderBottom: '2px solid #BFDBFE', borderTop: '2px solid #BFDBFE' }}>
+            {fmt(v)}
           </td>
         )
       })}
@@ -92,19 +113,13 @@ export default function LaundryPage() {
     load()
   }
 
+  const cols = tab === 'dirty' ? DIRTY_COLS : FRESH_COLS
+
   // Split into two halves
   const first15  = entries.filter(e => Number(e.date.slice(8)) <= 15)
   const second16 = entries.filter(e => Number(e.date.slice(8)) > 15)
 
-  const KEYS: (keyof Entry)[] = [
-    'bed_sheet_normal','bed_sheet_1ac','bed_sheet_total',
-    'pillow_cover_normal','pillow_cover_1ac','pillow_cover_total',
-    'face_towel','bath_towel','blanket_cover','blanket','canvas_bag',
-  ]
-  function sumGroup(group: Entry[], key: keyof Entry) {
-    return group.reduce((s, e) => s + Number(e[key]), 0)
-  }
-  const tot = (key: keyof Entry) => entries.reduce((s, e) => s + Number(e[key]), 0)
+  const tot = (key: string) => entries.reduce((s, e) => s + safe(e[key]), 0)
 
   const th: React.CSSProperties = {
     fontSize: 10, fontWeight: 700, color: 'var(--text-4)', textTransform: 'uppercase',
@@ -156,10 +171,10 @@ export default function LaundryPage() {
           { label: 'Pillow Covers', value: tot('pillow_cover_total').toLocaleString('en-IN'),             color: '#0EA5E9' },
           { label: 'Total Items',   value: (tot('bed_sheet_total') + tot('pillow_cover_total') + tot('face_towel') + tot('bath_towel') + tot('blanket_cover') + tot('blanket') + tot('canvas_bag')).toLocaleString('en-IN'), color: '#16A34A' },
         ] : [
-          { label: 'Days Entered',  value: entries.length,                    color: '#2563EB' },
-          { label: 'BS Fresh',      value: tot('bed_sheet_fresh' as keyof Entry).toLocaleString('en-IN'),      color: '#16A34A' },
-          { label: 'PC Fresh',      value: tot('pillow_cover_fresh' as keyof Entry).toLocaleString('en-IN'),   color: '#0EA5E9' },
-          { label: 'Packets',       value: tot('packets' as keyof Entry).toLocaleString('en-IN'),              color: '#7C3AED' },
+          { label: 'Days Entered',  value: entries.length,                              color: '#2563EB' },
+          { label: 'BS Fresh',      value: tot('bed_sheet_fresh').toLocaleString('en-IN'),      color: '#16A34A' },
+          { label: 'PC Fresh',      value: tot('pillow_cover_fresh').toLocaleString('en-IN'),   color: '#0EA5E9' },
+          { label: 'Packets',       value: tot('packets').toLocaleString('en-IN'),               color: '#7C3AED' },
         ]).map(({ label, value, color }) => (
           <div key={label} className="card" style={{ padding: '12px 16px' }}>
             <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--text-4)', margin: '0 0 4px' }}>{label}</p>
@@ -191,46 +206,28 @@ export default function LaundryPage() {
               <thead>
                 <tr>
                   <th style={{ ...th, textAlign: 'left', paddingLeft: 20 }}>Date</th>
-                  <th style={th}>B.Sheet<br/><span style={{ fontWeight: 400 }}>Normal</span></th>
-                  <th style={th}>B.Sheet<br/><span style={{ fontWeight: 400 }}>1st AC</span></th>
-                  <th style={{ ...th, color: 'var(--primary)' }}>B.Sheet<br/>Total</th>
-                  <th style={th}>P.Cover<br/><span style={{ fontWeight: 400 }}>Normal</span></th>
-                  <th style={th}>P.Cover<br/><span style={{ fontWeight: 400 }}>1st AC</span></th>
-                  <th style={{ ...th, color: 'var(--primary)' }}>P.Cover<br/>Total</th>
-                  <th style={th}>Face<br/>Towel</th>
-                  <th style={th}>Bath<br/>Towel</th>
-                  <th style={th}>Blanket<br/>Cover</th>
-                  <th style={th}>Blanket</th>
-                  <th style={th}>Canvas<br/>Bag</th>
+                  {cols.map(col => (
+                    <th key={col.key} style={{ ...th, color: col.primary ? 'var(--primary)' : undefined }}>
+                      {col.label}{col.sub ? <><br/><span style={{ fontWeight: 400 }}>{col.sub}</span></> : null}
+                    </th>
+                  ))}
                   <th style={{ ...th, width: 40 }}></th>
                 </tr>
               </thead>
               <tbody>
-                {/* ── Day 1-15 ── */}
-                {first15.map(e => <EntryRow key={e.id} e={e} onDel={del} td={td} editHref={tab === 'dirty' ? `/laundry/raw-data/${e.id}/edit` : `/laundry/fresh-data/${e.id}/edit`} />)}
-                {first15.length > 0 && (
-                  <SubtotalRow label="1–15 Total" group={first15} keys={KEYS} sumGroup={sumGroup} />
-                )}
-                {/* ── Day 16-31 ── */}
-                {second16.map(e => <EntryRow key={e.id} e={e} onDel={del} td={td} editHref={tab === 'dirty' ? `/laundry/raw-data/${e.id}/edit` : `/laundry/fresh-data/${e.id}/edit`} />)}
-                {second16.length > 0 && (
-                  <SubtotalRow label="16–31 Total" group={second16} keys={KEYS} sumGroup={sumGroup} />
-                )}
+                {first15.map(e => <EntryRow key={e.id} e={e} cols={cols} onDel={del} td={td} editHref={tab === 'dirty' ? `/laundry/raw-data/${e.id}/edit` : `/laundry/fresh-data/${e.id}/edit`} />)}
+                {first15.length > 0 && <SubtotalRow label="1–15 Total" group={first15} cols={cols} />}
+                {second16.map(e => <EntryRow key={e.id} e={e} cols={cols} onDel={del} td={td} editHref={tab === 'dirty' ? `/laundry/raw-data/${e.id}/edit` : `/laundry/fresh-data/${e.id}/edit`} />)}
+                {second16.length > 0 && <SubtotalRow label="16–31 Total" group={second16} cols={cols} />}
               </tbody>
               <tfoot>
                 <tr style={{ background: 'var(--surface-2)' }}>
                   <td style={{ ...td(true), textAlign: 'left', paddingLeft: 20, color: 'var(--text-3)', fontSize: 11 }}>TOTAL</td>
-                  <td style={td(true)}>{tot('bed_sheet_normal').toLocaleString('en-IN')}</td>
-                  <td style={td(true)}>{tot('bed_sheet_1ac').toLocaleString('en-IN')}</td>
-                  <td style={{ ...td(true), color: 'var(--primary)' }}>{tot('bed_sheet_total').toLocaleString('en-IN')}</td>
-                  <td style={td(true)}>{tot('pillow_cover_normal').toLocaleString('en-IN')}</td>
-                  <td style={td(true)}>{tot('pillow_cover_1ac').toLocaleString('en-IN')}</td>
-                  <td style={{ ...td(true), color: 'var(--primary)' }}>{tot('pillow_cover_total').toLocaleString('en-IN')}</td>
-                  <td style={td(true)}>{tot('face_towel').toLocaleString('en-IN')}</td>
-                  <td style={td(true)}>{tot('bath_towel').toLocaleString('en-IN')}</td>
-                  <td style={td(true)}>{tot('blanket_cover').toLocaleString('en-IN')}</td>
-                  <td style={td(true)}>{tot('blanket').toLocaleString('en-IN')}</td>
-                  <td style={td(true)}>{tot('canvas_bag').toLocaleString('en-IN')}</td>
+                  {cols.map(col => (
+                    <td key={col.key} style={{ ...td(true), color: col.primary ? 'var(--primary)' : undefined }}>
+                      {tot(col.key).toLocaleString('en-IN')}
+                    </td>
+                  ))}
                   <td></td>
                 </tr>
               </tfoot>
