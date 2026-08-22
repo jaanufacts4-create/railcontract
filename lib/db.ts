@@ -25,6 +25,7 @@ let _contractDocsMigrated  = false
 let _blobMigrated          = false
 let _pettyMigrated         = false
 let _laundrySettingsMigrated = false
+let _monthlyBillsMigrated  = false
 export async function ensureDB() {
   if (!_migrated) {
     await migrate()
@@ -58,7 +59,10 @@ export async function ensureDB() {
     await migrateNirmalV2()
     _nirmalV2Migrated = true
   }
-  await migrateMonthlyBills()
+  if (!_monthlyBillsMigrated) {
+    await migrateMonthlyBills()
+    _monthlyBillsMigrated = true
+  }
   if (!_obhsScheduleMigrated) {
     await migrateOBHSSchedule()
     _obhsScheduleMigrated = true
@@ -95,6 +99,69 @@ export async function ensureDB() {
     await migrateLaundrySettings()
     _laundrySettingsMigrated = true
   }
+  // INDEXES — run once per process; keeps reads from exploding on large tables
+  if (!_indexesEnsured) {
+    await ensureIndexes()
+    _indexesEnsured = true
+  }
+}
+
+let _indexesEnsured = false
+
+/** Create all performance indexes — idempotent (IF NOT EXISTS). */
+async function ensureIndexes() {
+  await db.executeMultiple(`
+    -- Primary trips
+    CREATE INDEX IF NOT EXISTS idx_trips_month      ON trips(month_year);
+    CREATE INDEX IF NOT EXISTS idx_trips_train      ON trips(train_no);
+
+    -- Coach scores — most critical: powers dashboard JOIN
+    CREATE INDEX IF NOT EXISTS idx_coach_scores_trip    ON coach_scores(trip_id);
+
+    -- Train master — composite for dashboard LEFT JOIN
+    CREATE INDEX IF NOT EXISTS idx_train_master_no_pos  ON train_master(train_no, position);
+
+    -- Intensive scores
+    CREATE INDEX IF NOT EXISTS idx_intensive_trip        ON intensive_scores(trip_id);
+
+    -- Annex penalties
+    CREATE INDEX IF NOT EXISTS idx_annex_penalties_trip  ON annex_penalties(trip_id);
+
+    -- Manpower
+    CREATE INDEX IF NOT EXISTS idx_manpower_trip         ON manpower(trip_id);
+
+    -- Secondary trips
+    CREATE INDEX IF NOT EXISTS idx_sec_trips_month       ON sec_trips(month_year);
+    CREATE INDEX IF NOT EXISTS idx_sec_trips_train       ON sec_trips(train_no);
+    CREATE INDEX IF NOT EXISTS idx_sec_coach_ratings_trip ON sec_coach_ratings(trip_id);
+    CREATE INDEX IF NOT EXISTS idx_sec_annex_trip        ON sec_annex_b(trip_id);
+
+    -- Nirmal trips
+    CREATE INDEX IF NOT EXISTS idx_nirmal_trips_month    ON nirmal_trips(month_year);
+    CREATE INDEX IF NOT EXISTS idx_nirmal_trips_train    ON nirmal_trips(train_no);
+    CREATE INDEX IF NOT EXISTS idx_nirmal_coach_trip     ON nirmal_coach_scores(trip_id);
+    CREATE INDEX IF NOT EXISTS idx_nirmal_intensive_trip ON nirmal_intensive_scores(trip_id);
+    CREATE INDEX IF NOT EXISTS idx_nirmal_manpower_trip  ON nirmal_manpower(trip_id);
+    CREATE INDEX IF NOT EXISTS idx_nirmal_annex_trip     ON nirmal_annex_penalties(trip_id);
+
+    -- OBHS entries
+    CREATE INDEX IF NOT EXISTS idx_obhs_entries_month    ON obhs_entries(month_year);
+    CREATE INDEX IF NOT EXISTS idx_obhs_entries_train    ON obhs_entries(train_no);
+    CREATE INDEX IF NOT EXISTS idx_nirmal_obhs_month     ON nirmal_obhs_entries(month_year);
+    CREATE INDEX IF NOT EXISTS idx_nirmal_obhs_train     ON nirmal_obhs_entries(train_no);
+
+    -- Laundry
+    CREATE INDEX IF NOT EXISTS idx_laundry_raw_month     ON laundry_raw_data(month_year);
+    CREATE INDEX IF NOT EXISTS idx_laundry_fresh_month   ON laundry_fresh_data(month_year);
+
+    -- Inspections
+    CREATE INDEX IF NOT EXISTS idx_inspections_month     ON inspections(month_year);
+    CREATE INDEX IF NOT EXISTS idx_insp_items_insp       ON inspection_items(inspection_id);
+    CREATE INDEX IF NOT EXISTS idx_insp_notes_month      ON inspection_notes(month_year);
+    CREATE INDEX IF NOT EXISTS idx_damaged_linen_month   ON damaged_linen_entries(month_year);
+    CREATE INDEX IF NOT EXISTS idx_damaged_items_entry   ON damaged_linen_items(entry_id);
+    CREATE INDEX IF NOT EXISTS idx_store_insp_month      ON store_inspections(month_year);
+  `)
 }
 
 /** Idempotent — creates train_schedule table + seeds data if empty. Runs once per process. */

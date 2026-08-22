@@ -45,6 +45,13 @@ export async function GET() {
   )
   const primaryMonthly = primaryBillRows.map(r => parseBillRow(r))
 
+  // Scope to last 6 months — prevents full-table scan across all historical coach_scores rows.
+  // (Indexes on trips.month_year + coach_scores.trip_id + train_master(train_no,position)
+  //  make this fast; without scoping this was scanning millions of rows per dashboard load.)
+  const d6 = new Date()
+  d6.setMonth(d6.getMonth() - 6)
+  const since6m = `${d6.getFullYear()}-${String(d6.getMonth() + 1).padStart(2,'0')}`
+
   const { rows: coachRows } = await db.execute({
     sql: `
       SELECT
@@ -59,8 +66,9 @@ export async function GET() {
       FROM trips t
       JOIN coach_scores cs ON cs.trip_id = t.id
       LEFT JOIN train_master tm ON tm.train_no = t.train_no AND tm.position = cs.position
+      WHERE t.month_year >= ?
     `,
-    args: [VB_TRAIN, VB_TRAIN],
+    args: [VB_TRAIN, VB_TRAIN, since6m],
   })
   const { rows: obhsTotals } = await db.execute(
     `SELECT SUM(ac_obhs_hrs + nac_obhs_hrs + vb_obhs_hrs + garibrath_obhs_hrs) as total_hrs FROM obhs_monthly`
