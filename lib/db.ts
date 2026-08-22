@@ -99,11 +99,8 @@ export async function ensureDB() {
     await migrateLaundrySettings()
     _laundrySettingsMigrated = true
   }
-  // INDEXES — run once per process; keeps reads from exploding on large tables
-  if (!_indexesEnsured) {
-    await ensureIndexes()
-    _indexesEnsured = true
-  }
+  // NOTE: ensureIndexes() is NOT called here to avoid Vercel timeout on cold start.
+  // Call it once manually via: GET /api/admin/ensure-indexes
 }
 
 let _indexesEnsured = false
