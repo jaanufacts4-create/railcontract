@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { coachCategory, PENALTY_LABELS } from '@/lib/types'
 import TodayPanel      from '@/components/TodayPanel'
 import WLCompareModule from '@/components/WLCompareModule'
-import { GitCompare, ClipboardList } from 'lucide-react'
+import { GitCompare, ClipboardList, Plus, Minus } from 'lucide-react'
 
 // Sub-criteria: [c1(1X2), c2, c3, c4, c5]
 // Normal  total = c1×2 + c2 + c3 + c4 + c5      (max 15, c5 default 0)
@@ -61,6 +61,7 @@ function NewTripPage() {
   const [penalties,    setPenalties]    = useState<Penalties>({})
   const [loading,      setLoading]      = useState(false)
   const [msg,          setMsg]          = useState('')
+  const [trainNotFound, setTrainNotFound] = useState<string | null>(null)
 
   // ── Train autocomplete ──────────────────────────────────────────────────────
   const [allTrains,       setAllTrains]       = useState<string[]>([])
@@ -167,6 +168,27 @@ function NewTripPage() {
     }
   }
 
+  // ── Add / Remove coach (per-trip override, like Secondary Bill) ────────────
+  function addCoach() {
+    const nextPos = positions.length > 0 ? Math.max(...positions.map(p => p.position)) + 1 : 1
+    const newPos: Position = { position: nextPos, coach_type: 'GSLRD' }
+    setPositions(prev => [...prev, newPos])
+    setCriteria(prev  => ({ ...prev, [nextPos]: [...DEFAULT_CRITERIA] as CriteriaRow }))
+    setExtScores(prev => ({ ...prev, [nextPos]: 3 }))
+  }
+
+  function removeCoach() {
+    if (positions.length <= 1) return
+    const lastPos = positions[positions.length - 1].position
+    setPositions(prev => prev.slice(0, -1))
+    setCriteria(prev     => { const n = { ...prev }; delete n[lastPos]; return n })
+    setExtScores(prev    => { const n = { ...prev }; delete n[lastPos]; return n })
+    setIntCriteria(prev  => { const n = { ...prev }; delete n[lastPos]; return n })
+    setIntExtScores(prev => { const n = { ...prev }; delete n[lastPos]; return n })
+    setCompOverride(prev => { const n = { ...prev }; delete n[lastPos]; return n })
+    setIntPrevType(prev  => { const n = { ...prev }; delete n[lastPos]; return n })
+  }
+
   // ── PULL ────────────────────────────────────────────────────────────────────
   const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
 
@@ -175,8 +197,10 @@ function NewTripPage() {
     if (!t) return setMsg('Please enter a train number first.')
     const data = await fetch(`/api/train-master?train_no=${t}`).then(r => r.json())
     if (!data.positions?.length) {
-      return setMsg(`Train ${t} not found in Train Master — please add it first.`)
+      setTrainNotFound(t)
+      return setMsg('')
     }
+    setTrainNotFound(null)
     const pos: Position[] = data.positions
     setPositions(pos)
     setCompOverride({})
@@ -426,12 +450,22 @@ function NewTripPage() {
       </div>
 
       {/* ── Pull ── */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <button onClick={() => pull()}
           className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium text-sm">
           ⬇ Pull Data
         </button>
         {msg && <span className="text-sm text-gray-500 italic">{msg}</span>}
+        {trainNotFound && (
+          <span className="text-sm text-red-600 font-medium">
+            ⚠ Train <b>{trainNotFound}</b> Train Master mein nahi hai —{' '}
+            <a href={`/train-master?train=${trainNotFound}`}
+               className="underline text-blue-600 hover:text-blue-800">
+              Yahan add karo
+            </a>
+            {' '}phir wapas aao.
+          </span>
+        )}
       </div>
 
       {/* ── Schedule Mismatch Warning ── */}
@@ -483,6 +517,23 @@ function NewTripPage() {
               <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs font-semibold">INT: {intCount}</span>
             )}
             <span className="text-[10px] text-gray-400">Dropdown se type change karo | INT = Intensive</span>
+            {/* +/- Coach buttons */}
+            <button type="button" onClick={addCoach} title="Ek coach add karo" style={{
+              display: 'inline-flex', alignItems: 'center', gap: 3,
+              padding: '2px 8px', borderRadius: 6, background: 'var(--primary,#2563EB)', border: 'none',
+              color: '#fff', fontWeight: 700, fontSize: 11, cursor: 'pointer',
+            }}>
+              <Plus size={11} /> Coach
+            </button>
+            <button type="button" onClick={removeCoach} disabled={positions.length <= 1} title="Last coach hatao" style={{
+              display: 'inline-flex', alignItems: 'center', gap: 3,
+              padding: '2px 8px', borderRadius: 6, background: '#E5E7EB', border: 'none',
+              color: '#374151', fontWeight: 700, fontSize: 11,
+              cursor: positions.length <= 1 ? 'not-allowed' : 'pointer',
+              opacity: positions.length <= 1 ? 0.4 : 1,
+            }}>
+              <Minus size={11} /> Coach
+            </button>
           </div>
 
           <p className="text-xs text-gray-500 mb-2 font-medium">

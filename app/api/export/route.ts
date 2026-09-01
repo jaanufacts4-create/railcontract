@@ -222,15 +222,19 @@ export async function GET(req: Request) {
       const mpDeployed = 0 // will be loaded below
 
       // Load data
-      const [scoresRes, masterRes, mpRes, penRes] = await Promise.all([
+      const [scoresRes, masterRes, mpRes, penRes, intPosRes] = await Promise.all([
         db.execute({ sql: 'SELECT position, score FROM coach_scores WHERE trip_id=? ORDER BY position', args: [tripId] }),
         db.execute({ sql: 'SELECT position, coach_type FROM train_master WHERE train_no=? ORDER BY position', args: [trainNo] }),
         db.execute({ sql: 'SELECT required, deployed FROM manpower WHERE trip_id=?', args: [tripId] }),
         db.execute({ sql: 'SELECT penalty_type, amount FROM annex_penalties WHERE trip_id=?', args: [tripId] }),
+        db.execute({ sql: 'SELECT position FROM intensive_scores WHERE trip_id=?', args: [tripId] }),
       ])
 
       const typeMap: Record<number, string> = {}
       for (const r of masterRes.rows) typeMap[r.position as number] = r.coach_type as string
+
+      // Positions saved as INT — exclude from Normal Summary to avoid 0-score penalty
+      const intPosSset = new Set(intPosRes.rows.map(r => r.position as number))
 
       const scoreMap: Record<number, number> = {}
       const extScoreMap: Record<number, number> = {}
@@ -257,6 +261,7 @@ export async function GET(req: Request) {
 
       for (const [pos, ct] of Object.entries(typeMap)) {
         const p = Number(pos)
+        if (intPosSset.has(p)) continue   // INT coach → in Intensive Summary, skip Normal
         const s = scoreMap[p] ?? 0
         const cat = coachCategory(ct)
         if (cat === 'AC')        acScores.push({ pos: p, score: s })
