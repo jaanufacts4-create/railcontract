@@ -1008,7 +1008,7 @@ export async function GET(req: Request) {
   ws5Header(s5r++, ['Type of Coaches', 'Normal Cleaning', 'Intensive Cleaning', 'Total'])
   ws5.mergeCells(s5r - 1, 4, s5r - 1, 6)
   const sectionB = [
-    ['AC Coaches',       totalNormAC,  totalIntAC,  totalNormAC + totalIntAC],
+    ['AC Coaches',       totalNormAC - totalNormVB,  totalIntAC - totalIntVB,  (totalNormAC - totalNormVB) + (totalIntAC - totalIntVB)],
     ['NAC Coaches',      totalNormNAC, totalIntNAC, totalNormNAC + totalIntNAC],
     ['Exterior Coaches', totalNormExt, totalIntExt, totalNormExt + totalIntExt],
     ['VB AC Coaches',    totalNormVB,  totalIntVB,  totalNormVB + totalIntVB],
