@@ -224,8 +224,7 @@ function NewTripPage() {
     try {
       const schedAll: Array<{ train_no: string; days: string[]; ac_count: number; nac_count: number }> =
         await fetch('/api/schedule').then(r => r.json())
-      const norm = (s: string) => s.trim().replace(/\s+/g, '+')
-      const sched = schedAll.find(s => norm(s.train_no) === norm(t))
+      const sched = schedAll.find(s => s.train_no === t)
 
       if (!sched) {
         setSchedWarn({ notInSchedule: true })

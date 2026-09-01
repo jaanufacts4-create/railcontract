@@ -55,7 +55,7 @@ function TrainMasterPage() {
 
   async function selectTrain(t: string) {
     setSelected(t)
-    const data = await fetch(`/api/train-master?train_no=${t}`).then(r => r.json())
+    const data = await fetch(`/api/train-master?train_no=${encodeURIComponent(t)}`).then(r => r.json())
     setPositions(data.positions)
   }
 
@@ -96,7 +96,7 @@ function TrainMasterPage() {
 
   async function deleteTrain() {
     if (!confirm(`Delete train ${selected}?`)) return
-    await fetch(`/api/train-master?train_no=${selected}`, { method: 'DELETE' })
+    await fetch(`/api/train-master?train_no=${encodeURIComponent(selected)}`, { method: 'DELETE' })
     setSelected(''); setPositions([]); loadTrains()
   }
 
