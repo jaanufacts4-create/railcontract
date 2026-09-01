@@ -630,18 +630,13 @@ function NewTripPage() {
       {/* ── Intensive Proforma (same structure as Normal + Exterior row) ── */}
       {intPositions.length > 0 && (
         <div className="bg-white rounded-lg shadow p-3 border-2 border-purple-300">
-          <div className="flex items-center gap-3 mb-1 flex-wrap">
+          <div className="flex items-center gap-3 mb-1">
             <p className="text-sm font-semibold text-purple-700">
               🔵 Intensive Cleaning Ratings
             </p>
             <span className="text-[10px] bg-purple-100 text-purple-600 px-2 py-0.5 rounded">
               Total = (1X2×2) + 2+3+4+5{!intAcwp ? ' + Ext' : ''}
             </span>
-            <label className="flex items-center gap-1 text-xs cursor-pointer select-none ml-auto">
-              <input type="checkbox" checked={intAcwp} onChange={e => setIntAcwp(e.target.checked)}
-                className="accent-purple-600 w-3.5 h-3.5" />
-              <span className="text-purple-700 font-medium">ACWP (Exterior covered)</span>
-            </label>
           </div>
           <p className="text-xs text-gray-400 mb-3">
             These coaches will not appear in the Normal Summary — they will be exported to the Intensive Summary sheet.
@@ -683,19 +678,30 @@ function NewTripPage() {
                 ))}
 
                 {/* Exterior row (max 3) — hidden when ACWP is on */}
-                {!intAcwp && (
-                  <tr className="bg-orange-50">
-                    <td className="proforma-label font-semibold text-orange-700">Ext (max 3)</td>
-                    {intPositions.map(p => (
-                      <td key={p.position} className="proforma-cell">
+                <tr className="bg-orange-50">
+                  <td className="proforma-label font-semibold text-orange-700">
+                    <div className="flex items-center gap-1 flex-nowrap">
+                      <span>Ext (max 3)</span>
+                      <label className="flex items-center gap-0.5 text-[9px] cursor-pointer ml-1 whitespace-nowrap">
+                        <input type="checkbox" checked={intAcwp} onChange={e => setIntAcwp(e.target.checked)}
+                          className="accent-purple-600 w-3 h-3" />
+                        <span className="text-purple-700 font-medium">ACWP</span>
+                      </label>
+                    </div>
+                  </td>
+                  {intPositions.map(p => (
+                    <td key={p.position} className="proforma-cell">
+                      {!intAcwp ? (
                         <input type="number" min={0} max={3}
                           value={intExtScores[p.position] ?? 3}
                           onChange={e => setIntExtScores(s => ({ ...s, [p.position]: Math.min(3, Number(e.target.value) || 0) }))}
                           className="w-8 text-center text-xs border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-orange-400 rounded" />
-                      </td>
-                    ))}
-                  </tr>
-                )}
+                      ) : (
+                        <span className="text-[9px] text-gray-400">—</span>
+                      )}
+                    </td>
+                  ))}
+                </tr>
 
                 {/* Total row — interior only, max 18 */}
                 <tr className="bg-yellow-100 font-bold">

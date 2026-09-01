@@ -221,14 +221,7 @@ export default function EditTripPage() {
       {/* Intensive coaches */}
       {intCoaches.length > 0 && (
         <section className="bg-purple-50 rounded-lg shadow p-4 mb-5">
-          <div className="flex items-center gap-4 mb-3 flex-wrap">
-            <h2 className="font-semibold text-sm text-purple-800">Intensive Cleaning</h2>
-            <label className="flex items-center gap-1 text-xs cursor-pointer select-none ml-auto">
-              <input type="checkbox" checked={intAcwp} onChange={e => setIntAcwp(e.target.checked)}
-                className="accent-purple-600 w-3.5 h-3.5" />
-              <span className="text-purple-700 font-medium">ACWP (Exterior covered)</span>
-            </label>
-          </div>
+          <h2 className="font-semibold text-sm text-purple-800 mb-3">Intensive Cleaning</h2>
           <div className="space-y-2">
             {intCoaches.map((ic, idx) => (
               <div key={ic.position} className="flex items-center gap-4 text-xs">
@@ -240,14 +233,23 @@ export default function EditTripPage() {
                     value={ic.score}
                     onChange={e => setIntCoaches(arr => arr.map((c, i) => i === idx ? { ...c, score: Number(e.target.value) } : c))} />
                 </label>
-                {!intAcwp && (
-                  <label className="flex items-center gap-1">
+                <div className="flex items-center gap-1">
+                  <span className="flex items-center gap-0.5">
                     Exterior (÷3)
+                    <label className="flex items-center gap-0.5 text-[10px] cursor-pointer ml-1">
+                      <input type="checkbox" checked={intAcwp} onChange={e => setIntAcwp(e.target.checked)}
+                        className="accent-purple-600 w-3 h-3" />
+                      <span className="text-purple-700 font-medium">ACWP</span>
+                    </label>
+                  </span>
+                  {!intAcwp ? (
                     <input type="number" min={0} max={MAX_EXT} className={numCls}
                       value={ic.ext_score}
                       onChange={e => setIntCoaches(arr => arr.map((c, i) => i === idx ? { ...c, ext_score: Number(e.target.value) } : c))} />
-                  </label>
-                )}
+                  ) : (
+                    <span className="text-gray-400 text-xs">—</span>
+                  )}
+                </div>
               </div>
             ))}
           </div>

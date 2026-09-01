@@ -68,7 +68,7 @@ export async function POST(req: Request) {
   // Insert trip
   const tripRes = await db.execute({
     sql: `INSERT INTO trips (date, train_no, wl_no, acwp, supervisor, month_year, int_acwp)
-          VALUES (?,?,?,?,?,?)`,
+          VALUES (?,?,?,?,?,?,?)`,
     args: [body.date, body.train_no, body.wl_no ?? null, body.acwp ? 1 : 0,
            body.supervisor, body.month_year, body.int_acwp ? 1 : 0],
   })
