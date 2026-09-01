@@ -1038,7 +1038,7 @@ export async function GET(req: Request) {
   const intBHTotal    = r2(totalIntBH)
 
   const sectionC = [
-    ['Penalty as per Annex A-1 (Rating Penalty)',    normRatingPen,  intRatingPen,  r2(normRatingPen + intRatingPen)],
+    ['Penalty as per Annex A-1 (Rating Penalty)',    '',  '',  ''],
     ['  — AC Coach Penalty',                          r2(totalNormACPen),  r2(totalIntACPen),  r2(totalNormACPen + totalIntACPen)],
     ['  — NAC Coach Penalty',                         r2(totalNormNACPen), r2(totalIntNACPen), r2(totalNormNACPen + totalIntNACPen)],
     ['  — Exterior Coach Penalty',                    r2(totalNormExtPen), r2(totalIntExtPen), r2(totalNormExtPen + totalIntExtPen)],
