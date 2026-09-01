@@ -458,12 +458,12 @@ function NewTripPage() {
         {msg && <span className="text-sm text-gray-500 italic">{msg}</span>}
         {trainNotFound && (
           <span className="text-sm text-red-600 font-medium">
-            ⚠ Train <b>{trainNotFound}</b> Train Master mein nahi hai —{' '}
+            ⚠ Train <b>{trainNotFound}</b> not found in Train Master —{' '}
             <a href={`/train-master?train=${trainNotFound}`}
                className="underline text-blue-600 hover:text-blue-800">
-              Yahan add karo
+              Add it here
             </a>
-            {' '}phir wapas aao.
+            {' '}and come back.
           </span>
         )}
       </div>
