@@ -34,6 +34,7 @@ function TrainMasterPage() {
   const [newTrain,  setNewTrain]  = useState('')
   const [saving,    setSaving]    = useState(false)
   const [msg,       setMsg]       = useState('')
+  const [requiredMp, setRequiredMp] = useState<number | null>(null)
 
   useEffect(() => { loadTrains() }, [])
 
@@ -59,6 +60,7 @@ function TrainMasterPage() {
     setSelected(t)
     const data = await fetch(`/api/train-master?train_no=${encodeURIComponent(t)}`).then(r => r.json())
     setPositions(data.positions)
+    setRequiredMp(data.required_mp ?? null)
   }
 
   function addNew() {
@@ -67,6 +69,7 @@ function TrainMasterPage() {
     setSelected(t)
     setPositions(Array.from({ length: 10 }, (_, i) => ({ position: i + 1, coach_type: 'NAC' })))
     setNewTrain('')
+    setRequiredMp(null)
   }
 
   function updateType(pos: number, type: string) {
@@ -88,7 +91,7 @@ function TrainMasterPage() {
     setSaving(true)
     await fetch('/api/train-master', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ train_no: selected, positions }),
+      body: JSON.stringify({ train_no: selected, positions, required_mp: requiredMp }),
     })
     setSaving(false)
     setMsg('Saved ✓')
@@ -167,6 +170,15 @@ function TrainMasterPage() {
                 {positions.length} coaches · {acCount} AC · {nacCount} NAC{vbCount > 0 ? ` · ${vbCount} VB` : ''}
               </p>
             </div>
+            {/* Fixed MP override */}
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-3)' }}>
+              <span style={{ whiteSpace: 'nowrap' }}>Fixed MP Required</span>
+              <input type="number" min={0} placeholder="Auto (0.38×)"
+                value={requiredMp ?? ''}
+                onChange={e => setRequiredMp(e.target.value ? Number(e.target.value) : null)}
+                style={{ width: 80, border: '1px solid var(--border)', borderRadius: 6, padding: '3px 6px', fontSize: 12, textAlign: 'center' }} />
+              {requiredMp != null && <span style={{ fontSize: 11, color: 'var(--text-4)' }}>(overrides 0.38 formula)</span>}
+            </label>
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
               <button onClick={addCoach} disabled={positions.length >= MAX_POS} className="btn btn-secondary btn-sm">
                 <Plus size={13} /> Coach

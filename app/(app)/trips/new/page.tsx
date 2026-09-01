@@ -58,6 +58,7 @@ function NewTripPage() {
   const [intAcwp,      setIntAcwp]      = useState(false)
 
   const [deployed,     setDeployed]     = useState(0)
+  const [trainRequiredMp, setTrainRequiredMp] = useState<number | null>(null)
   const [panelKey,     setPanelKey]     = useState(0)
   const [penalties,    setPenalties]    = useState<Penalties>({})
   const [loading,      setLoading]      = useState(false)
@@ -121,7 +122,7 @@ function NewTripPage() {
   const acCount    = acPositions.length
   const nacCount   = nacPositions.length
   const intCount   = intPositions.length
-  const mpRequired = Math.round((acCount + nacCount) * 0.38)
+  const mpRequired = trainRequiredMp != null ? trainRequiredMp : Math.round((acCount + nacCount) * 0.38)
 
   const scores = useMemo(() => {
     const s: Record<number, number> = {}
@@ -204,6 +205,7 @@ function NewTripPage() {
     setTrainNotFound(null)
     const pos: Position[] = data.positions
     setPositions(pos)
+    setTrainRequiredMp(data.required_mp ?? null)
     setCompOverride({})
     setIntCriteria({})
     setIntExtScores({})
@@ -323,7 +325,7 @@ function NewTripPage() {
       // Reset form — stay on page for next entry
       setTrainNo(''); setWlNo(''); setSupervisor('')
       setPositions([]); setCriteria({}); setExtScores({})
-      setIntCriteria({}); setIntExtScores({}); setCompOverride({}); setIntPrevType({}); setIntAcwp(false)
+      setIntCriteria({}); setIntExtScores({}); setCompOverride({}); setIntPrevType({}); setIntAcwp(false); setTrainRequiredMp(null)
       setDeployed(0); setPenalties({}); setSchedWarn(null)
       setMsg('✅ Trip saved! Enter next trip or go to Trips list.')
       setPanelKey(k => k + 1)
@@ -772,7 +774,7 @@ function NewTripPage() {
             <div className="text-center">
               <p className="text-xs text-gray-500 mb-1">Required (auto)</p>
               <div className="text-3xl font-bold text-gray-700">{mpRequired}</div>
-              <p className="text-xs text-gray-400 mt-1">({acCount}+{nacCount}) × 0.38</p>
+              <p className="text-xs text-gray-400 mt-1">{trainRequiredMp != null ? `Fixed: ${trainRequiredMp}` : `(${acCount}+${nacCount}) × 0.38`}</p>
             </div>
             <div className="text-3xl text-gray-300">→</div>
             <div>

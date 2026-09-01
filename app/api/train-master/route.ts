@@ -12,7 +12,12 @@ export async function GET(req: Request) {
       sql:  'SELECT position, coach_type FROM train_master WHERE train_no=? ORDER BY position',
       args: [trainNo],
     })
-    return NextResponse.json({ train_no: trainNo, positions: rows.rows })
+    const settingsRes = await db.execute({
+      sql:  'SELECT required_mp FROM train_settings WHERE train_no=?',
+      args: [trainNo],
+    })
+    const required_mp = settingsRes.rows[0]?.required_mp ?? null
+    return NextResponse.json({ train_no: trainNo, positions: rows.rows, required_mp })
   }
 
   // Return distinct train numbers
@@ -25,9 +30,10 @@ export async function GET(req: Request) {
 /** POST /api/train-master  — body: { train_no, positions: [{position, coach_type}] } */
 export async function POST(req: Request) {
   await ensureDB()
-  const { train_no, positions } = await req.json() as {
+  const { train_no, positions, required_mp } = await req.json() as {
     train_no: string
     positions: Array<{ position: number; coach_type: string }>
+    required_mp?: number | null
   }
   // Delete existing then reinsert (simpler than upsert per row)
   await db.execute({ sql: 'DELETE FROM train_master WHERE train_no=?', args: [train_no] })
@@ -36,6 +42,15 @@ export async function POST(req: Request) {
       sql:  'INSERT INTO train_master (train_no, position, coach_type) VALUES (?,?,?)',
       args: [train_no, position, coach_type.toUpperCase()],
     })
+  }
+  // Save/clear required_mp in train_settings
+  if (required_mp != null && required_mp > 0) {
+    await db.execute({
+      sql:  'INSERT INTO train_settings (train_no, required_mp) VALUES (?,?) ON CONFLICT(train_no) DO UPDATE SET required_mp=excluded.required_mp',
+      args: [train_no, required_mp],
+    })
+  } else {
+    await db.execute({ sql: 'DELETE FROM train_settings WHERE train_no=?', args: [train_no] })
   }
   return NextResponse.json({ ok: true })
 }
@@ -47,5 +62,6 @@ export async function DELETE(req: Request) {
   const trainNo = searchParams.get('train_no')
   if (!trainNo) return NextResponse.json({ error: 'train_no required' }, { status: 400 })
   await db.execute({ sql: 'DELETE FROM train_master WHERE train_no=?', args: [trainNo] })
+  await db.execute({ sql: 'DELETE FROM train_settings WHERE train_no=?', args: [trainNo] })
   return NextResponse.json({ ok: true })
 }

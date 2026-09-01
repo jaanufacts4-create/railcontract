@@ -25,6 +25,7 @@ let _contractDocsMigrated  = false
 let _blobMigrated          = false
 let _pettyMigrated         = false
 let _laundrySettingsMigrated = false
+let _trainSettingsMigrated   = false
 let _monthlyBillsMigrated  = false
 export async function ensureDB() {
   if (!_migrated) {
@@ -98,6 +99,10 @@ export async function ensureDB() {
   if (!_laundrySettingsMigrated) {
     await migrateLaundrySettings()
     _laundrySettingsMigrated = true
+  }
+  if (!_trainSettingsMigrated) {
+    await migrateTrainSettings()
+    _trainSettingsMigrated = true
   }
   // NOTE: ensureIndexes() is NOT called here to avoid Vercel timeout on cold start.
   // Call it once manually via: GET /api/admin/ensure-indexes
@@ -221,6 +226,12 @@ export async function migrate() {
       position   INTEGER NOT NULL,       -- 1 to 24
       coach_type TEXT    NOT NULL,       -- LWFCZAC, GSLRD, etc.
       UNIQUE(train_no, position)
+    );
+
+    -- ── Train Settings (per-train overrides) ─────────────────────────
+    CREATE TABLE IF NOT EXISTS train_settings (
+      train_no    TEXT PRIMARY KEY,
+      required_mp INTEGER          -- fixed MP override; NULL = use 0.38 formula
     );
 
     -- ── Trips ──────────────────────────────────────────────────────────
@@ -1048,6 +1059,17 @@ async function migratePetty() {
       args: [key, value],
     })
   }
+}
+
+/** ─── Train Settings table (per-train MP override etc.) ────────────────────── */
+async function migrateTrainSettings() {
+  // Table is created via IF NOT EXISTS in schema, but add for existing DBs
+  try {
+    await db.execute(`CREATE TABLE IF NOT EXISTS train_settings (
+      train_no    TEXT PRIMARY KEY,
+      required_mp INTEGER
+    )`)
+  } catch { /* ignore */ }
 }
 
 /** ─── Add file_url column (Vercel Blob migration) ────────────────────────── */
