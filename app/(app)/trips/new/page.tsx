@@ -459,7 +459,7 @@ function NewTripPage() {
         {trainNotFound && (
           <span className="text-sm text-red-600 font-medium">
             ⚠ Train <b>{trainNotFound}</b> not found in Train Master —{' '}
-            <a href={`/train-master?train=${trainNotFound}`}
+            <a href={`/train-master?train=${encodeURIComponent(trainNotFound)}&back=/trips/new`}
                className="underline text-blue-600 hover:text-blue-800">
               Add it here
             </a>

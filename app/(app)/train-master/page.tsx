@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState, Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { Plus, Minus, Save, Trash2, Train } from 'lucide-react'
 
 const MAX_POS = 24
@@ -39,6 +39,8 @@ function TrainMasterPage() {
 
   // Auto-add train from URL param (coming from WL Compare link)
   const searchParams = useSearchParams()
+  const router = useRouter()
+  const backUrl = searchParams.get('back')
   useEffect(() => {
     const t = searchParams.get('train')
     if (!t) return
@@ -89,9 +91,10 @@ function TrainMasterPage() {
       body: JSON.stringify({ train_no: selected, positions }),
     })
     setSaving(false)
-    setMsg('Saved')
-    setTimeout(() => setMsg(''), 2000)
+    setMsg('Saved ✓')
     loadTrains()
+    if (backUrl) { setTimeout(() => router.push(backUrl), 1200) }
+    else { setTimeout(() => setMsg(''), 2000) }
   }
 
   async function deleteTrain() {
