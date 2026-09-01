@@ -614,10 +614,25 @@ export async function GET(req: Request) {
           row.getCell(COL.BH).value      = iTripBH
         }
         row.getCell(COL.C).value = section
-        row.getCell(COL.D).value = coaches.length
         row.getCell(COL.E).value = rate
         row.getCell(COL.F).value = r2(rateNG)
 
+        // When INT ACWP is on, Exterior row shows "Attended by ACWP"
+        if (section === 'Exterior' && intAcwp) {
+          row.getCell(COL.D).value = 'ACWP'
+          row.getCell(COL.G).value = 'Attended by ACWP'
+          ws2.mergeCells(rowNum, COL.G, rowNum, COL.G + 23)
+          for (let col = COL.AE; col <= COL.AN; col++) row.getCell(col).value = 0
+          row.eachCell({ includeEmpty: false }, cell => {
+            cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } }
+            cell.border    = { top: { style: 'hair' }, bottom: { style: 'hair' }, left: { style: 'hair' }, right: { style: 'hair' } }
+            cell.alignment = { horizontal: 'center', vertical: 'middle' }
+            cell.font      = { size: 9 }
+          })
+          return
+        }
+
+        row.getCell(COL.D).value = coaches.length
         for (const c of coaches) {
           row.getCell(COL.G + c.seq - 1).value = c[scoreKey]
         }
