@@ -834,17 +834,20 @@ export async function GET(req: Request) {
   ws4.getRow(1).getCell(1).value = `PM MCC Normal & Intensive Summary — ${monthName}`
   ws4.getRow(1).getCell(1).font = { bold: true, size: 11 }
   ws4.getRow(1).getCell(1).alignment = { horizontal: 'center', vertical: 'middle' }
-  ws4.mergeCells(1, 1, 1, 8)
+  ws4.mergeCells(1, 1, 1, 11)
 
   const w4h = ws4.getRow(2)
   w4h.getCell(1).value = 'Date'
   w4h.getCell(2).value = 'No. of AC Coaches (incl. VB)'
   w4h.getCell(3).value = 'No. of Exterior Coaches'
   w4h.getCell(4).value = 'No. of NAC Coaches'
-  w4h.getCell(5).value = 'AC Penalty (₹)'
-  w4h.getCell(6).value = 'NAC Penalty (₹)'
-  w4h.getCell(7).value = 'Exterior Penalty (₹)'
-  w4h.getCell(8).value = 'Penalty as per A1-Back Side (₹)'
+  w4h.getCell(5).value = 'AC Normal Penalty (₹)'
+  w4h.getCell(6).value = 'AC Intensive Penalty (₹)'
+  w4h.getCell(7).value = 'NAC Normal Penalty (₹)'
+  w4h.getCell(8).value = 'NAC Intensive Penalty (₹)'
+  w4h.getCell(9).value = 'Exterior Normal Penalty (₹)'
+  w4h.getCell(10).value = 'Exterior Intensive Penalty (₹)'
+  w4h.getCell(11).value = 'Penalty as per A1-Back Side (₹)'
   w4h.eachCell(cell => {
     cell.font = { bold: true, color: { argb: 'FFFFFFFF' } }
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F5C5C' } }
@@ -855,26 +858,32 @@ export async function GET(req: Request) {
 
   let s4row = 3
   let g4AC = 0, g4Ext = 0, g4NAC = 0
-  let g4ACPen = 0, g4NACPen = 0, g4ExtPen = 0, g4BH = 0
+  let g4ACNormPen = 0, g4ACIntPen = 0, g4NACNormPen = 0, g4NACIntPen = 0, g4ExtNormPen = 0, g4ExtIntPen = 0, g4BH = 0
 
   for (const [d4, agg4] of dayAggMap) {
     const acT   = agg4.normAC  + agg4.intAC
     const extT  = agg4.normExt + agg4.intExt
     const nacT  = agg4.normNAC + agg4.intNAC
-    const acP   = r2(agg4.normACPen  + agg4.intACPen)
-    const nacP  = r2(agg4.normNACPen + agg4.intNACPen)
-    const extP  = r2(agg4.normExtPen + agg4.intExtPen)
-    const bhT   = r2(agg4.normBH + agg4.intBH)
+    const acNormP  = r2(agg4.normACPen)
+    const acIntP   = r2(agg4.intACPen)
+    const nacNormP = r2(agg4.normNACPen)
+    const nacIntP  = r2(agg4.intNACPen)
+    const extNormP = r2(agg4.normExtPen)
+    const extIntP  = r2(agg4.intExtPen)
+    const bhT      = r2(agg4.normBH + agg4.intBH)
     const row4  = ws4.getRow(s4row)
     row4.getCell(1).value  = new Date(d4)
     row4.getCell(1).numFmt = 'DD-MM-YYYY'
     row4.getCell(2).value  = acT
     row4.getCell(3).value  = extT
     row4.getCell(4).value  = nacT
-    row4.getCell(5).value  = acP
-    row4.getCell(6).value  = nacP
-    row4.getCell(7).value  = extP
-    row4.getCell(8).value  = bhT
+    row4.getCell(5).value  = acNormP
+    row4.getCell(6).value  = acIntP
+    row4.getCell(7).value  = nacNormP
+    row4.getCell(8).value  = nacIntP
+    row4.getCell(9).value  = extNormP
+    row4.getCell(10).value = extIntP
+    row4.getCell(11).value = bhT
     row4.eachCell({ includeEmpty: false }, cell => {
       cell.alignment = { horizontal: 'center', vertical: 'middle' }
       cell.border = { top: { style: 'hair' }, bottom: { style: 'hair' }, left: { style: 'hair' }, right: { style: 'hair' } }
@@ -882,7 +891,10 @@ export async function GET(req: Request) {
     })
     row4.getCell(1).font = { size: 9, bold: true }
     g4AC += acT; g4Ext += extT; g4NAC += nacT
-    g4ACPen += acP; g4NACPen += nacP; g4ExtPen += extP; g4BH += bhT
+    g4ACNormPen += acNormP; g4ACIntPen += acIntP
+    g4NACNormPen += nacNormP; g4NACIntPen += nacIntP
+    g4ExtNormPen += extNormP; g4ExtIntPen += extIntP
+    g4BH += bhT
     s4row++
   }
 
@@ -891,10 +903,13 @@ export async function GET(req: Request) {
   ws4gt.getCell(2).value = g4AC
   ws4gt.getCell(3).value = g4Ext
   ws4gt.getCell(4).value = g4NAC
-  ws4gt.getCell(5).value = r2(g4ACPen)
-  ws4gt.getCell(6).value = r2(g4NACPen)
-  ws4gt.getCell(7).value = r2(g4ExtPen)
-  ws4gt.getCell(8).value = r2(g4BH)
+  ws4gt.getCell(5).value = r2(g4ACNormPen)
+  ws4gt.getCell(6).value = r2(g4ACIntPen)
+  ws4gt.getCell(7).value = r2(g4NACNormPen)
+  ws4gt.getCell(8).value = r2(g4NACIntPen)
+  ws4gt.getCell(9).value = r2(g4ExtNormPen)
+  ws4gt.getCell(10).value = r2(g4ExtIntPen)
+  ws4gt.getCell(11).value = r2(g4BH)
   ws4gt.eachCell({ includeEmpty: false }, cell => {
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFF0000' } }
     cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 }
@@ -903,7 +918,7 @@ export async function GET(req: Request) {
   })
 
   ws4.getColumn(1).width = 12
-  for (let c4 = 2; c4 <= 8; c4++) ws4.getColumn(c4).width = 18
+  for (let c4 = 2; c4 <= 11; c4++) ws4.getColumn(c4).width = 18
 
   // ════════════════════════════════════════════════════════════════════
   // SHEET 5: Summary of Penalty
