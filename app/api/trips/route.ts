@@ -45,7 +45,7 @@ export async function POST(req: Request) {
   await ensureDB()
   const body = await req.json() as {
     date: string; train_no: string; wl_no?: string; acwp?: boolean
-    supervisor: string; month_year: string
+    supervisor: string; month_year: string; int_acwp?: boolean
     scores:     Record<string, number>   // AC/NAC coach totals
     ext_scores: Record<string, number>   // exterior scores (when ACWP=false)
     manpower:   Record<string, { required: number; deployed: number }>
@@ -67,10 +67,10 @@ export async function POST(req: Request) {
 
   // Insert trip
   const tripRes = await db.execute({
-    sql: `INSERT INTO trips (date, train_no, wl_no, acwp, supervisor, month_year)
+    sql: `INSERT INTO trips (date, train_no, wl_no, acwp, supervisor, month_year, int_acwp)
           VALUES (?,?,?,?,?,?)`,
     args: [body.date, body.train_no, body.wl_no ?? null, body.acwp ? 1 : 0,
-           body.supervisor, body.month_year],
+           body.supervisor, body.month_year, body.int_acwp ? 1 : 0],
   })
   const tripId = Number(tripRes.lastInsertRowid)
 

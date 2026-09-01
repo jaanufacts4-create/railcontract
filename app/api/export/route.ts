@@ -547,6 +547,7 @@ export async function GET(req: Request) {
       const trainNo = trip.train_no as string
 
       // Load scores + manpower + annex penalties
+      const intAcwp = !!(trip.int_acwp as number)
       const [intRes, iMpRes, iPenRes] = await Promise.all([
         db.execute({ sql: 'SELECT position, coach_type, score, ext_score FROM intensive_scores WHERE trip_id=? ORDER BY position', args: [tripId] }),
         db.execute({ sql: 'SELECT required, deployed FROM manpower WHERE trip_id=?', args: [tripId] }),
@@ -583,7 +584,7 @@ export async function GET(req: Request) {
 
       const acIntSlab  = acInt.length  ? calcSlabs(acInt.map(c => c.score),     acRateNG,  18) : null
       const nacIntSlab = nacInt.length ? calcSlabs(nacInt.map(c => c.score),    nacRateNG, 18) : null
-      const extIntSlab = allInt.length ? calcSlabs(allInt.map(c => c.extScore), extRateNG,  3) : null
+      const extIntSlab = (!intAcwp && allInt.length) ? calcSlabs(allInt.map(c => c.extScore), extRateNG, 3) : null
 
       dayIntAC  += acIntSlab?.totalPenalty  ?? 0
       dayIntNAC += nacIntSlab?.totalPenalty ?? 0
@@ -663,7 +664,7 @@ export async function GET(req: Request) {
       const iagg = getAgg(date)
       iagg.intAC     += acInt.length
       iagg.intNAC    += nacInt.length
-      iagg.intExt    += allInt.length
+      iagg.intExt    += intAcwp ? 0 : allInt.length
       iagg.intVB     += vbInt
       iagg.intACPen  += acIntSlab?.totalPenalty  ?? 0
       iagg.intNACPen += nacIntSlab?.totalPenalty ?? 0

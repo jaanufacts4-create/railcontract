@@ -22,6 +22,7 @@ export default function EditTripPage() {
   const [date,       setDate]       = useState('')
   const [wlNo,       setWlNo]       = useState('')
   const [acwp,       setAcwp]       = useState(false)
+  const [intAcwp,    setIntAcwp]    = useState(false)
   const [supervisor, setSupervisor] = useState('')
   const [trainNo,    setTrainNo]    = useState('')
 
@@ -58,6 +59,7 @@ export default function EditTripPage() {
       setDate(t.date)
       setWlNo(t.wl_no ?? '')
       setAcwp(!!t.acwp)
+      setIntAcwp(!!(t.int_acwp as number))
       setSupervisor(t.supervisor)
       setTrainNo(t.train_no)
 
@@ -119,6 +121,7 @@ export default function EditTripPage() {
       },
       penalties: Object.fromEntries(Object.entries(penalties).map(([k,v]) => [k, v])),
       intensive_coaches: intCoaches,
+      int_acwp: intAcwp,
     }
     const res = await fetch(`/api/trips/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     setSaving(false)
@@ -218,7 +221,14 @@ export default function EditTripPage() {
       {/* Intensive coaches */}
       {intCoaches.length > 0 && (
         <section className="bg-purple-50 rounded-lg shadow p-4 mb-5">
-          <h2 className="font-semibold text-sm text-purple-800 mb-3">Intensive Cleaning</h2>
+          <div className="flex items-center gap-4 mb-3 flex-wrap">
+            <h2 className="font-semibold text-sm text-purple-800">Intensive Cleaning</h2>
+            <label className="flex items-center gap-1 text-xs cursor-pointer select-none ml-auto">
+              <input type="checkbox" checked={intAcwp} onChange={e => setIntAcwp(e.target.checked)}
+                className="accent-purple-600 w-3.5 h-3.5" />
+              <span className="text-purple-700 font-medium">ACWP (Exterior covered)</span>
+            </label>
+          </div>
           <div className="space-y-2">
             {intCoaches.map((ic, idx) => (
               <div key={ic.position} className="flex items-center gap-4 text-xs">
@@ -230,12 +240,14 @@ export default function EditTripPage() {
                     value={ic.score}
                     onChange={e => setIntCoaches(arr => arr.map((c, i) => i === idx ? { ...c, score: Number(e.target.value) } : c))} />
                 </label>
-                <label className="flex items-center gap-1">
-                  Exterior (÷3)
-                  <input type="number" min={0} max={MAX_EXT} className={numCls}
-                    value={ic.ext_score}
-                    onChange={e => setIntCoaches(arr => arr.map((c, i) => i === idx ? { ...c, ext_score: Number(e.target.value) } : c))} />
-                </label>
+                {!intAcwp && (
+                  <label className="flex items-center gap-1">
+                    Exterior (÷3)
+                    <input type="number" min={0} max={MAX_EXT} className={numCls}
+                      value={ic.ext_score}
+                      onChange={e => setIntCoaches(arr => arr.map((c, i) => i === idx ? { ...c, ext_score: Number(e.target.value) } : c))} />
+                  </label>
+                )}
               </div>
             ))}
           </div>

@@ -55,6 +55,7 @@ function NewTripPage() {
   const [compOverride, setCompOverride] = useState<Record<number, string>>({})
   // Remembers coach_type before INT marking (for AC/NAC classification in export)
   const [intPrevType,  setIntPrevType]  = useState<Record<number, string>>({})
+  const [intAcwp,      setIntAcwp]      = useState(false)
 
   const [deployed,     setDeployed]     = useState(0)
   const [panelKey,     setPanelKey]     = useState(0)
@@ -299,7 +300,7 @@ function NewTripPage() {
       position:   p.position,
       coach_type: intPrevType[p.position] ?? positions.find(o => o.position === p.position)?.coach_type ?? 'GSLRD',
       score:      calcTotal(intCriteria[p.position] ?? ([...INT_DEFAULT_CRITERIA] as CriteriaRow)),  // interior max 18
-      ext_score:  intExtScores[p.position] ?? 3,   // exterior max 3
+      ext_score:  intAcwp ? 0 : (intExtScores[p.position] ?? 3),   // exterior max 3, 0 when ACWP on
     }))
 
     const res = await fetch('/api/trips', {
@@ -313,6 +314,7 @@ function NewTripPage() {
         manpower:          { AC: { required: mpRequired, deployed } },
         penalties:         penMap,
         intensive_coaches: intensiveCoaches,
+        int_acwp: intAcwp,
       }),
     })
 
@@ -321,7 +323,7 @@ function NewTripPage() {
       // Reset form — stay on page for next entry
       setTrainNo(''); setWlNo(''); setSupervisor('')
       setPositions([]); setCriteria({}); setExtScores({})
-      setIntCriteria({}); setIntExtScores({}); setCompOverride({}); setIntPrevType({})
+      setIntCriteria({}); setIntExtScores({}); setCompOverride({}); setIntPrevType({}); setIntAcwp(false)
       setDeployed(0); setPenalties({}); setSchedWarn(null)
       setMsg('✅ Trip saved! Enter next trip or go to Trips list.')
       setPanelKey(k => k + 1)
@@ -628,13 +630,18 @@ function NewTripPage() {
       {/* ── Intensive Proforma (same structure as Normal + Exterior row) ── */}
       {intPositions.length > 0 && (
         <div className="bg-white rounded-lg shadow p-3 border-2 border-purple-300">
-          <div className="flex items-center gap-3 mb-1">
+          <div className="flex items-center gap-3 mb-1 flex-wrap">
             <p className="text-sm font-semibold text-purple-700">
               🔵 Intensive Cleaning Ratings
             </p>
             <span className="text-[10px] bg-purple-100 text-purple-600 px-2 py-0.5 rounded">
-              Total = (1X2×2) + 2+3+4+5 + Ext
+              Total = (1X2×2) + 2+3+4+5{!intAcwp ? ' + Ext' : ''}
             </span>
+            <label className="flex items-center gap-1 text-xs cursor-pointer select-none ml-auto">
+              <input type="checkbox" checked={intAcwp} onChange={e => setIntAcwp(e.target.checked)}
+                className="accent-purple-600 w-3.5 h-3.5" />
+              <span className="text-purple-700 font-medium">ACWP (Exterior covered)</span>
+            </label>
           </div>
           <p className="text-xs text-gray-400 mb-3">
             These coaches will not appear in the Normal Summary — they will be exported to the Intensive Summary sheet.
@@ -675,18 +682,20 @@ function NewTripPage() {
                   </tr>
                 ))}
 
-                {/* Exterior row (max 3) */}
-                <tr className="bg-orange-50">
-                  <td className="proforma-label font-semibold text-orange-700">Ext (max 3)</td>
-                  {intPositions.map(p => (
-                    <td key={p.position} className="proforma-cell">
-                      <input type="number" min={0} max={3}
-                        value={intExtScores[p.position] ?? 3}
-                        onChange={e => setIntExtScores(s => ({ ...s, [p.position]: Math.min(3, Number(e.target.value) || 0) }))}
-                        className="w-8 text-center text-xs border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-orange-400 rounded" />
-                    </td>
-                  ))}
-                </tr>
+                {/* Exterior row (max 3) — hidden when ACWP is on */}
+                {!intAcwp && (
+                  <tr className="bg-orange-50">
+                    <td className="proforma-label font-semibold text-orange-700">Ext (max 3)</td>
+                    {intPositions.map(p => (
+                      <td key={p.position} className="proforma-cell">
+                        <input type="number" min={0} max={3}
+                          value={intExtScores[p.position] ?? 3}
+                          onChange={e => setIntExtScores(s => ({ ...s, [p.position]: Math.min(3, Number(e.target.value) || 0) }))}
+                          className="w-8 text-center text-xs border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-orange-400 rounded" />
+                      </td>
+                    ))}
+                  </tr>
+                )}
 
                 {/* Total row — interior only, max 18 */}
                 <tr className="bg-yellow-100 font-bold">

@@ -309,6 +309,11 @@ export async function migrate() {
   try {
     await db.execute('ALTER TABLE intensive_scores ADD COLUMN ext_score INTEGER NOT NULL DEFAULT 0')
   } catch { /* column already exists — ignore */ }
+
+  // Safe column addition: int_acwp on trips (0=exterior shown, 1=ACWP/no exterior)
+  try {
+    await db.execute('ALTER TABLE trips ADD COLUMN int_acwp INTEGER NOT NULL DEFAULT 0')
+  } catch { /* column already exists — ignore */ }
 }
 
 /** ─── Secondary Bill (M/s Dynamic Services) ─────────────────────────── */

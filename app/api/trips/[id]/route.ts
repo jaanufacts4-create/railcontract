@@ -29,7 +29,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   const { id: rawId } = await params
   const id = Number(rawId)
   const body = await req.json() as {
-    date: string; wl_no?: string; acwp?: boolean; supervisor: string
+    date: string; wl_no?: string; acwp?: boolean; supervisor: string; int_acwp?: boolean
     scores:     Record<string, number>
     ext_scores: Record<string, number>
     manpower:   Record<string, { required: number; deployed: number }>
@@ -37,8 +37,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     intensive_coaches?: Array<{ position: number; coach_type: string; score: number; ext_score: number }>
   }
 
-  await db.execute({ sql: 'UPDATE trips SET date=?, wl_no=?, acwp=?, supervisor=?, month_year=? WHERE id=?',
-    args: [body.date, body.wl_no ?? null, body.acwp ? 1 : 0, body.supervisor, body.date.slice(0, 7), id] })
+  await db.execute({ sql: 'UPDATE trips SET date=?, wl_no=?, acwp=?, supervisor=?, month_year=?, int_acwp=? WHERE id=?',
+    args: [body.date, body.wl_no ?? null, body.acwp ? 1 : 0, body.supervisor, body.date.slice(0, 7), body.int_acwp ? 1 : 0, id] })
 
   // Delete & reinsert child records
   await db.execute({ sql: 'DELETE FROM coach_scores WHERE trip_id=?', args: [id] })
