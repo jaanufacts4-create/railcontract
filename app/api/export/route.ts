@@ -1053,14 +1053,20 @@ export async function GET(req: Request) {
     ws5.mergeCells(s5r, 4, s5r, 6)
     s5r++
   }
-  ws5Total(s5r, [
-    'Total',
-    totalNormAC + totalNormNAC + totalNormExt,
-    totalIntAC  + totalIntNAC  + totalIntExt,
-    totalNormAC + totalNormNAC + totalNormExt + totalIntAC + totalIntNAC + totalIntExt,
-  ])
-  ws5.mergeCells(s5r, 4, s5r, 6)
-  s5r += 2 // +blank
+  // No total row in Section B (per user requirement)
+  s5r++ // blank row
+
+  // ── Save monthly totals to DB for billing certificate ────────────
+  await db.execute({
+    sql: `INSERT OR REPLACE INTO mcc_monthly_totals
+          (month_year, norm_ac, norm_nac, norm_ext, norm_vb, int_ac, int_nac, int_ext, int_vb, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+    args: [
+      monthYear,
+      Math.round(totalNormAC), Math.round(totalNormNAC), Math.round(totalNormExt), Math.round(totalNormVB),
+      Math.round(totalIntAC),  Math.round(totalIntNAC),  Math.round(totalIntExt),  Math.round(totalIntVB),
+    ],
+  })
 
   // ── Section C: MCC Penalty Details ───────────────────────────────
   ws5Title(s5r++, 'SECTION C: MCC PENALTY DETAILS (₹)')

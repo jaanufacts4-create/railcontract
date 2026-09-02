@@ -104,6 +104,10 @@ export async function ensureDB() {
     await migrateTrainSettings()
     _trainSettingsMigrated = true
   }
+  if (!_mccMonthlyTotalsMigrated) {
+    await migrateMccMonthlyTotals()
+    _mccMonthlyTotalsMigrated = true
+  }
   // NOTE: ensureIndexes() is NOT called here to avoid Vercel timeout on cold start.
   // Call it once manually via: GET /api/admin/ensure-indexes
 }
@@ -1059,6 +1063,24 @@ async function migratePetty() {
       args: [key, value],
     })
   }
+}
+
+/** ─── MCC Monthly Totals (shared between export & billing) ─────────────────── */
+async function migrateMccMonthlyTotals() {
+  try {
+    await db.execute(`CREATE TABLE IF NOT EXISTS mcc_monthly_totals (
+      month_year TEXT PRIMARY KEY,
+      norm_ac    INTEGER NOT NULL DEFAULT 0,
+      norm_nac   INTEGER NOT NULL DEFAULT 0,
+      norm_ext   INTEGER NOT NULL DEFAULT 0,
+      norm_vb    INTEGER NOT NULL DEFAULT 0,
+      int_ac     INTEGER NOT NULL DEFAULT 0,
+      int_nac    INTEGER NOT NULL DEFAULT 0,
+      int_ext    INTEGER NOT NULL DEFAULT 0,
+      int_vb     INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`)
+  } catch { /* ignore */ }
 }
 
 /** ─── Train Settings table (per-train MP override etc.) ────────────────────── */
