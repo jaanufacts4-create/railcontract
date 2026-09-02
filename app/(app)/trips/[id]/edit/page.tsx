@@ -1,306 +1,630 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { COACH_TYPE_MAP, PENALTY_LABELS } from '@/lib/types'
+import { coachCategory, PENALTY_LABELS } from '@/lib/types'
+import { Plus, Minus } from 'lucide-react'
 
-type Pos = { position: number; coach_type: string }
-type IntCoach = { position: number; coach_type: string; score: number; ext_score: number }
+type CriteriaRow = [number, number, number, number, number]
+type Criteria    = Record<number, CriteriaRow>
+type ExtScores   = Record<number, number>
+type Penalties   = Record<number, number>
+type Position    = { position: number; coach_type: string }
 
-const MAX_NORMAL = 15
-const MAX_INT    = 18
-const MAX_EXT    = 3
+const CRITERIA_LABELS       = ['1X2', '2', '3', '4', '5']
+const DEFAULT_CRITERIA:     CriteriaRow = [3, 3, 3, 3, 0]
+const INT_DEFAULT_CRITERIA: CriteriaRow = [3, 3, 3, 3, 3]
+const COACH_TYPES = ['LWFCZAC','LWACCN','LWCBAC','LWACZAC','GSLRD','LWSCN','LWS','LWSCZAC','LWLRRM','LWGRD','INT']
 
-function coachCat(type: string) {
-  return COACH_TYPE_MAP[type.toUpperCase()] ?? 'NAC'
+function calcTotal(c: CriteriaRow) { return c[0] * 2 + c[1] + c[2] + c[3] + c[4] }
+
+function scoreToDefaultCriteria(score: number, max: number): CriteriaRow {
+  let rem = Math.min(score, max)
+  const c: CriteriaRow = [0, 0, 0, 0, 0]
+  c[0] = Math.min(3, Math.floor(rem / 2)); rem -= c[0] * 2
+  for (let i = 1; i <= 4 && rem > 0; i++) { c[i] = Math.min(3, rem); rem -= c[i] }
+  return c
 }
 
 export default function EditTripPage() {
   const { id }  = useParams<{ id: string }>()
   const router  = useRouter()
 
-  // Basic info
-  const [date,       setDate]       = useState('')
-  const [wlNo,       setWlNo]       = useState('')
-  const [acwp,       setAcwp]       = useState(false)
-  const [intAcwp,    setIntAcwp]    = useState(false)
-  const [supervisor, setSupervisor] = useState('')
-  const [trainNo,    setTrainNo]    = useState('')
+  const [date,         setDate]         = useState('')
+  const [wlNo,         setWlNo]         = useState('')
+  const [trainNo,      setTrainNo]      = useState('')
+  const [supervisor,   setSupervisor]   = useState('')
+  const [acwp,         setAcwp]         = useState(true)
+  const [intAcwp,      setIntAcwp]      = useState(false)
 
-  // Composition (from train_master, read-only)
-  const [positions, setPositions] = useState<Pos[]>([])
+  const [positions,    setPositions]    = useState<Position[]>([])
+  const [criteria,     setCriteria]     = useState<Criteria>({})
+  const [extScores,    setExtScores]    = useState<ExtScores>({})
+  const [intCriteria,  setIntCriteria]  = useState<Criteria>({})
+  const [intExtScores, setIntExtScores] = useState<ExtScores>({})
+  const [compOverride, setCompOverride] = useState<Record<number, string>>({})
+  const [intPrevType,  setIntPrevType]  = useState<Record<number, string>>({})
 
-  // Scores: normal coaches (position → score 0-15)
-  const [scores,    setScores]    = useState<Record<number, number>>({})
-  // Exterior scores (position → score 0-3)
-  const [extScores, setExtScores] = useState<Record<number, number>>({})
-  // Intensive coaches
-  const [intCoaches, setIntCoaches] = useState<IntCoach[]>([])
+  const [deployed,          setDeployed]          = useState(0)
+  const [trainRequiredMp,   setTrainRequiredMp]   = useState<number | null>(null)
+  const [penalties,         setPenalties]          = useState<Penalties>({})
+  const [loading,           setLoading]            = useState(false)
+  const [msg,               setMsg]                = useState('')
+  const [fetchError,        setFetchError]         = useState('')
 
-  // Manpower
-  const [mpAcReq,   setMpAcReq]   = useState(0)
-  const [mpAcDep,   setMpAcDep]   = useState(0)
-  const [mpNacReq,  setMpNacReq]  = useState(0)
-  const [mpNacDep,  setMpNacDep]  = useState(0)
-
-  // Annex penalties (type 1-14)
-  const [penalties, setPenalties] = useState<Record<number, number>>({})
-
-  const [saving,  setSaving]  = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [error,   setError]   = useState('')
-
+  // ── Load existing trip ────────────────────────────────────────────────────
   useEffect(() => {
-    async function load() {
-      const res  = await fetch(`/api/trips/${id}`)
-      if (!res.ok) { setError('Trip not found'); setLoading(false); return }
-      const data = await res.json()
-      const t    = data.trip
+    if (!id) return
+    fetch(`/api/trips/${id}`)
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
+      .then(data => {
+        const trip = data.trip
+        setDate(trip.date ?? '')
+        setWlNo(trip.wl_no ?? '')
+        setTrainNo(trip.train_no ?? '')
+        setSupervisor(trip.supervisor ?? '')
+        setAcwp(trip.acwp === 1 || trip.acwp === true)
+        setIntAcwp(trip.int_acwp === 1 || trip.int_acwp === true)
 
-      setDate(t.date)
-      setWlNo(t.wl_no ?? '')
-      setAcwp(!!t.acwp)
-      setIntAcwp(!!(t.int_acwp as number))
-      setSupervisor(t.supervisor)
-      setTrainNo(t.train_no)
+        // Pull base composition from train_master for this train
+        fetch(`/api/train-master?train_no=${encodeURIComponent(trip.train_no)}`)
+          .then(r => r.json())
+          .then(tm => {
+            setPositions(tm.positions ?? [])
+            setTrainRequiredMp(tm.required_mp ?? null)
+          })
+          .catch(() => {})
 
-      // Load composition
-      const compRes = await fetch(`/api/train-master?train_no=${encodeURIComponent(t.train_no)}`)
-      const comp    = await compRes.json()
-      setPositions(comp.positions ?? [])
+        // intensive coaches
+        const intSet = new Set<number>()
+        const newCompOverride: Record<number, string> = {}
+        const newIntPrevType:  Record<number, string> = {}
+        const newIntCriteria:  Criteria    = {}
+        const newIntExtScores: ExtScores   = {}
 
-      // Build int position set
-      const intPositionSet = new Set((data.intensive as IntCoach[]).map(i => i.position))
+        for (const ic of (data.intensive ?? [])) {
+          const pos = ic.position
+          intSet.add(pos)
+          newCompOverride[pos]  = 'INT'
+          newIntPrevType[pos]   = ic.coach_type
+          newIntCriteria[pos]   = scoreToDefaultCriteria(ic.score ?? 0, 18)
+          newIntExtScores[pos]  = ic.ext_score ?? 3
+        }
+        setCompOverride(newCompOverride)
+        setIntPrevType(newIntPrevType)
+        setIntCriteria(newIntCriteria)
+        setIntExtScores(newIntExtScores)
 
-      // Scores (positive = normal, negative = exterior)
-      const sc: Record<number, number>  = {}
-      const ex: Record<number, number>  = {}
-      for (const row of data.scores as { position: number; score: number }[]) {
-        if (row.position > 0 && !intPositionSet.has(row.position)) sc[row.position] = row.score
-        if (row.position < 0) ex[-row.position] = row.score
-      }
-      setScores(sc)
-      setExtScores(ex)
+        // normal scores
+        const newCriteria:  Criteria  = {}
+        const newExtScores: ExtScores = {}
 
-      // Intensive
-      setIntCoaches(data.intensive ?? [])
+        for (const row of (data.scores ?? [])) {
+          const pos = row.position
+          if (pos > 0 && !intSet.has(pos)) {
+            newCriteria[pos] = scoreToDefaultCriteria(row.score ?? 0, 15)
+          }
+          if (pos < 0) {
+            newExtScores[-pos] = row.score ?? 3
+          }
+        }
+        setCriteria(newCriteria)
+        setExtScores(newExtScores)
 
-      // Manpower
-      for (const mp of data.manpower as { section: string; required: number; deployed: number }[]) {
-        if (mp.section === 'AC')  { setMpAcReq(mp.required);  setMpAcDep(mp.deployed) }
-        if (mp.section === 'NAC') { setMpNacReq(mp.required); setMpNacDep(mp.deployed) }
-      }
+        // manpower
+        const acMp = (data.manpower ?? []).find((m: { section: string }) => m.section === 'AC')
+        if (acMp) setDeployed(acMp.deployed ?? 0)
 
-      // Penalties
-      const pen: Record<number, number> = {}
-      for (const p of data.penalties as { penalty_type: number; amount: number }[]) {
-        pen[p.penalty_type] = p.amount
-      }
-      setPenalties(pen)
-
-      setLoading(false)
-    }
-    load()
+        // penalties
+        const penMap: Penalties = {}
+        for (const p of (data.penalties ?? [])) penMap[p.type] = p.amount
+        setPenalties(penMap)
+      })
+      .catch(e => setFetchError(e.message))
   }, [id])
 
-  // Derived: which positions are INT
-  const intSet   = new Set(intCoaches.map(i => i.position))
-  // attendable = not GEN and not INT
-  const attended = positions.filter(p => coachCat(p.coach_type) !== 'GEN' && !intSet.has(p.position))
-  const acRows   = attended.filter(p => coachCat(p.coach_type) === 'AC')
-  const nacRows  = attended.filter(p => coachCat(p.coach_type) === 'NAC')
+  // ── Derived ───────────────────────────────────────────────────────────────
+  function effType(pos: number, original: string) { return compOverride[pos] ?? original }
+  const effPositions = positions.map(p => ({ ...p, coach_type: effType(p.position, p.coach_type) }))
+  const acPositions  = effPositions.filter(p => coachCategory(p.coach_type) === 'AC')
+  const nacPositions = effPositions.filter(p => coachCategory(p.coach_type) === 'NAC')
+  const intPositions = effPositions.filter(p => p.coach_type === 'INT')
+  const attendable   = effPositions.filter(p => coachCategory(p.coach_type) !== 'GEN' && p.coach_type !== 'INT')
+  const acCount  = acPositions.length
+  const nacCount = nacPositions.length
+  const intCount = intPositions.length
+  const mpRequired = trainRequiredMp != null ? trainRequiredMp : Math.round((acCount + nacCount) * 0.38)
 
-  async function save() {
-    setSaving(true)
-    const body = {
-      date, wl_no: wlNo || undefined, acwp, supervisor,
-      scores:     Object.fromEntries(Object.entries(scores).map(([k,v]) => [k, v])),
-      ext_scores: Object.fromEntries(Object.entries(extScores).map(([k,v]) => [k, v])),
-      manpower: {
-        AC:  { required: mpAcReq,  deployed: mpAcDep },
-        NAC: { required: mpNacReq, deployed: mpNacDep },
-      },
-      penalties: Object.fromEntries(Object.entries(penalties).map(([k,v]) => [k, v])),
-      intensive_coaches: intCoaches,
-      int_acwp: intAcwp,
+  const scores = useMemo(() => {
+    const s: Record<number, number> = {}
+    for (const [pos, c] of Object.entries(criteria)) s[Number(pos)] = calcTotal(c)
+    return s
+  }, [criteria])
+
+  // ── Type change ───────────────────────────────────────────────────────────
+  function handleTypeChange(position: number, newType: string) {
+    const original = positions.find(p => p.position === position)?.coach_type ?? ''
+    const oldType  = compOverride[position] ?? original
+    const wasInt   = oldType === 'INT'
+    const isInt    = newType === 'INT'
+    const wasGEN   = !wasInt && coachCategory(oldType) === 'GEN'
+    const isGEN    = !isInt  && coachCategory(newType) === 'GEN'
+    setCompOverride(prev => ({ ...prev, [position]: newType }))
+    if (!wasInt && isInt) {
+      setCriteria(prev    => { const n = { ...prev }; delete n[position]; return n })
+      setExtScores(prev   => { const n = { ...prev }; delete n[position]; return n })
+      setIntCriteria(prev  => ({ ...prev, [position]: [...INT_DEFAULT_CRITERIA] as CriteriaRow }))
+      setIntExtScores(prev => ({ ...prev, [position]: 3 }))
+      setIntPrevType(prev  => ({ ...prev, [position]: oldType }))
+    } else if (wasInt && !isInt) {
+      setIntCriteria(prev  => { const n = { ...prev }; delete n[position]; return n })
+      setIntExtScores(prev => { const n = { ...prev }; delete n[position]; return n })
+      setIntPrevType(prev  => { const n = { ...prev }; delete n[position]; return n })
+      if (!isGEN) {
+        setCriteria(prev  => prev[position] ? prev : { ...prev, [position]: [...DEFAULT_CRITERIA] as CriteriaRow })
+        setExtScores(prev => prev[position] !== undefined ? prev : { ...prev, [position]: 3 })
+      }
+    } else if (!wasInt && !isInt) {
+      if (!wasGEN && isGEN) {
+        setCriteria(prev  => { const n = { ...prev }; delete n[position]; return n })
+        setExtScores(prev => { const n = { ...prev }; delete n[position]; return n })
+      } else if (wasGEN && !isGEN) {
+        if (!criteria[position]) {
+          setCriteria(prev  => ({ ...prev, [position]: [...DEFAULT_CRITERIA] as CriteriaRow }))
+          setExtScores(prev => ({ ...prev, [position]: 3 }))
+        }
+      }
     }
-    const res = await fetch(`/api/trips/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-    setSaving(false)
-    if (res.ok) router.push('/trips')
-    else setError('Save failed')
   }
 
-  if (loading) return <p className="text-sm text-gray-400 p-6">Loading…</p>
-  if (error)   return <p className="text-sm text-red-500 p-6">{error}</p>
+  function addCoach() {
+    const nextPos = positions.length > 0 ? Math.max(...positions.map(p => p.position)) + 1 : 1
+    setPositions(prev => [...prev, { position: nextPos, coach_type: 'GSLRD' }])
+    setCriteria(prev  => ({ ...prev, [nextPos]: [...DEFAULT_CRITERIA] as CriteriaRow }))
+    setExtScores(prev => ({ ...prev, [nextPos]: 3 }))
+  }
 
-  const inputCls = 'border rounded px-2 py-1 text-sm w-full'
-  const numCls   = 'border rounded px-2 py-1 text-sm w-16 text-center'
+  function removeCoach() {
+    if (positions.length <= 1) return
+    const lastPos = positions[positions.length - 1].position
+    setPositions(prev => prev.slice(0, -1))
+    setCriteria(prev     => { const n = { ...prev }; delete n[lastPos]; return n })
+    setExtScores(prev    => { const n = { ...prev }; delete n[lastPos]; return n })
+    setIntCriteria(prev  => { const n = { ...prev }; delete n[lastPos]; return n })
+    setIntExtScores(prev => { const n = { ...prev }; delete n[lastPos]; return n })
+    setCompOverride(prev => { const n = { ...prev }; delete n[lastPos]; return n })
+    setIntPrevType(prev  => { const n = { ...prev }; delete n[lastPos]; return n })
+  }
+
+  // Reload composition from train_master (resets scores)
+  async function reloadComposition() {
+    if (!window.confirm('Composition reload karne se saare scores reset ho jayenge. Continue?')) return
+    const data = await fetch(`/api/train-master?train_no=${encodeURIComponent(trainNo)}`).then(r => r.json())
+    if (!data.positions?.length) { setMsg('Train not found in master.'); return }
+    const pos: Position[] = data.positions
+    setPositions(pos)
+    setTrainRequiredMp(data.required_mp ?? null)
+    setCompOverride({}); setIntCriteria({}); setIntExtScores({}); setIntPrevType({})
+    const c: Criteria = {}; const e: ExtScores = {}
+    for (const { position, coach_type } of pos) {
+      if (coachCategory(coach_type) !== 'GEN') { c[position] = [...DEFAULT_CRITERIA] as CriteriaRow; e[position] = 3 }
+    }
+    setCriteria(c); setExtScores(e)
+    setMsg('Composition reloaded from Train Master. Scores have been reset.')
+  }
+
+  function setC(position: number, cIdx: number, val: number) {
+    const clamped = Math.min(3, Math.max(0, val))
+    setCriteria(prev => {
+      const row = [...(prev[position] ?? [...DEFAULT_CRITERIA])] as CriteriaRow
+      row[cIdx] = clamped
+      return { ...prev, [position]: row }
+    })
+  }
+
+  function setIC(position: number, cIdx: number, val: number) {
+    const clamped = Math.min(3, Math.max(0, val))
+    setIntCriteria(prev => {
+      const row = [...(prev[position] ?? [...INT_DEFAULT_CRITERIA])] as CriteriaRow
+      row[cIdx] = clamped
+      return { ...prev, [position]: row }
+    })
+  }
+
+  // ── Save ──────────────────────────────────────────────────────────────────
+  async function save() {
+    if (!trainNo || !date) return setMsg('Date and Train No. are required.')
+    if (!positions.length)  return setMsg('No coach composition loaded.')
+    setLoading(true)
+    const monthYear = date.slice(0, 7)
+    const penMap: Record<string, number> = {}
+    for (const [k, v] of Object.entries(penalties)) if (v) penMap[k] = v
+    const intensiveCoaches = intPositions.map(p => ({
+      position:   p.position,
+      coach_type: intPrevType[p.position] ?? positions.find(o => o.position === p.position)?.coach_type ?? 'GSLRD',
+      score:      calcTotal(intCriteria[p.position] ?? ([...INT_DEFAULT_CRITERIA] as CriteriaRow)),
+      ext_score:  intAcwp ? 0 : (intExtScores[p.position] ?? 3),
+    }))
+    const res = await fetch(`/api/trips/${id}`, {
+      method:  'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        date, train_no: trainNo, wl_no: wlNo || null,
+        acwp, supervisor, month_year: monthYear,
+        scores,
+        ext_scores:        acwp ? {} : extScores,
+        manpower:          { AC: { required: mpRequired, deployed } },
+        penalties:         penMap,
+        intensive_coaches: intensiveCoaches,
+        int_acwp: intAcwp,
+        comp_override: compOverride,
+        int_prev_type: intPrevType,
+      }),
+    })
+    setLoading(false)
+    if (res.ok) {
+      router.push('/trips')
+    } else {
+      const body = await res.json().catch(() => ({}))
+      setMsg(body.error ?? `Error ${res.status}`)
+    }
+  }
+
+  if (fetchError) return <div className="p-8 text-red-600">⚠ Could not load trip: {fetchError}</div>
 
   return (
-    <div className="max-w-5xl mx-auto pb-12">
-      <div className="flex items-center gap-4 mb-6">
-        <h1 className="text-xl font-bold">Edit Trip</h1>
-        <span className="text-sm text-gray-500">{trainNo}</span>
+    <div className="pb-10 space-y-5">
+      <h1 className="text-xl font-bold">Edit Trip</h1>
+
+      {/* ── Header ── */}
+      <div className="bg-white rounded-lg shadow p-4 grid grid-cols-3 gap-4 max-w-3xl">
+        <Field label="Date">
+          <input type="date" className="input" value={date} onChange={e => setDate(e.target.value)} />
+        </Field>
+        <Field label="Train No.">
+          <input className="input bg-gray-50 text-gray-600 cursor-not-allowed" value={trainNo} readOnly />
+        </Field>
+        <Field label="WL No.">
+          <input className="input" value={wlNo} onChange={e => setWlNo(e.target.value)} placeholder="e.g. 4" />
+        </Field>
+        <Field label="Supervisor">
+          <input className="input" value={supervisor} onChange={e => setSupervisor(e.target.value)} placeholder="Name" />
+        </Field>
+        <Field label="Exterior — ACWP?">
+          <label className="flex items-center gap-2 mt-1.5 cursor-pointer select-none">
+            <input type="checkbox" checked={acwp} onChange={e => setAcwp(e.target.checked)} className="w-4 h-4 accent-blue-600" />
+            <span className={`text-sm font-medium ${acwp ? 'text-blue-700' : 'text-orange-700'}`}>
+              {acwp ? '✅ Attended by ACWP' : '✏️ Manual — fill ratings'}
+            </span>
+          </label>
+        </Field>
       </div>
 
-      {/* Basic info */}
-      <section className="bg-white rounded-lg shadow p-4 mb-5">
-        <h2 className="font-semibold text-sm text-gray-700 mb-3">Basic Info</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
-            Date
-            <input type="date" className={inputCls} value={date} onChange={e => setDate(e.target.value)} />
-          </label>
-          <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
-            WL No.
-            <input type="text" className={inputCls} value={wlNo} onChange={e => setWlNo(e.target.value)} placeholder="Optional" />
-          </label>
-          <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
-            Supervisor
-            <input type="text" className={inputCls} value={supervisor} onChange={e => setSupervisor(e.target.value)} />
-          </label>
-          <label className="flex items-center gap-2 text-xs font-medium text-gray-600 pt-4">
-            <input type="checkbox" checked={acwp} onChange={e => setAcwp(e.target.checked)} />
-            ACWP (exterior by ACWP)
-          </label>
+      {/* ── Reload composition ── */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <button onClick={reloadComposition}
+          className="px-5 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded font-medium text-sm">
+          🔄 Reload Composition from Master
+        </button>
+        {msg && <span className="text-sm text-gray-500 italic">{msg}</span>}
+      </div>
+
+      {/* ── Normal Proforma Grid ── */}
+      {positions.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-3">
+          <div className="flex items-center gap-3 mb-2 flex-wrap">
+            <span className="text-xs font-semibold text-gray-600">Coach Count:</span>
+            <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-semibold">AC: {acCount}</span>
+            <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs font-semibold">NAC: {nacCount}</span>
+            {intCount > 0 && (
+              <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs font-semibold">INT: {intCount}</span>
+            )}
+            <span className="text-[10px] text-gray-400">Dropdown se type change karo | INT = Intensive</span>
+            <button type="button" onClick={addCoach} style={{
+              display: 'inline-flex', alignItems: 'center', gap: 3,
+              padding: '2px 8px', borderRadius: 6, background: 'var(--primary,#2563EB)', border: 'none',
+              color: '#fff', fontWeight: 700, fontSize: 11, cursor: 'pointer',
+            }}>
+              <Plus size={11} /> Coach
+            </button>
+            <button type="button" onClick={removeCoach} disabled={positions.length <= 1} style={{
+              display: 'inline-flex', alignItems: 'center', gap: 3,
+              padding: '2px 8px', borderRadius: 6, background: '#E5E7EB', border: 'none',
+              color: '#374151', fontWeight: 700, fontSize: 11,
+              cursor: positions.length <= 1 ? 'not-allowed' : 'pointer',
+              opacity: positions.length <= 1 ? 0.4 : 1,
+            }}>
+              <Minus size={11} /> Coach
+            </button>
+          </div>
+
+          <p className="text-xs text-gray-500 mb-2 font-medium">
+            Normal Ratings — Total = (1X2 × 2) + row 2 + 3 + 4 + 5
+          </p>
+          <p className="text-[10px] text-amber-600 mb-2">
+            ℹ Criteria exact reconstruct nahi hote — totals loaded hain, adjust karo agar zaroorat ho.
+          </p>
+
+          <div className="overflow-x-auto">
+            <table className="border-collapse text-xs">
+              <thead>
+                <tr>
+                  <th className="proforma-label bg-yellow-100">Coach No.</th>
+                  {positions.map(p => (
+                    <th key={p.position} className="proforma-cell bg-yellow-100 font-bold text-gray-700 min-w-[36px]">
+                      {p.position}
+                    </th>
+                  ))}
+                </tr>
+                <tr>
+                  <th className="proforma-label bg-orange-50">Composition</th>
+                  {positions.map(p => {
+                    const eff = effType(p.position, p.coach_type)
+                    const cat = eff === 'INT' ? 'INT' : coachCategory(eff)
+                    const bg = cat==='AC' ? 'bg-blue-100' : cat==='NAC' ? 'bg-green-100' : cat==='INT' ? 'bg-purple-100' : 'bg-gray-100'
+                    const tc = cat==='AC' ? 'text-blue-700' : cat==='NAC' ? 'text-green-700' : cat==='INT' ? 'text-purple-700' : 'text-gray-500'
+                    return (
+                      <td key={p.position} className={`proforma-cell ${bg}`} style={{ minWidth: 56 }}>
+                        <select value={eff} onChange={e => handleTypeChange(p.position, e.target.value)}
+                          className={`text-[9px] border-0 bg-transparent w-full cursor-pointer focus:outline-none font-semibold ${tc}`}>
+                          {COACH_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                      </td>
+                    )
+                  })}
+                </tr>
+              </thead>
+              <tbody>
+                {CRITERIA_LABELS.map((label, cIdx) => (
+                  <tr key={label} className={cIdx % 2 === 0 ? 'bg-blue-50' : 'bg-white'}>
+                    <td className="proforma-label font-semibold text-blue-800">{label}</td>
+                    {positions.map(p => {
+                      const eff          = effType(p.position, p.coach_type)
+                      const isInt        = eff === 'INT'
+                      const isAttendable = !isInt && coachCategory(eff) !== 'GEN'
+                      const val = criteria[p.position]?.[cIdx] ?? (isAttendable ? DEFAULT_CRITERIA[cIdx] : 0)
+                      return (
+                        <td key={p.position} className="proforma-cell">
+                          {isInt ? (
+                            <span className="text-[9px] font-bold text-purple-400">INT</span>
+                          ) : isAttendable ? (
+                            <input type="number" min={0} max={3}
+                              value={val === 0 && cIdx === 4 ? '' : val}
+                              onChange={e => setC(p.position, cIdx, Number(e.target.value) || 0)}
+                              className="w-8 text-center text-xs border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-blue-400 rounded" />
+                          ) : (
+                            <span className="text-gray-300">—</span>
+                          )}
+                        </td>
+                      )
+                    })}
+                  </tr>
+                ))}
+                <tr className="bg-yellow-100 font-bold">
+                  <td className="proforma-label text-gray-800">Total</td>
+                  {positions.map(p => {
+                    const eff   = effType(p.position, p.coach_type)
+                    const isInt = eff === 'INT'
+                    const cat   = coachCategory(eff)
+                    const total = criteria[p.position] ? calcTotal(criteria[p.position]) : 0
+                    return (
+                      <td key={p.position} className={`proforma-cell font-bold text-sm ${
+                        isInt       ? 'text-purple-400' :
+                        cat==='AC'  ? 'text-blue-700'   :
+                        cat==='NAC' ? 'text-green-700'  : 'text-gray-300'}`}>
+                        {isInt ? 'INT' : cat !== 'GEN' ? total : '—'}
+                      </td>
+                    )
+                  })}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex gap-3 mt-2 text-xs flex-wrap">
+            <span className="px-2 py-0.5 bg-blue-100 rounded text-blue-700">AC Interior</span>
+            <span className="px-2 py-0.5 bg-green-100 rounded text-green-700">NAC Interior</span>
+            <span className="px-2 py-0.5 bg-purple-100 rounded text-purple-700">INT — Intensive</span>
+            <span className="px-2 py-0.5 bg-gray-100 rounded text-gray-500">Generator/Brake Van</span>
+          </div>
         </div>
-      </section>
-
-      {/* AC scores */}
-      {acRows.length > 0 && (
-        <section className="bg-blue-50 rounded-lg shadow p-4 mb-5">
-          <h2 className="font-semibold text-sm text-blue-800 mb-3">AC Coach Scores (max {MAX_NORMAL})</h2>
-          <div className="flex flex-wrap gap-3">
-            {acRows.map(p => (
-              <label key={p.position} className="flex flex-col items-center gap-1 text-xs text-gray-600">
-                <span className="font-medium">#{p.position}</span>
-                <span className="text-gray-400">{p.coach_type}</span>
-                <input type="number" min={0} max={MAX_NORMAL} className={numCls}
-                  value={scores[p.position] ?? 0}
-                  onChange={e => setScores(s => ({ ...s, [p.position]: Number(e.target.value) }))} />
-              </label>
-            ))}
-          </div>
-        </section>
       )}
 
-      {/* NAC scores */}
-      {nacRows.length > 0 && (
-        <section className="bg-green-50 rounded-lg shadow p-4 mb-5">
-          <h2 className="font-semibold text-sm text-green-800 mb-3">NAC Coach Scores (max {MAX_NORMAL})</h2>
-          <div className="flex flex-wrap gap-3">
-            {nacRows.map(p => (
-              <label key={p.position} className="flex flex-col items-center gap-1 text-xs text-gray-600">
-                <span className="font-medium">#{p.position}</span>
-                <span className="text-gray-400">{p.coach_type}</span>
-                <input type="number" min={0} max={MAX_NORMAL} className={numCls}
-                  value={scores[p.position] ?? 0}
-                  onChange={e => setScores(s => ({ ...s, [p.position]: Number(e.target.value) }))} />
-              </label>
-            ))}
+      {/* ── Intensive Proforma ── */}
+      {intPositions.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-3 border-2 border-purple-300">
+          <div className="flex items-center gap-3 mb-1">
+            <p className="text-sm font-semibold text-purple-700">🔵 Intensive Cleaning Ratings</p>
+            <span className="text-[10px] bg-purple-100 text-purple-600 px-2 py-0.5 rounded">
+              Total = (1X2×2) + 2+3+4+5{!intAcwp ? ' + Ext' : ''}
+            </span>
           </div>
-        </section>
+          <p className="text-xs text-gray-400 mb-3">
+            These coaches will not appear in the Normal Summary — they will be exported to the Intensive Summary sheet.
+          </p>
+          <div className="overflow-x-auto">
+            <table className="border-collapse text-xs">
+              <thead>
+                <tr>
+                  <th className="proforma-label bg-purple-100">Coach No.</th>
+                  {intPositions.map(p => (
+                    <th key={p.position} className="proforma-cell bg-purple-100 font-bold min-w-[40px] text-purple-800">
+                      {p.position}
+                      <div className="text-[8px] font-normal text-purple-400">({intPrevType[p.position] ?? '—'})</div>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {CRITERIA_LABELS.map((label, cIdx) => (
+                  <tr key={label} className={cIdx % 2 === 0 ? 'bg-purple-50' : 'bg-white'}>
+                    <td className="proforma-label font-semibold text-purple-700">{label}</td>
+                    {intPositions.map(p => {
+                      const val = intCriteria[p.position]?.[cIdx] ?? INT_DEFAULT_CRITERIA[cIdx]
+                      return (
+                        <td key={p.position} className="proforma-cell">
+                          <input type="number" min={0} max={3} value={val}
+                            onChange={e => setIC(p.position, cIdx, Number(e.target.value) || 0)}
+                            className="w-8 text-center text-xs border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-purple-400 rounded" />
+                        </td>
+                      )
+                    })}
+                  </tr>
+                ))}
+                <tr className="bg-orange-50">
+                  <td className="proforma-label font-semibold text-orange-700">
+                    <div className="flex items-center gap-1 flex-nowrap">
+                      <span>Ext (max 3)</span>
+                      <label className="flex items-center gap-0.5 text-[9px] cursor-pointer ml-1 whitespace-nowrap">
+                        <input type="checkbox" checked={intAcwp} onChange={e => setIntAcwp(e.target.checked)}
+                          className="accent-purple-600 w-3 h-3" />
+                        <span className="text-purple-700 font-medium">ACWP</span>
+                      </label>
+                    </div>
+                  </td>
+                  {intPositions.map(p => (
+                    <td key={p.position} className="proforma-cell">
+                      {!intAcwp ? (
+                        <input type="number" min={0} max={3}
+                          value={intExtScores[p.position] ?? 3}
+                          onChange={e => setIntExtScores(s => ({ ...s, [p.position]: Math.min(3, Number(e.target.value) || 0) }))}
+                          className="w-8 text-center text-xs border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-orange-400 rounded" />
+                      ) : (
+                        <span className="text-[9px] text-gray-400">—</span>
+                      )}
+                    </td>
+                  ))}
+                </tr>
+                <tr className="bg-yellow-100 font-bold">
+                  <td className="proforma-label text-gray-800">Total (÷18)</td>
+                  {intPositions.map(p => {
+                    const cr    = intCriteria[p.position] ?? ([...INT_DEFAULT_CRITERIA] as CriteriaRow)
+                    const total = calcTotal(cr)
+                    const pct   = Math.round(total / 18 * 100)
+                    const col   = pct >= 86 ? 'text-green-700' : pct >= 76 ? 'text-yellow-600' : pct >= 66 ? 'text-orange-500' : pct >= 50 ? 'text-red-500' : 'text-red-700'
+                    return (
+                      <td key={p.position} className={`proforma-cell font-bold text-sm ${col}`}>
+                        {total}<div className="text-[9px] font-normal">{pct}%</div>
+                      </td>
+                    )
+                  })}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p className="text-[10px] text-gray-400 mt-2">
+            Slab: ≥86% → Nil | 76–85% → 5% | 66–75% → 10% | 50–65% → 20% | &lt;50% → 100%
+          </p>
+        </div>
       )}
 
-      {/* Exterior scores */}
-      {!acwp && attended.length > 0 && (
-        <section className="bg-orange-50 rounded-lg shadow p-4 mb-5">
-          <h2 className="font-semibold text-sm text-orange-700 mb-3">Exterior Scores (max {MAX_EXT})</h2>
-          <div className="flex flex-wrap gap-3">
-            {attended.map(p => (
-              <label key={p.position} className="flex flex-col items-center gap-1 text-xs text-gray-600">
-                <span className="font-medium">#{p.position}</span>
-                <input type="number" min={0} max={MAX_EXT} className={numCls}
-                  value={extScores[p.position] ?? 0}
-                  onChange={e => setExtScores(s => ({ ...s, [p.position]: Number(e.target.value) }))} />
-              </label>
-            ))}
+      {/* ── Normal Exterior ── */}
+      {positions.length > 0 && !acwp && (
+        <div className="bg-white rounded-lg shadow p-3 border-2 border-orange-300">
+          <p className="text-sm font-semibold text-orange-700 mb-2">
+            Exterior Ratings — Normal Coaches (Manual, max 3)
+          </p>
+          <div className="overflow-x-auto">
+            <table className="border-collapse text-xs">
+              <thead>
+                <tr>
+                  <th className="proforma-label bg-orange-100">Coach #</th>
+                  {attendable.map(p => (
+                    <th key={p.position} className="proforma-cell bg-orange-100 font-bold min-w-[36px]">{p.position}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="bg-orange-50">
+                  <td className="proforma-label font-semibold text-orange-700">Ext Score</td>
+                  {attendable.map(p => (
+                    <td key={p.position} className="proforma-cell">
+                      <input type="number" min={0} max={3}
+                        value={extScores[p.position] ?? 3}
+                        onChange={e => setExtScores(s => ({ ...s, [p.position]: Number(e.target.value) || 0 }))}
+                        className="w-8 text-center text-xs border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-orange-400 rounded" />
+                    </td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
           </div>
-        </section>
+        </div>
       )}
 
-      {/* Intensive coaches */}
-      {intCoaches.length > 0 && (
-        <section className="bg-purple-50 rounded-lg shadow p-4 mb-5">
-          <h2 className="font-semibold text-sm text-purple-800 mb-3">Intensive Cleaning</h2>
-          <div className="space-y-2">
-            {intCoaches.map((ic, idx) => (
-              <div key={ic.position} className="flex items-center gap-4 text-xs">
-                <span className="font-medium w-16">Pos #{ic.position}</span>
-                <span className="text-gray-500">{ic.coach_type}</span>
-                <label className="flex items-center gap-1">
-                  Interior (÷18)
-                  <input type="number" min={0} max={MAX_INT} className={numCls}
-                    value={ic.score}
-                    onChange={e => setIntCoaches(arr => arr.map((c, i) => i === idx ? { ...c, score: Number(e.target.value) } : c))} />
-                </label>
-                <div className="flex items-center gap-1">
-                  <span className="flex items-center gap-0.5">
-                    Exterior (÷3)
-                    <label className="flex items-center gap-0.5 text-[10px] cursor-pointer ml-1">
-                      <input type="checkbox" checked={intAcwp} onChange={e => setIntAcwp(e.target.checked)}
-                        className="accent-purple-600 w-3 h-3" />
-                      <span className="text-purple-700 font-medium">ACWP</span>
-                    </label>
-                  </span>
-                  {!intAcwp ? (
-                    <input type="number" min={0} max={MAX_EXT} className={numCls}
-                      value={ic.ext_score}
-                      onChange={e => setIntCoaches(arr => arr.map((c, i) => i === idx ? { ...c, ext_score: Number(e.target.value) } : c))} />
-                  ) : (
-                    <span className="text-gray-400 text-xs">—</span>
-                  )}
-                </div>
+      {/* ── Manpower ── */}
+      {positions.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-4 max-w-lg">
+          <h2 className="font-semibold mb-3 text-sm text-gray-600">Manpower</h2>
+          <div className="flex items-center gap-10">
+            <div className="text-center">
+              <p className="text-xs text-gray-500 mb-1">Required (auto)</p>
+              <div className="text-3xl font-bold text-gray-700">{mpRequired}</div>
+              <p className="text-xs text-gray-400 mt-1">{trainRequiredMp != null ? `Fixed: ${trainRequiredMp}` : `(${acCount}+${nacCount}) × 0.38`}</p>
+            </div>
+            <div className="text-3xl text-gray-300">→</div>
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Deployed</p>
+              <input type="number" min={0}
+                className="border-2 rounded px-3 py-2 text-2xl font-bold w-24 text-center focus:outline-none focus:ring-2 focus:ring-blue-400"
+                value={deployed} onChange={e => setDeployed(Number(e.target.value))} />
+              {deployed < mpRequired && deployed >= 0 && (
+                <p className="text-xs text-red-600 mt-1 font-medium">⚠ Short: {mpRequired - deployed} staff</p>
+              )}
+              {deployed >= mpRequired && deployed > 0 && (
+                <p className="text-xs text-green-600 mt-1">✓ OK</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Annex A2 Penalties ── */}
+      {positions.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-4">
+          <h2 className="font-semibold mb-3 text-sm text-gray-600">
+            Annex A2 Penalties <span className="font-normal text-gray-400">(0 rakho agar nahi)</span>
+          </h2>
+          <div className="grid grid-cols-2 gap-2">
+            {Object.entries(PENALTY_LABELS).map(([type, label]) => (
+              <div key={type} className="flex items-center gap-2">
+                <span className="text-xs text-gray-400 w-5 shrink-0 text-right">{type}.</span>
+                <span className="text-xs flex-1 text-gray-600">{label}</span>
+                <input type="number" min={0} step={100}
+                  className="border rounded px-2 py-0.5 text-sm w-24 text-right focus:outline-none focus:ring-1 focus:ring-blue-400"
+                  value={penalties[Number(type)] ?? 0}
+                  onChange={e => setPenalties(p => ({ ...p, [Number(type)]: Number(e.target.value) }))} />
               </div>
             ))}
           </div>
-        </section>
+        </div>
       )}
 
-      {/* Manpower */}
-      <section className="bg-white rounded-lg shadow p-4 mb-5">
-        <h2 className="font-semibold text-sm text-gray-700 mb-3">Manpower</h2>
-        <div className="grid grid-cols-2 gap-4 text-xs">
-          {[
-            { label: 'AC Required',   v: mpAcReq,  set: setMpAcReq },
-            { label: 'AC Deployed',   v: mpAcDep,  set: setMpAcDep },
-            { label: 'NAC Required',  v: mpNacReq, set: setMpNacReq },
-            { label: 'NAC Deployed',  v: mpNacDep, set: setMpNacDep },
-          ].map(({ label, v, set }) => (
-            <label key={label} className="flex flex-col gap-1 font-medium text-gray-600">
-              {label}
-              <input type="number" min={0} className="border rounded px-2 py-1 text-sm w-24"
-                value={v} onChange={e => set(Number(e.target.value))} />
-            </label>
-          ))}
+      {/* ── Save ── */}
+      {positions.length > 0 && (
+        <div className="flex gap-4 items-center flex-wrap">
+          <button onClick={save} disabled={loading}
+            className="px-8 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded font-semibold disabled:opacity-50">
+            {loading ? 'Saving…' : '💾 Save Changes'}
+          </button>
+          {intCount > 0 && (
+            <span className="text-xs text-purple-600 bg-purple-50 border border-purple-200 rounded px-3 py-1.5">
+              {intCount} INT coach{intCount > 1 ? 'es' : ''} → will appear in Intensive Summary
+            </span>
+          )}
+          <button onClick={() => router.push('/trips')} className="px-6 py-2 text-gray-500 hover:text-gray-700 text-sm">
+            Cancel
+          </button>
         </div>
-      </section>
+      )}
+    </div>
+  )
+}
 
-      {/* Annex penalties */}
-      <section className="bg-white rounded-lg shadow p-4 mb-6">
-        <h2 className="font-semibold text-sm text-gray-700 mb-3">Annex Penalties</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-          {Array.from({ length: 14 }, (_, i) => i + 1).map(type => (
-            <label key={type} className="flex items-center justify-between gap-2 text-xs text-gray-600">
-              <span>{type}. {PENALTY_LABELS[type]}</span>
-              <input type="number" min={0} className="border rounded px-2 py-1 w-24 text-sm text-right"
-                value={penalties[type] ?? 0}
-                onChange={e => setPenalties(p => ({ ...p, [type]: Number(e.target.value) }))} />
-            </label>
-          ))}
-        </div>
-      </section>
-
-      {/* Actions */}
-      <div className="flex gap-3">
-        <button onClick={save} disabled={saving}
-          className="px-6 py-2 bg-blue-700 text-white rounded text-sm font-medium hover:bg-blue-800 disabled:opacity-50">
-          {saving ? 'Saving…' : 'Save Changes'}
-        </button>
-        <button onClick={() => router.push('/trips')}
-          className="px-6 py-2 border rounded text-sm text-gray-600 hover:bg-gray-50">
-          Cancel
-        </button>
-      </div>
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="block text-xs text-gray-500 mb-1">{label}</label>
+      {children}
     </div>
   )
 }
