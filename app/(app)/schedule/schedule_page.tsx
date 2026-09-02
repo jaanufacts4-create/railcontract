@@ -200,7 +200,8 @@ function TrainMasterTab() {
   const [newTrain,  setNewTrain]  = useState('')
   const [saving,    setSaving]    = useState(false)
   const [msg,       setMsg]       = useState('')
-  const [seeding,   setSeeding]   = useState(false)
+  const [seeding,    setSeeding]    = useState(false)
+  const [requiredMp, setRequiredMp] = useState<number | null>(null)
 
   useEffect(() => { loadTrains() }, [])
 
@@ -228,6 +229,7 @@ function TrainMasterTab() {
     setSelected(t)
     const data = await fetch(`/api/train-master?train_no=${t}`).then(r => r.json())
     setPositions(data.positions)
+    setRequiredMp(data.required_mp ?? null)
   }
 
   function addNew() {
@@ -236,6 +238,7 @@ function TrainMasterTab() {
     setSelected(t)
     setPositions(Array.from({ length: 10 }, (_, i) => ({ position: i + 1, coach_type: 'GSLRD' })))
     setNewTrain('')
+    setRequiredMp(null)
   }
 
   function updateType(pos: number, type: string) {
@@ -246,7 +249,7 @@ function TrainMasterTab() {
     setSaving(true)
     await fetch('/api/train-master', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ train_no: selected, positions }),
+      body: JSON.stringify({ train_no: selected, positions, required_mp: requiredMp }),
     })
     setSaving(false)
     setMsg('Saved'); setTimeout(() => setMsg(''), 2000)
@@ -317,6 +320,17 @@ function TrainMasterTab() {
               <p style={{ fontSize: 12, color: 'var(--text-4)', margin: '3px 0 0' }}>
                 {positions.length} coaches · {acCount} AC · {nacCount} NAC
               </p>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', letterSpacing: '.04em', textTransform: 'uppercase' }}>
+                Fixed MP Required
+              </label>
+              <input
+                type="number" min={0} placeholder="Auto (0.38×)"
+                className="input" style={{ width: 130, padding: '5px 10px', fontSize: 13 }}
+                value={requiredMp ?? ''}
+                onChange={e => setRequiredMp(e.target.value === '' ? null : Number(e.target.value))}
+              />
             </div>
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
               <button className="btn btn-secondary btn-sm" onClick={() => {
