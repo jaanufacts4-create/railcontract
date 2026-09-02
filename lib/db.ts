@@ -26,6 +26,7 @@ let _blobMigrated          = false
 let _pettyMigrated         = false
 let _laundrySettingsMigrated = false
 let _trainSettingsMigrated   = false
+let _mccMonthlyTotalsMigrated = false
 let _monthlyBillsMigrated  = false
 export async function ensureDB() {
   if (!_migrated) {
