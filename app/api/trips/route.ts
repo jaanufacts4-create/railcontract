@@ -111,11 +111,8 @@ export async function POST(req: Request) {
     }
   }
 
-  // Insert intensive cleaning scores (skip VB-type coaches — VB train has no intensive)
+  // Insert intensive cleaning scores
   if (body.intensive_coaches?.length) {
-    body.intensive_coaches = body.intensive_coaches.filter((ic: { coach_type: string }) =>
-      ic.coach_type?.toUpperCase() !== 'VB'
-    )
     for (const ic of body.intensive_coaches) {
       await db.execute({
         sql:  'INSERT INTO intensive_scores (trip_id, position, coach_type, score, ext_score) VALUES (?,?,?,?,?)',

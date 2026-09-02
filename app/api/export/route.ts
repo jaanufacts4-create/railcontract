@@ -546,9 +546,6 @@ export async function GET(req: Request) {
       const tripId  = trip.id as number
       const trainNo = trip.train_no as string
 
-      // VB train has no intensive cleaning — skip it here (handled in Normal loop)
-      if (trainNo === '22488') continue
-
       // Load scores + manpower + annex penalties
       const intAcwp = !!(trip.int_acwp as number)
       const [intRes, iMpRes, iPenRes] = await Promise.all([
