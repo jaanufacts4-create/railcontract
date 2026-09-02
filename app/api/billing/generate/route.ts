@@ -17,8 +17,8 @@ export async function POST(req: NextRequest) {
         SUM(CASE WHEN t.train_no != ? AND cs.position > 0
                       AND UPPER(tm.coach_type) IN ${AC_TYPES}  THEN 1 ELSE 0 END) as ac_coaches,
         SUM(CASE WHEN cs.position > 0
-                      AND UPPER(tm.coach_type) NOT IN ${AC_TYPES}
-                      AND UPPER(tm.coach_type) NOT IN ${GEN_TYPES} THEN 1 ELSE 0 END) as nac_coaches,
+                      AND (tm.coach_type IS NULL OR (UPPER(tm.coach_type) NOT IN ${AC_TYPES}
+                      AND UPPER(tm.coach_type) NOT IN ${GEN_TYPES})) THEN 1 ELSE 0 END) as nac_coaches,
         SUM(CASE WHEN cs.position < 0                             THEN 1 ELSE 0 END) as ext_coaches,
         SUM(CASE WHEN t.train_no = ? AND cs.position > 0
                       AND UPPER(tm.coach_type) IN ${AC_TYPES}  THEN 1 ELSE 0 END) as vb_coaches
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
         SUM(CASE WHEN is2.position > 0
                       AND UPPER(is2.coach_type) NOT IN ${AC_TYPES}
                       AND UPPER(is2.coach_type) NOT IN ${GEN_TYPES} THEN 1 ELSE 0 END) as nac_coaches,
-        SUM(CASE WHEN is2.position > 0 THEN 1 ELSE 0 END) as ext_coaches
+        SUM(CASE WHEN is2.position < 0 THEN 1 ELSE 0 END) as ext_coaches
       FROM trips t
       JOIN intensive_scores is2 ON is2.trip_id = t.id
       WHERE t.month_year = ?
