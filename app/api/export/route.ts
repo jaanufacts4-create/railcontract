@@ -850,7 +850,7 @@ export async function GET(req: Request) {
   ws4.getRow(1).getCell(1).value = `PM MCC Normal & Intensive Summary — ${monthName}`
   ws4.getRow(1).getCell(1).font = { bold: true, size: 11 }
   ws4.getRow(1).getCell(1).alignment = { horizontal: 'center', vertical: 'middle' }
-  ws4.mergeCells(1, 1, 1, 11)
+  ws4.mergeCells(1, 1, 1, 12)
 
   const w4h = ws4.getRow(2)
   w4h.getCell(1).value = 'Date'
@@ -863,7 +863,8 @@ export async function GET(req: Request) {
   w4h.getCell(8).value = 'NAC Intensive Penalty (₹)'
   w4h.getCell(9).value = 'Exterior Normal Penalty (₹)'
   w4h.getCell(10).value = 'Exterior Intensive Penalty (₹)'
-  w4h.getCell(11).value = 'Penalty as per A1-Back Side (₹)'
+  w4h.getCell(11).value = 'Penalty as per A1-Back Side Normal (₹)'
+  w4h.getCell(12).value = 'Penalty as per A1-Back Side Intensive (₹)'
   w4h.eachCell(cell => {
     cell.font = { bold: true, color: { argb: 'FFFFFFFF' } }
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F5C5C' } }
@@ -874,7 +875,7 @@ export async function GET(req: Request) {
 
   let s4row = 3
   let g4AC = 0, g4Ext = 0, g4NAC = 0
-  let g4ACNormPen = 0, g4ACIntPen = 0, g4NACNormPen = 0, g4NACIntPen = 0, g4ExtNormPen = 0, g4ExtIntPen = 0, g4BH = 0
+  let g4ACNormPen = 0, g4ACIntPen = 0, g4NACNormPen = 0, g4NACIntPen = 0, g4ExtNormPen = 0, g4ExtIntPen = 0, g4BH = 0, g4IntBH = 0
 
   for (const [d4, agg4] of dayAggMap) {
     const acT   = agg4.normAC  + agg4.intAC
@@ -900,6 +901,7 @@ export async function GET(req: Request) {
     row4.getCell(9).value  = extNormP
     row4.getCell(10).value = extIntP
     row4.getCell(11).value = bhT
+    row4.getCell(12).value = r2(agg4.intBH)
     row4.eachCell({ includeEmpty: false }, cell => {
       cell.alignment = { horizontal: 'center', vertical: 'middle' }
       cell.border = { top: { style: 'hair' }, bottom: { style: 'hair' }, left: { style: 'hair' }, right: { style: 'hair' } }
@@ -911,6 +913,7 @@ export async function GET(req: Request) {
     g4NACNormPen += nacNormP; g4NACIntPen += nacIntP
     g4ExtNormPen += extNormP; g4ExtIntPen += extIntP
     g4BH += bhT
+    g4IntBH += r2(agg4.intBH)
     s4row++
   }
 
@@ -926,6 +929,7 @@ export async function GET(req: Request) {
   ws4gt.getCell(9).value = r2(g4ExtNormPen)
   ws4gt.getCell(10).value = r2(g4ExtIntPen)
   ws4gt.getCell(11).value = r2(g4BH)
+  ws4gt.getCell(12).value = r2(g4IntBH)
   ws4gt.eachCell({ includeEmpty: false }, cell => {
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFF0000' } }
     cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 }
@@ -934,7 +938,7 @@ export async function GET(req: Request) {
   })
 
   ws4.getColumn(1).width = 12
-  for (let c4 = 2; c4 <= 11; c4++) ws4.getColumn(c4).width = 18
+  for (let c4 = 2; c4 <= 12; c4++) ws4.getColumn(c4).width = 18
 
   // ════════════════════════════════════════════════════════════════════
   // SHEET 5: Summary of Penalty
