@@ -886,7 +886,7 @@ export async function GET(req: Request) {
     const nacIntP  = r2(agg4.intNACPen)
     const extNormP = r2(agg4.normExtPen)
     const extIntP  = r2(agg4.intExtPen)
-    const bhT      = r2(agg4.normBH + agg4.intBH)
+    const bhT = r2(agg4.normBH)
     const row4  = ws4.getRow(s4row)
     row4.getCell(1).value  = new Date(d4)
     row4.getCell(1).numFmt = 'DD-MM-YYYY'
