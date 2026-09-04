@@ -215,7 +215,7 @@ export default function EditTripPage() {
   function setC(position: number, cIdx: number, val: number) {
     const clamped = Math.min(3, Math.max(0, val))
     setCriteria(prev => {
-      const row = [...(prev[position] ?? [...DEFAULT_CRITERIA])] as CriteriaRow
+      const row = [...(prev[position] ?? [0, 0, 0, 0, 0])] as CriteriaRow
       row[cIdx] = clamped
       return { ...prev, [position]: row }
     })
@@ -341,7 +341,7 @@ export default function EditTripPage() {
             Normal Ratings — Total = (1X2 × 2) + row 2 + 3 + 4 + 5
           </p>
           <p className="text-[10px] text-amber-600 mb-2">
-            ℹ Criteria exact reconstruct nahi hote — totals loaded hain, adjust karo agar zaroorat ho.
+            ℹ Totals as-saved hain. Criteria cells approximately reconstruct ki gayi hain (billing total same rahega). 0 total = us din score nahi kiya tha.
           </p>
 
           <div className="overflow-x-auto">
@@ -381,7 +381,7 @@ export default function EditTripPage() {
                       const eff          = effType(p.position, p.coach_type)
                       const isInt        = eff === 'INT'
                       const isAttendable = !isInt && coachCategory(eff) !== 'GEN'
-                      const val = criteria[p.position]?.[cIdx] ?? (isAttendable ? DEFAULT_CRITERIA[cIdx] : 0)
+                      const val = criteria[p.position]?.[cIdx] ?? 0
                       return (
                         <td key={p.position} className="proforma-cell">
                           {isInt ? (
