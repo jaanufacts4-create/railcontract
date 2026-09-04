@@ -46,7 +46,15 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const annexB: Record<number, number> = {}
   for (const r of annexRes.rows) annexB[Number(r.penalty_slot)] = Number(r.amount)
 
-  return NextResponse.json({ trip, coachCriteria, coachRatings, annexB })
+  // Include rates in response so edit page needs only one API call
+  const cfgRes = await db.execute("SELECT key, value FROM config WHERE key IN ('sec_rate_per_coach','sec_rate_per_coach_exterior')")
+  const cfg: Record<string, number> = {}
+  for (const r of cfgRes.rows) cfg[r.key as string] = Number(r.value)
+
+  return NextResponse.json({ trip, coachCriteria, coachRatings, annexB,
+    sec_rate_per_coach: cfg.sec_rate_per_coach ?? 322.49,
+    sec_rate_per_coach_exterior: cfg.sec_rate_per_coach_exterior ?? 144.28,
+  })
 }
 
 /* ─── PUT /api/sec/trips/[id] ─── */

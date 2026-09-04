@@ -54,13 +54,10 @@ export default function EditSecTripPage({ params }: { params: Promise<{ id: stri
   const [initDone, setInitDone] = useState(false)
 
   useEffect(() => {
-    // Load trip + settings first (critical), schedule in background (used for train dropdown only)
-    Promise.all([
-      fetch(`/api/sec/trips/${id}`).then(r => r.json()),
-      fetch('/api/settings').then(r => r.json()),
-    ]).then(([tripData, cfgData]) => {
-      if (cfgData.sec_rate_per_coach)          setRatePerCoach(Number(cfgData.sec_rate_per_coach))
-      if (cfgData.sec_rate_per_coach_exterior) setRatePerCoachExterior(Number(cfgData.sec_rate_per_coach_exterior))
+    // Single API call — trip GET now includes rates
+    fetch(`/api/sec/trips/${id}`).then(r => r.json()).then((tripData) => {
+      if (tripData.sec_rate_per_coach)          setRatePerCoach(tripData.sec_rate_per_coach)
+      if (tripData.sec_rate_per_coach_exterior) setRatePerCoachExterior(tripData.sec_rate_per_coach_exterior)
 
       const { trip, coachCriteria } = tripData
       const cnt = Number(trip.coach_count)

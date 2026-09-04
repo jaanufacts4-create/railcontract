@@ -193,10 +193,17 @@ export default function SecTripsPage() {
                       </td>
                       <td>
                         <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
-                          {g.interior && <Link href={`/sec/trips/${g.interior.id}/edit`} title="Edit Interior" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', padding: 4, borderRadius: 6, display: 'inline-flex', alignItems: 'center' }}><Pencil size={12} /></Link>}
-                          {g.exterior && <Link href={`/sec/trips/${g.exterior.id}/edit`} title="Edit Exterior" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0EA5E9', padding: 4, borderRadius: 6, display: 'inline-flex', alignItems: 'center' }}><Pencil size={12} /></Link>}
-                          {g.interior && <button onClick={() => del(g.interior!.id, `${g.train_no} Int ${fmtDate(g.date)}`)} title="Delete Interior" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: 4, borderRadius: 6 }}><Trash2 size={12} /></button>}
-                          {g.exterior && <button onClick={() => del(g.exterior!.id, `${g.train_no} Ext ${fmtDate(g.date)}`)} title="Delete Exterior" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444', padding: 4, borderRadius: 6 }}><Trash2 size={12} /></button>}
+                          <Link href={`/sec/trips/${(g.interior ?? g.exterior)!.id}/edit`}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', padding: 4, borderRadius: 6, display: 'inline-flex', alignItems: 'center' }}>
+                            <Pencil size={12} />
+                          </Link>
+                          <button onClick={() => {
+                            const ids = [g.interior?.id, g.exterior?.id].filter(Boolean) as number[]
+                            if (!confirm(`Delete ${g.train_no} trip for ${fmtDate(g.date)}?`)) return
+                            Promise.all(ids.map(id => fetch(`/api/sec/trips/${id}`, { method: 'DELETE' }))).then(load)
+                          }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: 4, borderRadius: 6 }}>
+                            <Trash2 size={12} />
+                          </button>
                         </div>
                       </td>
                     </tr>
