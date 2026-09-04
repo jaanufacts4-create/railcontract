@@ -52,15 +52,6 @@ function StatCard({ icon: Icon, label, value, sub, trend, color, sparkData }: {
 }) {
   const isUp = (trend ?? 0) >= 0
   return (
-    <>
-    <style>{`
-      @keyframes progressPulse {
-        0%   { width: 15%; }
-        50%  { width: 85%; }
-        100% { width: 15%; }
-      }
-      @keyframes spin { to { transform: rotate(360deg); } }
-    `}</style>
     <div className="card" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12, transition: 'box-shadow .18s, transform .18s', cursor: 'default' }}
       onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.boxShadow = 'var(--shadow-lg)'; el.style.transform = 'translateY(-2px)' }}
       onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.boxShadow = 'var(--shadow)';   el.style.transform = 'translateY(0)' }}
@@ -244,6 +235,15 @@ function ReportsContent() {
   ]
 
   return (
+    <>
+    <style>{`
+      @keyframes progressPulse {
+        0%   { width: 15%; }
+        50%  { width: 85%; }
+        100% { width: 15%; }
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+    `}</style>
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
 
       {/* Page header */}
