@@ -140,7 +140,7 @@ export default function SecReportsPage() {
               <button onClick={fetchReport} disabled={fetching} className="btn btn-primary">
                 {fetching ? 'Loading…' : 'View Report'}
               </button>
-              <a href={`/api/export/sec?month_year=${repFrom.slice(0,7)}`} download className="btn btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <a href={`/api/export/sec/status?from=${repFrom}&to=${repTo}`} download className="btn btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                 <Download size={14} /> Download Excel
               </a>
             </div>
