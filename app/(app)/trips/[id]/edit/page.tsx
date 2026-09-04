@@ -101,7 +101,12 @@ export default function EditTripPage() {
         for (const row of (data.scores ?? [])) {
           const pos = row.position
           if (pos > 0 && !intSet.has(pos)) {
-            newCriteria[pos] = scoreToDefaultCriteria(row.score ?? 0, 15)
+            // Use stored criteria cells if available, else reconstruct from total
+            if (row.c0 != null && (row.c0 + row.c1 + row.c2 + row.c3 + row.c4) > 0) {
+              newCriteria[pos] = [row.c0, row.c1, row.c2, row.c3, row.c4] as CriteriaRow
+            } else {
+              newCriteria[pos] = scoreToDefaultCriteria(row.score ?? 0, 15)
+            }
           }
           if (pos < 0) {
             newExtScores[-pos] = row.score ?? 3
@@ -251,6 +256,7 @@ export default function EditTripPage() {
         date, train_no: trainNo, wl_no: wlNo || null,
         acwp, supervisor, month_year: monthYear,
         scores,
+        criteria:          Object.fromEntries(Object.entries(criteria).map(([p, c]) => [p, c])),
         ext_scores:        acwp ? {} : extScores,
         manpower:          { AC: { required: mpRequired, deployed } },
         penalties:         penMap,
@@ -340,9 +346,7 @@ export default function EditTripPage() {
           <p className="text-xs text-gray-500 mb-2 font-medium">
             Normal Ratings — Total = (1X2 × 2) + row 2 + 3 + 4 + 5
           </p>
-          <p className="text-[10px] text-amber-600 mb-2">
-            ℹ Totals as-saved hain. Criteria cells approximately reconstruct ki gayi hain (billing total same rahega). 0 total = us din score nahi kiya tha.
-          </p>
+
 
           <div className="overflow-x-auto">
             <table className="border-collapse text-xs">

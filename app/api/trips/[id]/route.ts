@@ -8,7 +8,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   const id = Number(rawId)
   const [trip, scores, manpower, penalties, intensive] = await Promise.all([
     db.execute({ sql: 'SELECT * FROM trips WHERE id=?', args: [id] }),
-    db.execute({ sql: 'SELECT position, score FROM coach_scores WHERE trip_id=? ORDER BY position', args: [id] }),
+    db.execute({ sql: 'SELECT position, score, c0, c1, c2, c3, c4 FROM coach_scores WHERE trip_id=? ORDER BY position', args: [id] }),
     db.execute({ sql: 'SELECT section, required, deployed FROM manpower WHERE trip_id=?', args: [id] }),
     db.execute({ sql: 'SELECT penalty_type, amount FROM annex_penalties WHERE trip_id=?', args: [id] }),
     db.execute({ sql: 'SELECT position, coach_type, score, ext_score FROM intensive_scores WHERE trip_id=? ORDER BY position', args: [id] }),
@@ -31,6 +31,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   const body = await req.json() as {
     date: string; wl_no?: string; acwp?: boolean; supervisor: string; int_acwp?: boolean
     scores:     Record<string, number>
+    criteria:   Record<string, [number,number,number,number,number]>
     ext_scores: Record<string, number>
     manpower:   Record<string, { required: number; deployed: number }>
     penalties:  Record<string, number>
@@ -43,8 +44,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   // Delete & reinsert child records
   await db.execute({ sql: 'DELETE FROM coach_scores WHERE trip_id=?', args: [id] })
   for (const [pos, score] of Object.entries(body.scores)) {
-    await db.execute({ sql: 'INSERT INTO coach_scores (trip_id, position, score) VALUES (?,?,?)',
-      args: [id, Number(pos), score] })
+    const c = body.criteria?.[pos] ?? [0,0,0,0,0]
+    await db.execute({ sql: 'INSERT INTO coach_scores (trip_id, position, score, c0, c1, c2, c3, c4) VALUES (?,?,?,?,?,?,?,?)',
+      args: [id, Number(pos), score, c[0], c[1], c[2], c[3], c[4]] })
   }
   if (!body.acwp && body.ext_scores) {
     for (const [pos, score] of Object.entries(body.ext_scores)) {

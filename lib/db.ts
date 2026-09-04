@@ -330,6 +330,13 @@ export async function migrate() {
   try {
     await db.execute('ALTER TABLE trips ADD COLUMN int_acwp INTEGER NOT NULL DEFAULT 0')
   } catch { /* column already exists — ignore */ }
+
+  // Safe column addition: individual criteria cells on coach_scores
+  for (const col of ['c0','c1','c2','c3','c4']) {
+    try {
+      await db.execute(`ALTER TABLE coach_scores ADD COLUMN ${col} INTEGER NOT NULL DEFAULT 0`)
+    } catch { /* column already exists — ignore */ }
+  }
 }
 
 /** ─── Secondary Bill (M/s Dynamic Services) ─────────────────────────── */
