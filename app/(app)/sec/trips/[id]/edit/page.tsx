@@ -41,6 +41,7 @@ export default function EditSecTripPage({ params }: { params: Promise<{ id: stri
   const [reqMp,        setReqMp]        = useState(0)
   const [availMp,      setAvailMp]      = useState(0)
   const [washingLine,  setWashingLine]  = useState('')
+  const [supervisor,   setSupervisor]   = useState('')
 
   // Interior: criteria[criterionIndex][coachIndex]
   const [intCriteria, setIntCriteria] = useState<number[][]>([])
@@ -53,12 +54,11 @@ export default function EditSecTripPage({ params }: { params: Promise<{ id: stri
   const [initDone, setInitDone] = useState(false)
 
   useEffect(() => {
+    // Load trip + settings first (critical), schedule in background (used for train dropdown only)
     Promise.all([
-      fetch('/api/sec/schedule').then(r => r.json()),
       fetch(`/api/sec/trips/${id}`).then(r => r.json()),
       fetch('/api/settings').then(r => r.json()),
-    ]).then(([trainsData, tripData, cfgData]) => {
-      setTrains(trainsData)
+    ]).then(([tripData, cfgData]) => {
       if (cfgData.sec_rate_per_coach)          setRatePerCoach(Number(cfgData.sec_rate_per_coach))
       if (cfgData.sec_rate_per_coach_exterior) setRatePerCoachExterior(Number(cfgData.sec_rate_per_coach_exterior))
 
@@ -72,9 +72,14 @@ export default function EditSecTripPage({ params }: { params: Promise<{ id: stri
       setReqMp(Number(trip.req_manpower))
       setAvailMp(Number(trip.avail_manpower))
       setWashingLine(trip.washing_line ?? '')
+      setSupervisor(trip.supervisor ?? '')
 
-      const t = trainsData.find((x: SecTrain) => x.train_no === trip.train_no)
-      if (t) setAcCount(t.ac_count)
+      // Load schedule in background for dropdown & ac_count
+      fetch('/api/sec/schedule').then(r => r.json()).then((trainsData: SecTrain[]) => {
+        setTrains(trainsData)
+        const t = trainsData.find((x: SecTrain) => x.train_no === trip.train_no)
+        if (t) setAcCount(t.ac_count)
+      })
 
       if (trip.cleaning_type === 'Interior') {
         // coachCriteria is [[crit1 values], [crit2 values], [crit3 values], [crit4 values]]
@@ -152,7 +157,7 @@ export default function EditSecTripPage({ params }: { params: Promise<{ id: stri
       body: JSON.stringify({
         date, train_no: trainNo, cleaning_type: cleaningType,
         coach_count: coachCount, req_manpower: reqMp,
-        avail_manpower: availMp, washing_line: washingLine,
+        avail_manpower: availMp, washing_line: washingLine, supervisor,
         is_acwp: cleaningType === 'Exterior' ? isAcwp : false,
         coach_criteria: cleaningType === 'Interior' ? intCriteria : undefined,
         coach_ratings:  cleaningType === 'Exterior' ? (!isAcwp ? extRatings : []) : undefined,
@@ -234,6 +239,10 @@ export default function EditSecTripPage({ params }: { params: Promise<{ id: stri
           <div>
             <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.04em', display: 'block', marginBottom: 6 }}>Washing Line No.</label>
             <input type="text" className="input" placeholder="e.g. 5" value={washingLine} onChange={e => setWashingLine(e.target.value)} />
+          </div>
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.04em', display: 'block', marginBottom: 6 }}>Supervisor</label>
+            <input type="text" className="input" placeholder="e.g. Ramesh" value={supervisor} onChange={e => setSupervisor(e.target.value)} />
           </div>
         </div>
         {cleaningType === 'Exterior' && (

@@ -55,7 +55,7 @@ export async function POST(req: Request) {
   const body = await req.json()
   const {
     date, train_no, cleaning_type, coach_count, ac_count,
-    req_manpower, avail_manpower, washing_line, is_acwp,
+    req_manpower, avail_manpower, washing_line, is_acwp, supervisor,
     coach_criteria,  // number[][] Interior: [crit1[], crit2[], crit3[], crit4[]]
     coach_ratings,   // number[]   Exterior: per-coach values 0-3
     annex_b,         // Record<number, number>
@@ -77,9 +77,9 @@ export async function POST(req: Request) {
 
   const { lastInsertRowid } = await db.execute({
     sql:  `INSERT INTO sec_trips
-             (date, train_no, cleaning_type, coach_count, req_manpower, avail_manpower, washing_line, is_acwp, month_year)
-           VALUES (?,?,?,?,?,?,?,?,?)`,
-    args: [date, train_no, cleaning_type, coach_count, req_manpower, avail_manpower, washing_line, is_acwp ? 1 : 0, month_year],
+             (date, train_no, cleaning_type, coach_count, req_manpower, avail_manpower, washing_line, is_acwp, month_year, supervisor)
+           VALUES (?,?,?,?,?,?,?,?,?,?)`,
+    args: [date, train_no, cleaning_type, coach_count, req_manpower, avail_manpower, washing_line, is_acwp ? 1 : 0, month_year, supervisor ?? ''],
   })
   const tripId = Number(lastInsertRowid)
 

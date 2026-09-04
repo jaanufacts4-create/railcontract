@@ -6,9 +6,14 @@ import Link from 'next/link'
 type TripRow = {
   id: number; date: string; train_no: string; cleaning_type: string
   coach_count: number; avail_manpower: number; req_manpower: number
-  washing_line: string; is_acwp: number
+  washing_line: string; is_acwp: number; supervisor: string
   overallRating: number; pctRating: number; pctPenalty: number
   penaltyA: number; annexBTotal: number; totalPenalty: number
+}
+type GroupedTrip = {
+  key: string; date: string; train_no: string
+  interior?: TripRow; exterior?: TripRow
+  totalPenalty: number; penaltyA: number; annexBTotal: number
 }
 
 function fmt(n: number) { return n === 0 ? '—' : `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 2 })}` }
@@ -60,8 +65,22 @@ export default function SecTripsPage() {
     !filter || t.train_no.includes(filter) || t.date.includes(filter) || t.cleaning_type.toLowerCase().includes(filter.toLowerCase())
   )
 
-  const totalA = filtered.reduce((s, t) => s + t.penaltyA, 0)
-  const totalB = filtered.reduce((s, t) => s + t.annexBTotal, 0)
+  // Group Interior + Exterior into single row per date+train
+  const groupMap = new Map<string, GroupedTrip>()
+  for (const t of filtered) {
+    const key = `${t.date}|${t.train_no}`
+    if (!groupMap.has(key)) groupMap.set(key, { key, date: t.date, train_no: t.train_no, totalPenalty: 0, penaltyA: 0, annexBTotal: 0 })
+    const g = groupMap.get(key)!
+    if (t.cleaning_type === 'Interior') g.interior = t
+    else g.exterior = t
+    g.penaltyA    += t.penaltyA
+    g.annexBTotal += t.annexBTotal
+    g.totalPenalty += t.totalPenalty
+  }
+  const grouped = Array.from(groupMap.values())
+
+  const totalA = grouped.reduce((s, g) => s + g.penaltyA, 0)
+  const totalB = grouped.reduce((s, g) => s + g.annexBTotal, 0)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -82,9 +101,9 @@ export default function SecTripsPage() {
       {/* Stat chips */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
         {[
-          { label: 'Total Trips',  value: filtered.length, color: '#2563EB' },
-          { label: 'Interior',     value: filtered.filter(t => t.cleaning_type === 'Interior').length, color: '#8B5CF6' },
-          { label: 'Exterior',     value: filtered.filter(t => t.cleaning_type === 'Exterior').length, color: '#0EA5E9' },
+          { label: 'Total Trips',  value: grouped.length, color: '#2563EB' },
+          { label: 'Interior',     value: grouped.filter(g => g.interior).length, color: '#8B5CF6' },
+          { label: 'Exterior',     value: grouped.filter(g => g.exterior).length, color: '#0EA5E9' },
           { label: 'Penalty A+B',  value: `₹${(totalA+totalB).toLocaleString('en-IN',{maximumFractionDigits:0})}`, color: '#EF4444' },
         ].map(({ label, value, color }) => (
           <div key={label} className="card" style={{ padding: '12px 16px' }}>
@@ -109,7 +128,7 @@ export default function SecTripsPage() {
         <div className="card" style={{ overflow: 'hidden', padding: 0 }}>
           <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Trip Details</p>
-            <p style={{ fontSize: 12, color: 'var(--text-4)', margin: 0 }}>Showing {filtered.length} trips</p>
+            <p style={{ fontSize: 12, color: 'var(--text-4)', margin: 0 }}>Showing {grouped.length} rakes</p>
           </div>
           <div style={{ overflowX: 'auto' }}>
             <table className="table-grid" style={{ fontSize: 12 }}>
@@ -130,63 +149,59 @@ export default function SecTripsPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(t => (
-                  <tr key={t.id}>
-                    <td style={{ textAlign: 'left', paddingLeft: 20, color: 'var(--text-3)', fontWeight: 500 }}>{fmtDate(t.date)}</td>
-                    <td style={{ textAlign: 'left' }}>
-                      <span style={{ fontWeight: 700, color: 'var(--text)', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                        <Train size={11} style={{ color: 'var(--text-4)' }} />{t.train_no}
-                      </span>
-                    </td>
-                    <td>
-                      {t.cleaning_type === 'Interior'
-                        ? <span className="badge badge-blue">Interior</span>
-                        : <span className={`badge ${t.is_acwp ? 'badge-gray' : 'badge-green'}`}>
-                            {t.is_acwp ? 'Ext (ACWP)' : 'Exterior'}
-                          </span>}
-                    </td>
-                    <td style={{ fontWeight: 600 }}>{t.coach_count}</td>
-                    <td>
-                      <span style={{ color: t.avail_manpower >= t.req_manpower ? 'var(--success)' : 'var(--danger)', fontWeight: 600 }}>
-                        {t.avail_manpower}/{t.req_manpower}
-                      </span>
-                    </td>
-                    <td style={{ color: 'var(--text-3)' }}>{t.washing_line || '—'}</td>
-                    <td>
-                      {t.cleaning_type === 'Interior' && !t.is_acwp ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <div style={{ width: 40, height: 4, borderRadius: 99, background: 'var(--surface-3)', overflow: 'hidden' }}>
-                            <div style={{ height: '100%', width: `${t.pctRating}%`, borderRadius: 99, background: pctColor(t.pctRating) }} />
-                          </div>
-                          <span style={{ fontSize: 11, fontWeight: 600, color: pctColor(t.pctRating) }}>{t.pctRating.toFixed(1)}%</span>
+                {grouped.map(g => {
+                  const t = g.interior ?? g.exterior!
+                  const flags = getSecFlags(t)
+                  return (
+                    <tr key={g.key}>
+                      <td style={{ textAlign: 'left', paddingLeft: 20, color: 'var(--text-3)', fontWeight: 500 }}>{fmtDate(g.date)}</td>
+                      <td style={{ textAlign: 'left' }}>
+                        <span style={{ fontWeight: 700, color: 'var(--text)', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                          <Train size={11} style={{ color: 'var(--text-4)' }} />{g.train_no}
+                        </span>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                          {g.interior && <span className="badge badge-blue">Interior</span>}
+                          {g.exterior && <span className={`badge ${g.exterior.is_acwp ? 'badge-gray' : 'badge-green'}`}>{g.exterior.is_acwp ? 'Ext (ACWP)' : 'Exterior'}</span>}
                         </div>
-                      ) : <span style={{ color: 'var(--text-4)', fontSize: 11 }}>ACWP</span>}
-                    </td>
-                    <td>{t.penaltyA > 0 ? <span className="badge badge-red" style={{ fontSize: 11 }}>{fmt(t.penaltyA)}</span> : '—'}</td>
-                    <td>{t.annexBTotal > 0 ? <span className="badge badge-yellow" style={{ fontSize: 11 }}>{fmt(t.annexBTotal)}</span> : '—'}</td>
-                    <td style={{ fontWeight: 700, color: t.totalPenalty > 0 ? 'var(--danger)' : 'var(--text-3)' }}>
-                      {t.totalPenalty > 0 ? fmt(t.totalPenalty) : '—'}
-                    </td>
-                    <td style={{ textAlign: 'center' }}>
-                      {(() => {
-                        const flags = getSecFlags(t)
-                        return flags.length > 0
-                          ? <span title={flags.join('\n')} style={{ cursor: 'help', fontSize: 14 }}>⚠️</span>
-                          : null
-                      })()}
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
-                        <Link href={`/sec/trips/${t.id}/edit`} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', padding: 4, borderRadius: 6, display: 'inline-flex', alignItems: 'center' }}>
-                          <Pencil size={12} />
-                        </Link>
-                        <button onClick={() => del(t.id, `${t.train_no} ${fmtDate(t.date)}`)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: 4, borderRadius: 6 }}>
-                          <Trash2 size={12} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td style={{ fontWeight: 600 }}>{t.coach_count}</td>
+                      <td>
+                        <span style={{ color: t.avail_manpower >= t.req_manpower ? 'var(--success)' : 'var(--danger)', fontWeight: 600 }}>
+                          {t.avail_manpower}/{t.req_manpower}
+                        </span>
+                      </td>
+                      <td style={{ color: 'var(--text-3)' }}>{t.washing_line || '—'}</td>
+                      <td>
+                        {g.interior && !g.interior.is_acwp ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <div style={{ width: 40, height: 4, borderRadius: 99, background: 'var(--surface-3)', overflow: 'hidden' }}>
+                              <div style={{ height: '100%', width: `${g.interior.pctRating}%`, borderRadius: 99, background: pctColor(g.interior.pctRating) }} />
+                            </div>
+                            <span style={{ fontSize: 11, fontWeight: 600, color: pctColor(g.interior.pctRating) }}>{g.interior.pctRating.toFixed(1)}%</span>
+                          </div>
+                        ) : <span style={{ color: 'var(--text-4)', fontSize: 11 }}>ACWP</span>}
+                      </td>
+                      <td>{g.penaltyA > 0 ? <span className="badge badge-red" style={{ fontSize: 11 }}>{fmt(g.penaltyA)}</span> : '—'}</td>
+                      <td>{g.annexBTotal > 0 ? <span className="badge badge-yellow" style={{ fontSize: 11 }}>{fmt(g.annexBTotal)}</span> : '—'}</td>
+                      <td style={{ fontWeight: 700, color: g.totalPenalty > 0 ? 'var(--danger)' : 'var(--text-3)' }}>
+                        {g.totalPenalty > 0 ? fmt(g.totalPenalty) : '—'}
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        {flags.length > 0 ? <span title={flags.join('\n')} style={{ cursor: 'help', fontSize: 14 }}>⚠️</span> : null}
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                          {g.interior && <Link href={`/sec/trips/${g.interior.id}/edit`} title="Edit Interior" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', padding: 4, borderRadius: 6, display: 'inline-flex', alignItems: 'center' }}><Pencil size={12} /></Link>}
+                          {g.exterior && <Link href={`/sec/trips/${g.exterior.id}/edit`} title="Edit Exterior" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0EA5E9', padding: 4, borderRadius: 6, display: 'inline-flex', alignItems: 'center' }}><Pencil size={12} /></Link>}
+                          {g.interior && <button onClick={() => del(g.interior!.id, `${g.train_no} Int ${fmtDate(g.date)}`)} title="Delete Interior" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: 4, borderRadius: 6 }}><Trash2 size={12} /></button>}
+                          {g.exterior && <button onClick={() => del(g.exterior!.id, `${g.train_no} Ext ${fmtDate(g.date)}`)} title="Delete Exterior" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444', padding: 4, borderRadius: 6 }}><Trash2 size={12} /></button>}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
               <tfoot>
                 <tr style={{ background: 'var(--surface-2)' }}>

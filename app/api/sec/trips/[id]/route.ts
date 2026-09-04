@@ -57,7 +57,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   const body = await req.json()
   const {
     date, train_no, cleaning_type, coach_count,
-    req_manpower, avail_manpower, washing_line, is_acwp,
+    req_manpower, avail_manpower, washing_line, is_acwp, supervisor,
     coach_criteria, coach_ratings, annex_b,
   } = body
 
@@ -66,9 +66,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   await db.execute({
     sql:  `UPDATE sec_trips SET
              date=?, train_no=?, cleaning_type=?, coach_count=?,
-             req_manpower=?, avail_manpower=?, washing_line=?, is_acwp=?, month_year=?
+             req_manpower=?, avail_manpower=?, washing_line=?, is_acwp=?, month_year=?, supervisor=?
            WHERE id=?`,
-    args: [date, train_no, cleaning_type, coach_count, req_manpower, avail_manpower, washing_line, is_acwp ? 1 : 0, month_year, id],
+    args: [date, train_no, cleaning_type, coach_count, req_manpower, avail_manpower, washing_line, is_acwp ? 1 : 0, month_year, supervisor ?? '', id],
   })
 
   // Replace ratings

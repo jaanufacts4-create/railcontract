@@ -56,6 +56,7 @@ function NewSecTripPage() {
   const [reqMp,       setReqMp]       = useState(0)
   const [availMp,     setAvailMp]     = useState(0)
   const [washingLine, setWashingLine] = useState('')
+  const [supervisor,  setSupervisor]  = useState('')
 
   // Derived counts
   const coachCount      = coachTypes.length
@@ -196,7 +197,7 @@ function NewSecTripPage() {
         date, train_no: trainNo,
         coach_count: effectiveCount, ac_count: acCount,
         req_manpower: reqMp, avail_manpower: availMp,
-        washing_line: washingLine,
+        washing_line: washingLine, supervisor,
         is_acwp: isAcwp,
         coach_criteria: activeCriteria,
         coach_ratings: !isAcwp ? activeExtRatings : [],
@@ -214,7 +215,7 @@ function NewSecTripPage() {
 
     setSaving(false)
     setTrainNo(''); setCoachTypes([])
-    setReqMp(0); setAvailMp(0); setWashingLine('')
+    setReqMp(0); setAvailMp(0); setWashingLine(''); setSupervisor('')
     setIntCriteria([]); setExtRatings([]); setAnnexB({}); setIsAcwp(true); setDayWarn(null)
     setSavedMsg(`✅ Trip saved for ${date}! Enter next trip or `)
     setTimeout(() => setSavedMsg(''), 8000)
@@ -320,6 +321,10 @@ function NewSecTripPage() {
             <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.04em', display: 'block', marginBottom: 6 }}>Washing Line No.</label>
             <input type="text" className="input" placeholder="e.g. 5" value={washingLine} onChange={e => setWashingLine(e.target.value)}
               style={{ borderColor: !washingLine.trim() ? 'var(--danger)' : undefined }} />
+          </div>
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.04em', display: 'block', marginBottom: 6 }}>Supervisor</label>
+            <input type="text" className="input" placeholder="e.g. Ramesh" value={supervisor} onChange={e => setSupervisor(e.target.value)} />
           </div>
         </div>
       </div>

@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { Download, Train, CheckCircle2, Clock, CalendarDays, BarChart3, ListFilter, IndianRupee, AlertCircle } from 'lucide-react'
+import { Download, Train, CheckCircle2, Clock, CalendarDays, BarChart3, ListFilter, IndianRupee, AlertCircle, Loader2 } from 'lucide-react'
 
 type StatusRow   = { date: string; dow: string; train_no: string; ac: number; nac: number; total: number; done: boolean }
 type DaySummary  = { date: string; dow: string; sched: number; done: number }
@@ -43,6 +43,7 @@ export default function SecReportsPage() {
   const [summRows,  setSummRows]  = useState<SummaryRow[]>([])
   const [summTotals, setSummTotals] = useState<{ totalPenaltyA: number; totalPenaltyB: number; grandTotal: number } | null>(null)
   const [loadingS,  setLoadingS]  = useState(false)
+  const [exportingXl, setExportingXl] = useState(false)
 
   useEffect(() => { loadSummary() }, [monthYear])
 
@@ -68,7 +69,35 @@ export default function SecReportsPage() {
     { id: 'trains', label: 'Train Summary',   icon: BarChart3    },
   ]
 
+  async function handleExportExcel() {
+    setExportingXl(true)
+    try {
+      const res  = await fetch(`/api/export/sec?month_year=${monthYear}`)
+      if (!res.ok) throw new Error(`Export failed: ${res.status}`)
+      const blob = await res.blob()
+      const url  = URL.createObjectURL(blob)
+      const a    = document.createElement('a')
+      a.href     = url
+      a.download = `SecSumm_${monthYear.replace('-', '')}.xlsx`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setExportingXl(false)
+    }
+  }
+
   return (
+    <>
+    <style>{`
+      @keyframes progressPulse {
+        0%   { left: -40%; width: 40%; }
+        50%  { left: 60%; width: 40%; }
+        100% { left: 110%; width: 40%; }
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+    `}</style>
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <div>
         <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', letterSpacing: '-.02em', margin: 0 }}>Reports — Secondary</h1>
@@ -289,9 +318,20 @@ export default function SecReportsPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <input type="month" className="input" style={{ width: 160 }} value={monthYear} onChange={e => setMonthYear(e.target.value)} />
             {loadingS && <span style={{ fontSize: 12, color: 'var(--text-4)' }}>Loading…</span>}
-            <a href={`/api/export/sec?month_year=${monthYear}`} download className="btn btn-secondary" style={{ marginLeft: 'auto' }}>
-              <Download size={14} /> Export Excel
-            </a>
+            <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+              <button onClick={handleExportExcel} disabled={exportingXl}
+                className="btn btn-secondary"
+                style={{ display: 'flex', alignItems: 'center', gap: 6, opacity: exportingXl ? 0.8 : 1 }}>
+                {exportingXl
+                  ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Generating…</>
+                  : <><Download size={14} /> Export Excel</>}
+              </button>
+              {exportingXl && (
+                <div style={{ width: 140, height: 4, borderRadius: 2, background: 'var(--surface-2)', overflow: 'hidden', position: 'relative' }}>
+                  <div style={{ position: 'absolute', left: 0, top: 0, height: '100%', borderRadius: 2, background: '#2563EB', animation: 'progressPulse 1.4s ease-in-out infinite' }} />
+                </div>
+              )}
+            </div>
           </div>
 
           {summTotals && (
@@ -385,5 +425,6 @@ export default function SecReportsPage() {
         </div>
       )}
     </div>
+  </>
   )
 }

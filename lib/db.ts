@@ -337,6 +337,11 @@ export async function migrate() {
       await db.execute(`ALTER TABLE coach_scores ADD COLUMN ${col} INTEGER NOT NULL DEFAULT 0`)
     } catch { /* column already exists — ignore */ }
   }
+
+  // Safe column addition: supervisor on sec_trips
+  try {
+    await db.execute("ALTER TABLE sec_trips ADD COLUMN supervisor TEXT NOT NULL DEFAULT ''")
+  } catch { /* column already exists — ignore */ }
 }
 
 /** ─── Secondary Bill (M/s Dynamic Services) ─────────────────────────── */
