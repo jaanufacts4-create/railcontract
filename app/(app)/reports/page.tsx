@@ -883,6 +883,7 @@ function ReportsContent() {
       })()}
 
     </div>
+  </>
   )
 }
 
@@ -891,6 +892,5 @@ export default function ReportsPage() {
     <Suspense fallback={<div style={{ padding: 40, color: 'var(--text-4)' }}>Loading...</div>}>
       <ReportsContent />
     </Suspense>
-  </>
   )
 }
