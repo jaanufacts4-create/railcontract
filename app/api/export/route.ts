@@ -259,10 +259,13 @@ export async function GET(req: Request) {
       const nacScores: { pos: number; score: number }[] = []
       const extScores: { pos: number; score: number }[] = []
 
-      for (const [pos, ct] of Object.entries(typeMap)) {
-        const p = Number(pos)
+      // Iterate over actually-scored positions only (not all train_master positions).
+      // Coaches in train_master but not scored on this day are excluded — they were
+      // not present on the physical proforma for that trip.
+      for (const p of Object.keys(scoreMap).map(Number).sort((a, b) => a - b)) {
         if (intPosSset.has(p)) continue   // INT coach → in Intensive Summary, skip Normal
-        const s = scoreMap[p] ?? 0
+        const s = scoreMap[p]
+        const ct = typeMap[p] ?? 'GSLRD'  // fallback for manually-added coaches not in master
         const cat = coachCategory(ct)
         if (cat === 'AC')        acScores.push({ pos: p, score: s })
         else if (cat === 'NAC')  nacScores.push({ pos: p, score: s })
