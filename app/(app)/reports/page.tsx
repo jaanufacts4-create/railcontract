@@ -238,9 +238,9 @@ function ReportsContent() {
     <>
     <style>{`
       @keyframes progressPulse {
-        0%   { width: 15%; }
-        50%  { width: 85%; }
-        100% { width: 15%; }
+        0%   { left: -40%; width: 40%; }
+        50%  { left: 60%; width: 40%; }
+        100% { left: 110%; width: 40%; }
       }
       @keyframes spin { to { transform: rotate(360deg); } }
     `}</style>
@@ -508,10 +508,11 @@ function ReportsContent() {
                   : <><Download size={14} /> Export Excel</>}
               </button>
               {exportingXl && (
-                <div style={{ width: 140, height: 4, borderRadius: 2, background: 'var(--surface-2)', overflow: 'hidden' }}>
+                <div style={{ width: 140, height: 4, borderRadius: 2, background: 'var(--surface-2)', overflow: 'hidden', position: 'relative' }}>
                   <div style={{
+                    position: 'absolute', left: 0, top: 0,
                     height: '100%', borderRadius: 2,
-                    background: 'var(--primary, #2563EB)',
+                    background: '#2563EB',
                     animation: 'progressPulse 1.4s ease-in-out infinite',
                   }} />
                 </div>
