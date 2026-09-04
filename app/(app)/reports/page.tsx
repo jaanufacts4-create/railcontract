@@ -52,6 +52,15 @@ function StatCard({ icon: Icon, label, value, sub, trend, color, sparkData }: {
 }) {
   const isUp = (trend ?? 0) >= 0
   return (
+    <>
+    <style>{`
+      @keyframes progressPulse {
+        0%   { width: 15%; }
+        50%  { width: 85%; }
+        100% { width: 15%; }
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+    `}</style>
     <div className="card" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12, transition: 'box-shadow .18s, transform .18s', cursor: 'default' }}
       onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.boxShadow = 'var(--shadow-lg)'; el.style.transform = 'translateY(-2px)' }}
       onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.boxShadow = 'var(--shadow)';   el.style.transform = 'translateY(0)' }}
@@ -185,6 +194,7 @@ function ReportsContent() {
   const [monthYear, setMonthYear] = useState(() => new Date().toISOString().slice(0, 7))
   const [summRows,  setSummRows]  = useState<SummaryRow[]>([])
   const [loadingS,  setLoadingS]  = useState(false)
+  const [exportingXl, setExportingXl] = useState(false)
 
   useEffect(() => { loadSummary() }, [monthYear])
 
@@ -193,6 +203,25 @@ function ReportsContent() {
     const data = await fetch(`/api/summary?month_year=${monthYear}`).then(r => r.json())
     setSummRows(data.rows ?? [])
     setLoadingS(false)
+  }
+
+  async function handleExportExcel() {
+    setExportingXl(true)
+    try {
+      const res  = await fetch(`/api/export?month_year=${monthYear}`)
+      if (!res.ok) throw new Error(`Export failed: ${res.status}`)
+      const blob = await res.blob()
+      const url  = URL.createObjectURL(blob)
+      const a    = document.createElement('a')
+      a.href     = url
+      a.download = `Summ_${monthYear.replace('-', '')}.xlsx`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setExportingXl(false)
+    }
   }
 
   async function fetchReport() {
@@ -470,9 +499,24 @@ function ReportsContent() {
             <input type="month" className="input" style={{ width: 160 }}
               value={monthYear} onChange={e => setMonthYear(e.target.value)} />
             {loadingS && <span style={{ fontSize: 12, color: 'var(--text-4)' }}>Loading…</span>}
-            <a href={`/api/export?month_year=${monthYear}`} download className="btn btn-secondary" style={{ marginLeft: 'auto' }}>
-              <Download size={14} /> Export Excel
-            </a>
+            <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+              <button onClick={handleExportExcel} disabled={exportingXl}
+                className="btn btn-secondary"
+                style={{ display: 'flex', alignItems: 'center', gap: 6, opacity: exportingXl ? 0.8 : 1 }}>
+                {exportingXl
+                  ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Generating…</>
+                  : <><Download size={14} /> Export Excel</>}
+              </button>
+              {exportingXl && (
+                <div style={{ width: 140, height: 4, borderRadius: 2, background: 'var(--surface-2)', overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%', borderRadius: 2,
+                    background: 'var(--primary, #2563EB)',
+                    animation: 'progressPulse 1.4s ease-in-out infinite',
+                  }} />
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Stat cards */}
@@ -847,5 +891,6 @@ export default function ReportsPage() {
     <Suspense fallback={<div style={{ padding: 40, color: 'var(--text-4)' }}>Loading...</div>}>
       <ReportsContent />
     </Suspense>
+  </>
   )
 }
