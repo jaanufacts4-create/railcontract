@@ -103,6 +103,28 @@ export default function TripsPage() {
     { ac: 0, nac: 0, ext: 0 }
   )
 
+  const penaltyTotals = visible.reduce(
+    (a, t) => {
+      const p = penaltyMap[t.id]
+      if (!p) return a
+      return {
+        normal:    a.normal    + p.normal,
+        intensive: a.intensive + p.intensive,
+        manpower:  a.manpower  + p.manpower,
+        annex:     a.annex     + p.annex,
+        total:     a.total     + p.total,
+      }
+    },
+    { normal: 0, intensive: 0, manpower: 0, annex: 0, total: 0 }
+  )
+  const penaltyLoaded = visible.length > 0 && visible.every(t => penaltyMap[t.id] != null)
+
+  function fmtRs(v: number) {
+    if (v >= 100000) return `₹${(v / 100000).toFixed(1)}L`
+    if (v >= 1000)   return `₹${(v / 1000).toFixed(1)}K`
+    return `₹${Math.round(v)}`
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
 
@@ -160,6 +182,43 @@ export default function TripsPage() {
           </div>
         )}
       </div>
+
+      {/* Penalty Summary Cards */}
+      {visible.length > 0 && (
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          {[
+            { label: 'Normal Rating Pen.',    value: penaltyTotals.normal,    color: '#EF4444', bg: '#FEF2F2' },
+            { label: 'Intensive Rating Pen.', value: penaltyTotals.intensive, color: '#8B5CF6', bg: '#F5F3FF' },
+            { label: 'Manpower Pen.',         value: penaltyTotals.manpower,  color: '#F59E0B', bg: '#FFFBEB' },
+            { label: 'Annex A2 Pen.',         value: penaltyTotals.annex,     color: '#6366F1', bg: '#EEF2FF' },
+          ].map(({ label, value, color, bg }) => (
+            <div key={label} style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              background: 'var(--surface)', border: '1px solid var(--border)',
+              borderRadius: 10, padding: '8px 14px',
+            }}>
+              <div style={{ width: 7, height: 7, borderRadius: '50%', background: color }} />
+              <span style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 600 }}>{label}</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: penaltyLoaded && value > 0 ? color : 'var(--text)' }}>
+                {penaltyLoaded ? fmtRs(value) : '…'}
+              </span>
+            </div>
+          ))}
+          {/* Total card - highlighted */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            background: penaltyLoaded && penaltyTotals.total > 0 ? '#FEF2F2' : 'var(--surface)',
+            border: `1px solid ${penaltyLoaded && penaltyTotals.total > 0 ? '#FECACA' : 'var(--border)'}`,
+            borderRadius: 10, padding: '8px 14px',
+          }}>
+            <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#DC2626' }} />
+            <span style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 600 }}>Total Penalty</span>
+            <span style={{ fontSize: 14, fontWeight: 800, color: penaltyLoaded && penaltyTotals.total > 0 ? '#DC2626' : 'var(--text)' }}>
+              {penaltyLoaded ? fmtRs(penaltyTotals.total) : '…'}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Loading */}
       {loading && (
