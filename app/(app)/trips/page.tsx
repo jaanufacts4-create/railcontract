@@ -174,51 +174,42 @@ export default function TripsPage() {
           </button>
         )}
         {visible.length > 0 && (
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             <StatChip label="Trips" value={visible.length} color="#2563EB" />
             <StatChip label="AC"    value={totals.ac}      color="#3B82F6" />
             <StatChip label="NAC"   value={totals.nac}     color="#22C55E" />
             <StatChip label="Ext"   value={totals.ext}     color="#F59E0B" />
+            {!loading && penaltyLoaded && (
+              <>
+                <div style={{ width: 1, height: 24, background: 'var(--border-md)', margin: '0 2px' }} />
+                {([
+                  { label: 'Norm. Pen.', val: penaltyTotals.normal,    color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
+                  { label: 'Int. Pen.',  val: penaltyTotals.intensive, color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' },
+                  { label: 'MP Pen.',    val: penaltyTotals.manpower,  color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
+                  { label: 'Annex A2',  val: penaltyTotals.annex,     color: '#4F46E5', bg: '#EEF2FF', border: '#C7D2FE' },
+                ] as { label: string; val: number; color: string; bg: string; border: string }[]).map(({ label, val, color, bg, border }) => (
+                  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, background: bg, border: `1px solid ${border}`, borderRadius: 10, padding: '5px 10px' }}>
+                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: color }} />
+                    <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
+                      <span style={{ fontSize: 10, color, fontWeight: 600 }}>{label}</span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color }}>{fmtRs(val)}</span>
+                      {val >= 1000 && <span style={{ fontSize: 9, color, opacity: 0.7 }}>₹{Math.round(val).toLocaleString('en-IN')}</span>}
+                    </div>
+                  </div>
+                ))}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#FEF2F2', border: '1.5px solid #F87171', borderRadius: 10, padding: '5px 10px' }}>
+                  <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#DC2626' }} />
+                  <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
+                    <span style={{ fontSize: 10, color: '#991B1B', fontWeight: 700 }}>TOTAL</span>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: '#DC2626' }}>{fmtRs(penaltyTotals.total)}</span>
+                    {penaltyTotals.total >= 1000 && <span style={{ fontSize: 9, color: '#DC2626', opacity: 0.7 }}>₹{Math.round(penaltyTotals.total).toLocaleString('en-IN')}</span>}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>
-
-      {/* Penalty Summary Cards */}
-      {visible.length > 0 && (
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          {[
-            { label: 'Normal Rating Pen.',    value: penaltyTotals.normal,    color: '#EF4444', bg: '#FEF2F2' },
-            { label: 'Intensive Rating Pen.', value: penaltyTotals.intensive, color: '#8B5CF6', bg: '#F5F3FF' },
-            { label: 'Manpower Pen.',         value: penaltyTotals.manpower,  color: '#F59E0B', bg: '#FFFBEB' },
-            { label: 'Annex A2 Pen.',         value: penaltyTotals.annex,     color: '#6366F1', bg: '#EEF2FF' },
-          ].map(({ label, value, color, bg }) => (
-            <div key={label} style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              background: 'var(--surface)', border: '1px solid var(--border)',
-              borderRadius: 10, padding: '8px 14px',
-            }}>
-              <div style={{ width: 7, height: 7, borderRadius: '50%', background: color }} />
-              <span style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 600 }}>{label}</span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: penaltyLoaded && value > 0 ? color : 'var(--text)' }}>
-                {penaltyLoaded ? fmtRs(value) : '…'}
-              </span>
-            </div>
-          ))}
-          {/* Total card - highlighted */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            background: penaltyLoaded && penaltyTotals.total > 0 ? '#FEF2F2' : 'var(--surface)',
-            border: `1px solid ${penaltyLoaded && penaltyTotals.total > 0 ? '#FECACA' : 'var(--border)'}`,
-            borderRadius: 10, padding: '8px 14px',
-          }}>
-            <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#DC2626' }} />
-            <span style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 600 }}>Total Penalty</span>
-            <span style={{ fontSize: 14, fontWeight: 800, color: penaltyLoaded && penaltyTotals.total > 0 ? '#DC2626' : 'var(--text)' }}>
-              {penaltyLoaded ? fmtRs(penaltyTotals.total) : '…'}
-            </span>
-          </div>
-        </div>
-      )}
 
       {/* Loading */}
       {loading && (
@@ -272,7 +263,7 @@ export default function TripsPage() {
               <tbody>
                 {visible.map(t => (
                   <tr key={t.id}>
-                    <td style={{ textAlign: 'left', paddingLeft: 20, color: 'var(--text-3)', fontWeight: 500 }}>
+                    <td style={{ textAlign: 'left', paddingLeft: 20, color: 'var(--text-3)', fontWeight: 500, whiteSpace: 'nowrap', fontSize: 12 }}>
                       {fmtDate(t.date)}
                     </td>
                     <td>
