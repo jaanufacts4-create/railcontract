@@ -145,6 +145,66 @@ export default function EditTripPage() {
     return s
   }, [criteria])
 
+  // ── Config (rates) ─────────────────────────────────────────────────────────
+  const [cfg, setCfg] = useState<Record<string, number>>({})
+  useEffect(() => {
+    fetch('/api/config').then(r => r.json()).then((c: Record<string, string>) => {
+      const n: Record<string, number> = {}
+      for (const [k, v] of Object.entries(c)) n[k] = Number(v)
+      setCfg(n)
+    }).catch(() => {})
+  }, [])
+
+  // ── Live penalty calculation ─────────────────────────────────────────────────
+  function slabTotal(scrs: number[], rateGST: number, gstPct: number, maxScore: number): number {
+    const rNG = rateGST * 100 / (100 + (gstPct || 18))
+    let pen = 0
+    for (const s of scrs) {
+      const pct = (s / maxScore) * 100
+      pen += rNG * (pct >= 86 ? 0 : pct >= 76 ? 0.05 : pct >= 66 ? 0.10 : pct >= 50 ? 0.20 : 1.00)
+    }
+    return Math.round(pen * 100) / 100
+  }
+
+  const liveCalc = useMemo(() => {
+    const gst = cfg.gst_pct || 18
+    const acRate  = cfg.ac_rate_gst  || 0
+    const nacRate = cfg.nac_rate_gst || 0
+    const extRate = cfg.ext_rate_gst || 0
+    // Normal coaches
+    const acSc: number[] = [], nacSc: number[] = [], extNSc: number[] = []
+    for (const p of effPositions) {
+      if (p.coach_type === 'INT') continue
+      const cat = coachCategory(p.coach_type)
+      const sc = criteria[p.position] ? calcTotal(criteria[p.position]) : 0
+      if (cat === 'AC')  acSc.push(sc)
+      else if (cat === 'NAC') nacSc.push(sc)
+      if (!acwp && extScores[p.position] !== undefined) extNSc.push(extScores[p.position])
+    }
+    const normalPen = slabTotal(acSc, acRate, gst, 15)
+                    + slabTotal(nacSc, nacRate, gst, 15)
+                    + (acwp ? 0 : slabTotal(extNSc, extRate, gst, 3))
+    // Intensive
+    const acIS: number[] = [], nacIS: number[] = [], extIS: number[] = []
+    for (const p of intPositions) {
+      const prevType = intPrevType[p.position] || 'LWFCZAC'
+      const cat = coachCategory(prevType)
+      const sc = intCriteria[p.position] ? calcTotal(intCriteria[p.position]) : 0
+      if (cat === 'AC')  acIS.push(sc)
+      else if (cat === 'NAC') nacIS.push(sc)
+      if (!intAcwp) extIS.push(intExtScores[p.position] ?? 0)
+    }
+    const intPen = slabTotal(acIS, acRate, gst, 18)
+                 + slabTotal(nacIS, nacRate, gst, 18)
+                 + (intAcwp ? 0 : slabTotal(extIS, extRate, gst, 3))
+    const minW = cfg.min_wages || 0
+    const mpPen = Math.max(0, mpRequired - deployed) * 2 * minW
+    const annexPen = Object.values(penalties).reduce((s, v) => s + (Number(v) || 0), 0)
+    return { normal: normalPen, intensive: intPen, manpower: mpPen, annex: annexPen,
+             total: normalPen + intPen + mpPen + annexPen }
+  }, [effPositions, criteria, extScores, intCriteria, intExtScores, intPrevType,
+      acwp, intAcwp, mpRequired, deployed, penalties, cfg, intPositions])
+
   // ── Type change ───────────────────────────────────────────────────────────
   function handleTypeChange(position: number, newType: string) {
     const original = positions.find(p => p.position === position)?.coach_type ?? ''
@@ -599,6 +659,30 @@ export default function EditTripPage() {
                   onChange={e => setPenalties(p => ({ ...p, [Number(type)]: Number(e.target.value) }))} />
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Live Penalty Summary ── */}
+      {positions.length > 0 && Object.keys(cfg).length > 0 && (
+        <div style={{ background: 'var(--surface)', border: '1.5px solid var(--border-md)', borderRadius: 12, padding: '14px 18px' }}>
+          <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--text-4)', margin: '0 0 10px' }}>Live Penalty Calculation</p>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            {([
+              { label: 'Normal Rating',    value: liveCalc.normal,    color: '#EF4444' },
+              { label: 'Intensive Rating', value: liveCalc.intensive, color: '#8B5CF6' },
+              { label: 'Manpower',         value: liveCalc.manpower,  color: '#F59E0B' },
+              { label: 'Annex A2',         value: liveCalc.annex,     color: '#6366F1' },
+            ] as const).map(({ label, value, color }) => (
+              <div key={label} style={{ flex: '1 1 120px', background: 'var(--surface-2)', borderRadius: 8, padding: '8px 12px' }}>
+                <p style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '.04em', margin: '0 0 2px' }}>{label}</p>
+                <p style={{ fontSize: 15, fontWeight: 700, color: value > 0 ? color : 'var(--text-3)', margin: 0 }}>₹{value.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</p>
+              </div>
+            ))}
+            <div style={{ flex: '1 1 140px', background: liveCalc.total > 0 ? '#FEF2F2' : 'var(--surface-2)', border: liveCalc.total > 0 ? '1.5px solid #FECACA' : 'none', borderRadius: 8, padding: '8px 12px' }}>
+              <p style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '.04em', margin: '0 0 2px' }}>Total Penalty</p>
+              <p style={{ fontSize: 18, fontWeight: 800, color: liveCalc.total > 0 ? '#DC2626' : 'var(--text-3)', margin: 0 }}>₹{liveCalc.total.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</p>
+            </div>
           </div>
         </div>
       )}

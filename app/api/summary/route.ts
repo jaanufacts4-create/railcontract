@@ -32,11 +32,12 @@ export async function GET(req: Request) {
     const tripId = trip.id as number
 
     // Coach scores + train master (to classify AC/NAC)
-    const [scoresRes, masterRes, mpRes, penRes] = await Promise.all([
+    const [scoresRes, masterRes, mpRes, penRes, intRes] = await Promise.all([
       db.execute({ sql: 'SELECT position, score FROM coach_scores WHERE trip_id=? ORDER BY position', args: [tripId] }),
       db.execute({ sql: 'SELECT position, coach_type FROM train_master WHERE train_no=? ORDER BY position', args: [trip.train_no as string] }),
       db.execute({ sql: 'SELECT section, required, deployed FROM manpower WHERE trip_id=?', args: [tripId] }),
       db.execute({ sql: 'SELECT penalty_type, amount FROM annex_penalties WHERE trip_id=?', args: [tripId] }),
+      db.execute({ sql: 'SELECT coach_type, score, ext_score FROM intensive_scores WHERE trip_id=? ORDER BY position', args: [tripId] }),
     ])
 
     // Build position → type map
@@ -82,7 +83,23 @@ export async function GET(req: Request) {
       annexTotal += p.amount as number
     }
 
-    const ratingPenalty = acSlab.totalPenalty + nacSlab.totalPenalty + (extSlab?.totalPenalty ?? 0)
+    const normalPenalty = acSlab.totalPenalty + nacSlab.totalPenalty + (extSlab?.totalPenalty ?? 0)
+
+    // Intensive cleaning penalty
+    const intAcwp = Boolean(trip.int_acwp)
+    const acIntScores: number[] = []
+    const nacIntScores: number[] = []
+    const extIntScores: number[] = []
+    for (const r of intRes.rows) {
+      const cat = coachCategory(r.coach_type as string)
+      if (cat === 'AC')  acIntScores.push(r.score as number)
+      else if (cat === 'NAC') nacIntScores.push(r.score as number)
+      if (!intAcwp) extIntScores.push((r.ext_score ?? 0) as number)
+    }
+    const acIntSlab  = acIntScores.length  ? calcSlabs(acIntScores,  acRateNoGST,  18) : null
+    const nacIntSlab = nacIntScores.length ? calcSlabs(nacIntScores, nacRateNoGST, 18) : null
+    const extIntSlab = (!intAcwp && extIntScores.length) ? calcSlabs(extIntScores, extRateNoGST, 3) : null
+    const intensivePenalty = (acIntSlab?.totalPenalty ?? 0) + (nacIntSlab?.totalPenalty ?? 0) + (extIntSlab?.totalPenalty ?? 0)
 
     return {
       trip,
@@ -91,8 +108,10 @@ export async function GET(req: Request) {
       manpowerPenalty: mpPenalty,
       annexPenalties:  penMap,
       annexTotal,
-      ratingPenalty,
-      grandTotal: ratingPenalty + mpPenalty + annexTotal,
+      normalPenalty,
+      intensivePenalty,
+      ratingPenalty: normalPenalty + intensivePenalty, // backward compat
+      grandTotal: normalPenalty + intensivePenalty + mpPenalty + annexTotal,
       manpower:   mpRes.rows,
     }
   }))

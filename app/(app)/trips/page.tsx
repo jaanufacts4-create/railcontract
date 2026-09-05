@@ -8,7 +8,8 @@ type Trip = {
   wl_no: string | null; acwp: number; supervisor: string; month_year: string
   ac_count: number; nac_count: number; ext_count: number; int_count: number
 }
-type PenaltyMap = Record<number, number> // trip_id -> total penalty
+type PenaltyBreakdown = { normal: number; intensive: number; manpower: number; annex: number; total: number }
+type PenaltyMap = Record<number, PenaltyBreakdown>
 
 function fmtDate(d: string) {
   const [y, m, day] = d.split('-')
@@ -55,7 +56,13 @@ export default function TripsPage() {
       .then((data: { rows?: Array<{ trip: { id: number }; ratingPenalty: number; annexTotal: number }> }) => {
         const m: PenaltyMap = {}
         for (const row of data.rows ?? []) {
-          m[row.trip.id] = (row.ratingPenalty ?? 0) + (row.annexTotal ?? 0)
+          m[row.trip.id] = {
+            normal:    row.normalPenalty    ?? 0,
+            intensive: row.intensivePenalty ?? 0,
+            manpower:  row.manpowerPenalty  ?? 0,
+            annex:     row.annexTotal       ?? 0,
+            total:     row.grandTotal       ?? 0,
+          }
         }
         setPenaltyMap(m)
       })
@@ -194,7 +201,11 @@ export default function TripsPage() {
                   <th style={{ color: '#3B82F6' }}>AC</th>
                   <th style={{ color: '#22C55E' }}>NAC</th>
                   <th style={{ color: '#F59E0B' }}>Ext</th>
-                  <th style={{ color: '#EF4444' }}>Penalty</th>
+                  <th style={{ color: '#EF4444', fontSize: 11 }}>Rat. Pen.</th>
+                  <th style={{ color: '#8B5CF6', fontSize: 11 }}>Int. Pen.</th>
+                  <th style={{ color: '#F59E0B', fontSize: 11 }}>MP Pen.</th>
+                  <th style={{ color: '#6366F1', fontSize: 11 }}>Annex A2</th>
+                  <th style={{ color: '#DC2626', fontSize: 11, fontWeight: 700 }}>Total Pen.</th>
                   <th style={{ width: 40 }}>Flag</th>
                   <th style={{ width: 100 }}></th>
                 </tr>
@@ -233,14 +244,25 @@ export default function TripsPage() {
                         ? <span className="badge badge-yellow">{t.ext_count}</span>
                         : <span style={{ color: 'var(--text-4)' }}>—</span>}
                     </td>
+                    {(['normal','intensive','manpower','annex'] as const).map(key => (
+                      <td key={key}>
+                        {penaltyMap[t.id] != null
+                          ? penaltyMap[t.id][key] > 0
+                            ? <span style={{ fontWeight: 600, color: key === 'normal' ? '#EF4444' : key === 'intensive' ? '#8B5CF6' : key === 'manpower' ? '#F59E0B' : '#6366F1', fontSize: 12 }}>
+                                ₹{penaltyMap[t.id][key].toLocaleString('en-IN')}
+                              </span>
+                            : <span style={{ color: 'var(--text-4)', fontSize: 12 }}>—</span>
+                          : <span style={{ color: 'var(--text-4)', fontSize: 10 }}>…</span>}
+                      </td>
+                    ))}
                     <td>
                       {penaltyMap[t.id] != null
-                        ? penaltyMap[t.id] > 0
-                          ? <span style={{ fontWeight: 700, color: '#EF4444', fontSize: 13 }}>
-                              ₹{penaltyMap[t.id].toLocaleString('en-IN')}
+                        ? penaltyMap[t.id].total > 0
+                          ? <span style={{ fontWeight: 700, color: '#DC2626', fontSize: 13 }}>
+                              ₹{penaltyMap[t.id].total.toLocaleString('en-IN')}
                             </span>
                           : <span style={{ color: 'var(--text-4)' }}>—</span>
-                        : <span style={{ color: 'var(--text-4)', fontSize: 11 }}>…</span>}
+                        : <span style={{ color: 'var(--text-4)', fontSize: 10 }}>…</span>}
                     </td>
                     <td style={{ textAlign: 'center' }}>
                       {(() => {
