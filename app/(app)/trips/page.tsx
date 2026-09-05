@@ -8,6 +8,7 @@ type Trip = {
   wl_no: string | null; acwp: number; supervisor: string; month_year: string
   ac_count: number; nac_count: number; ext_count: number; int_count: number
 }
+type PenaltyMap = Record<number, number> // trip_id -> total penalty
 
 function fmtDate(d: string) {
   const [y, m, day] = d.split('-')
@@ -44,6 +45,22 @@ export default function TripsPage() {
   useEffect(() => {
     fetch('/api/schedule').then(r => r.json()).then(setSchedules).catch(() => {})
   }, [])
+
+  const [penaltyMap, setPenaltyMap] = useState<PenaltyMap>({})
+
+  useEffect(() => {
+    setPenaltyMap({})
+    fetch(`/api/summary?month_year=${monthYear}`)
+      .then(r => r.json())
+      .then((data: { rows?: Array<{ trip: { id: number }; ratingPenalty: number; annexTotal: number }> }) => {
+        const m: PenaltyMap = {}
+        for (const row of data.rows ?? []) {
+          m[row.trip.id] = (row.ratingPenalty ?? 0) + (row.annexTotal ?? 0)
+        }
+        setPenaltyMap(m)
+      })
+      .catch(() => {})
+  }, [monthYear])
 
   const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
 
@@ -177,6 +194,7 @@ export default function TripsPage() {
                   <th style={{ color: '#3B82F6' }}>AC</th>
                   <th style={{ color: '#22C55E' }}>NAC</th>
                   <th style={{ color: '#F59E0B' }}>Ext</th>
+                  <th style={{ color: '#EF4444' }}>Penalty</th>
                   <th style={{ width: 40 }}>Flag</th>
                   <th style={{ width: 100 }}></th>
                 </tr>
@@ -214,6 +232,15 @@ export default function TripsPage() {
                       {t.ext_count > 0
                         ? <span className="badge badge-yellow">{t.ext_count}</span>
                         : <span style={{ color: 'var(--text-4)' }}>—</span>}
+                    </td>
+                    <td>
+                      {penaltyMap[t.id] != null
+                        ? penaltyMap[t.id] > 0
+                          ? <span style={{ fontWeight: 700, color: '#EF4444', fontSize: 13 }}>
+                              ₹{penaltyMap[t.id].toLocaleString('en-IN')}
+                            </span>
+                          : <span style={{ color: 'var(--text-4)' }}>—</span>
+                        : <span style={{ color: 'var(--text-4)', fontSize: 11 }}>…</span>}
                     </td>
                     <td style={{ textAlign: 'center' }}>
                       {(() => {
