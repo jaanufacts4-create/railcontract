@@ -53,7 +53,7 @@ export default function TripsPage() {
     setPenaltyMap({})
     fetch(`/api/summary?month_year=${monthYear}`)
       .then(r => r.json())
-      .then((data: { rows?: Array<{ trip: { id: number }; ratingPenalty: number; annexTotal: number }> }) => {
+      .then((data: { rows?: Array<{ trip: { id: number }; normalPenalty: number; intensivePenalty: number; manpowerPenalty: number; annexTotal: number; grandTotal: number }> }) => {
         const m: PenaltyMap = {}
         for (const row of data.rows ?? []) {
           m[row.trip.id] = {
