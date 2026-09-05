@@ -90,73 +90,7 @@ function NewTripPage() {
     }).catch(() => {})
   }, [])
 
-  // ── Live penalty calculation ─────────────────────────────────────────────────
-  function slabTotal(scores: number[], rateGST: number, gstPct: number, maxScore: number): number {
-    const rNG = rateGST * 100 / (100 + (gstPct || 18))
-    let pen = 0
-    for (const s of scores) {
-      const pct = (s / maxScore) * 100
-      pen += rNG * (pct >= 86 ? 0 : pct >= 76 ? 0.05 : pct >= 66 ? 0.10 : pct >= 50 ? 0.20 : 1.00)
-    }
-    return Math.round(pen * 100) / 100
-  }
 
-  const liveCalc = useMemo(() => {
-    const gst = cfg.gst_pct || 18
-    const acRate  = cfg.ac_rate_gst  || 0
-    const nacRate = cfg.nac_rate_gst || 0
-    const extRate = cfg.ext_rate_gst || 0
-
-    // Normal coaches (non-INT)
-    const acScores:  number[] = []
-    const nacScores: number[] = []
-    const extNormScores: number[] = []
-    for (const p of effPositions) {
-      if (p.coach_type === 'INT') continue
-      const cat = coachCategory(p.coach_type)
-      const sc = criteria[p.position] ? calcTotal(criteria[p.position]) : 0
-      if (cat === 'AC')  acScores.push(sc)
-      else if (cat === 'NAC') nacScores.push(sc)
-      if (!acwp && extScores[p.position] !== undefined)
-        extNormScores.push(extScores[p.position])
-    }
-    const normalPen = slabTotal(acScores, acRate, gst, 15)
-                    + slabTotal(nacScores, nacRate, gst, 15)
-                    + (acwp ? 0 : slabTotal(extNormScores, extRate, gst, 3))
-
-    // Intensive coaches
-    const acIntSc:  number[] = []
-    const nacIntSc: number[] = []
-    const extIntSc: number[] = []
-    for (const p of intPositions) {
-      const prevType = intPrevType[p.position] || 'LWFCZAC'
-      const cat = coachCategory(prevType)
-      const sc = intCriteria[p.position] ? calcTotal(intCriteria[p.position]) : 0
-      if (cat === 'AC')  acIntSc.push(sc)
-      else if (cat === 'NAC') nacIntSc.push(sc)
-      if (!intAcwp) extIntSc.push(intExtScores[p.position] ?? 0)
-    }
-    const intPen = slabTotal(acIntSc, acRate, gst, 18)
-                 + slabTotal(nacIntSc, nacRate, gst, 18)
-                 + (intAcwp ? 0 : slabTotal(extIntSc, extRate, gst, 3))
-
-    // Manpower penalty
-    const minW = cfg.min_wages || 0
-    const mpShort = Math.max(0, mpRequired - deployed)
-    const mpPen = mpShort * 2 * minW
-
-    // Annex A2
-    const annexPen = Object.values(penalties).reduce((s, v) => s + (Number(v) || 0), 0)
-
-    return {
-      normal:    normalPen,
-      intensive: intPen,
-      manpower:  mpPen,
-      annex:     annexPen,
-      total:     normalPen + intPen + mpPen + annexPen,
-    }
-  }, [effPositions, criteria, extScores, intCriteria, intExtScores, intPrevType,
-      acwp, intAcwp, mpRequired, deployed, penalties, cfg, intPositions])
 
   // Hide dropdowns when clicking outside
   useEffect(() => {
@@ -201,6 +135,54 @@ function NewTripPage() {
   const nacCount   = nacPositions.length
   const intCount   = intPositions.length
   const mpRequired = trainRequiredMp != null ? trainRequiredMp : Math.round((acCount + nacCount) * 0.38)
+
+  // ── Live penalty calculation ─────────────────────────────────────────────────
+  function slabTotal(scores: number[], rateGST: number, gstPct: number, maxScore: number): number {
+    const rNG = rateGST * 100 / (100 + (gstPct || 18))
+    let pen = 0
+    for (const s of scores) {
+      const pct = (s / maxScore) * 100
+      pen += rNG * (pct >= 86 ? 0 : pct >= 76 ? 0.05 : pct >= 66 ? 0.10 : pct >= 50 ? 0.20 : 1.00)
+    }
+    return Math.round(pen * 100) / 100
+  }
+
+  const liveCalc = useMemo(() => {
+    const gst = cfg.gst_pct || 18
+    const acRate  = cfg.ac_rate_gst  || 0
+    const nacRate = cfg.nac_rate_gst || 0
+    const extRate = cfg.ext_rate_gst || 0
+    const acScores: number[] = [], nacScores: number[] = [], extNormScores: number[] = []
+    for (const p of effPositions) {
+      if (p.coach_type === 'INT') continue
+      const cat = coachCategory(p.coach_type)
+      const sc = criteria[p.position] ? calcTotal(criteria[p.position]) : 0
+      if (cat === 'AC')  acScores.push(sc)
+      else if (cat === 'NAC') nacScores.push(sc)
+      if (!acwp && extScores[p.position] !== undefined)
+        extNormScores.push(extScores[p.position])
+    }
+    const normalPen = slabTotal(acScores, acRate, gst, 15)
+                    + slabTotal(nacScores, nacRate, gst, 15)
+                    + (acwp ? 0 : slabTotal(extNormScores, extRate, gst, 3))
+    const acIntSc: number[] = [], nacIntSc: number[] = [], extIntSc: number[] = []
+    for (const p of intPositions) {
+      const prevType = intPrevType[p.position] || 'LWFCZAC'
+      const cat = coachCategory(prevType)
+      const sc = intCriteria[p.position] ? calcTotal(intCriteria[p.position]) : 0
+      if (cat === 'AC')  acIntSc.push(sc)
+      else if (cat === 'NAC') nacIntSc.push(sc)
+      if (!intAcwp) extIntSc.push(intExtScores[p.position] ?? 0)
+    }
+    const intPen = slabTotal(acIntSc, acRate, gst, 18)
+                 + slabTotal(nacIntSc, nacRate, gst, 18)
+                 + (intAcwp ? 0 : slabTotal(extIntSc, extRate, gst, 3))
+    const mpPen = Math.max(0, mpRequired - deployed) * 2 * (cfg.min_wages || 0)
+    const annexPen = Object.values(penalties).reduce((s, v) => s + (Number(v) || 0), 0)
+    return { normal: normalPen, intensive: intPen, manpower: mpPen, annex: annexPen,
+             total: normalPen + intPen + mpPen + annexPen }
+  }, [effPositions, intPositions, criteria, extScores, intCriteria, intExtScores, intPrevType,
+      acwp, intAcwp, mpRequired, deployed, penalties, cfg])
 
   const scores = useMemo(() => {
     const s: Record<number, number> = {}
