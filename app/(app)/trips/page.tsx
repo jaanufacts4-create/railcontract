@@ -31,7 +31,13 @@ function StatChip({ label, value, color }: { label: string; value: number; color
 }
 
 export default function TripsPage() {
-  const [monthYear,   setMonthYear]   = useState(() => new Date().toISOString().slice(0, 7))
+  const [monthYear,   setMonthYear]   = useState(() => {
+    try { return localStorage.getItem('trips_month') || new Date().toISOString().slice(0, 7) } catch { return new Date().toISOString().slice(0, 7) }
+  })
+  const handleMonthChange = (v: string) => {
+    setMonthYear(v)
+    try { localStorage.setItem('trips_month', v) } catch { /* ignore */ }
+  }
   const [trips,       setTrips]       = useState<Trip[]>([])
   const [filterDate,  setFilterDate]  = useState('')
   const [filterTrain, setFilterTrain] = useState('')
@@ -120,9 +126,7 @@ export default function TripsPage() {
   const penaltyLoaded = visible.length > 0 && visible.every(t => penaltyMap[t.id] != null)
 
   function fmtRs(v: number) {
-    if (v >= 100000) return `₹${(v / 100000).toFixed(1)}L`
-    if (v >= 1000)   return `₹${(v / 1000).toFixed(1)}K`
-    return `₹${Math.round(v)}`
+    return `₹${Math.round(v).toLocaleString('en-IN')}`
   }
 
   return (
@@ -136,7 +140,7 @@ export default function TripsPage() {
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           <input type="month" className="input" style={{ width: 160 }}
-            value={monthYear} onChange={e => setMonthYear(e.target.value)} />
+            value={monthYear} onChange={e => handleMonthChange(e.target.value)} />
           <a href={`/api/export/trips?month_year=${monthYear}`} target="_blank" className="btn btn-secondary">
             <Download size={14} /> Export
           </a>
@@ -179,7 +183,7 @@ export default function TripsPage() {
             <StatChip label="AC"    value={totals.ac}      color="#3B82F6" />
             <StatChip label="NAC"   value={totals.nac}     color="#22C55E" />
             <StatChip label="Ext"   value={totals.ext}     color="#F59E0B" />
-            {!loading && penaltyLoaded && (
+            {!loading && visible.length > 0 && (
               <>
                 <div style={{ width: 1, height: 24, background: 'var(--border-md)', margin: '0 2px' }} />
                 {([
@@ -192,8 +196,8 @@ export default function TripsPage() {
                     <div style={{ width: 6, height: 6, borderRadius: '50%', background: color }} />
                     <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
                       <span style={{ fontSize: 10, color, fontWeight: 600 }}>{label}</span>
-                      <span style={{ fontSize: 12, fontWeight: 700, color }}>{fmtRs(val)}</span>
-                      {val >= 1000 && <span style={{ fontSize: 9, color, opacity: 0.7 }}>₹{Math.round(val).toLocaleString('en-IN')}</span>}
+                      <span style={{ fontSize: 12, fontWeight: 700, color }}>{penaltyLoaded ? fmtRs(val) : '₹…'}</span>
+                      {!penaltyLoaded && <span style={{ fontSize: 9, color, opacity: 0.7 }}>loading…</span>}
                     </div>
                   </div>
                 ))}
@@ -201,8 +205,8 @@ export default function TripsPage() {
                   <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#DC2626' }} />
                   <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
                     <span style={{ fontSize: 10, color: '#991B1B', fontWeight: 700 }}>TOTAL</span>
-                    <span style={{ fontSize: 13, fontWeight: 800, color: '#DC2626' }}>{fmtRs(penaltyTotals.total)}</span>
-                    {penaltyTotals.total >= 1000 && <span style={{ fontSize: 9, color: '#DC2626', opacity: 0.7 }}>₹{Math.round(penaltyTotals.total).toLocaleString('en-IN')}</span>}
+                    <span style={{ fontSize: 13, fontWeight: 800, color: '#DC2626' }}>{penaltyLoaded ? fmtRs(penaltyTotals.total) : '₹…'}</span>
+                    {!penaltyLoaded && <span style={{ fontSize: 9, color: '#DC2626', opacity: 0.7 }}>loading…</span>}
                   </div>
                 </div>
               </>
