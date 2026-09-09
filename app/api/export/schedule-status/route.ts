@@ -35,6 +35,22 @@ function dateRange(from: string, to: string): string[] {
   return dates
 }
 
+
+/** Expand a train_no into canonical train numbers it represents.
+ *  "54611+54613" → ["54611","54613"]  (combined trip covers both)
+ *  "14674/50"    → ["14674","14650"]  (slash = replace last N digits)
+ *  "12204"       → ["12204"]
+ */
+function expandTrainNo(tn: string): string[] {
+  const s = tn.trim()
+  if (s.includes('+')) return s.split('+').flatMap(p => expandTrainNo(p.trim()))
+  if (s.includes('/')) {
+    const [base, suf] = s.split('/').map(x => x.trim())
+    return [base, base.slice(0, base.length - suf.length) + suf]
+  }
+  return [s]
+}
+
 /**
  * GET /api/export/schedule-status?from=YYYY-MM-DD&to=YYYY-MM-DD
  * Returns Excel with schedule vs actuals for the date range
@@ -61,7 +77,16 @@ export async function GET(req: Request) {
     sql:  'SELECT date, train_no FROM trips WHERE date>=? AND date<=?',
     args: [from, to],
   })
-  const doneSet = new Set(tripsRes.rows.map(r => `${r.date}|${r.train_no}`))
+  // Build covered set — expand trip train_no to handle "A+B" and "A/XX" notations
+  const coveredSet = new Set<string>()
+  for (const row of tripsRes.rows) {
+    for (const t of expandTrainNo(row.train_no as string)) {
+      coveredSet.add(`${row.date}|${t}`)
+    }
+  }
+  function isCovered(date: string, scheduleTrain: string): boolean {
+    return expandTrainNo(scheduleTrain).some(t => coveredSet.has(`${date}|${t}`))
+  }
 
   // Build per-date rows
   type Row = {
@@ -76,7 +101,7 @@ export async function GET(req: Request) {
     const todayTrains = schedule.filter(s => s.days.includes('Daily') || s.days.includes(dow))
     for (const s of todayTrains) {
       rows.push({ date, dow, train_no: s.train_no, ac: s.ac_count, nac: s.nac_count,
-        done: doneSet.has(`${date}|${s.train_no}`) })
+        done: isCovered(date, s.train_no) })
     }
   }
 

@@ -21,6 +21,22 @@ function dateRange(from: string, to: string): string[] {
   return dates
 }
 
+
+/** Expand a train_no into canonical train numbers it represents.
+ *  "54611+54613" → ["54611","54613"]  (combined trip covers both)
+ *  "14674/50"    → ["14674","14650"]  (slash = replace last N digits)
+ *  "12204"       → ["12204"]
+ */
+function expandTrainNo(tn: string): string[] {
+  const s = tn.trim()
+  if (s.includes('+')) return s.split('+').flatMap(p => expandTrainNo(p.trim()))
+  if (s.includes('/')) {
+    const [base, suf] = s.split('/').map(x => x.trim())
+    return [base, base.slice(0, base.length - suf.length) + suf]
+  }
+  return [s]
+}
+
 /** GET /api/schedule-status?from=YYYY-MM-DD&to=YYYY-MM-DD */
 export async function GET(req: Request) {
   await ensureDB()
@@ -42,7 +58,16 @@ export async function GET(req: Request) {
     sql: 'SELECT date, train_no FROM trips WHERE date>=? AND date<=?',
     args: [from, to],
   })
-  const doneSet = new Set(tripsRes.rows.map(r => `${r.date}|${r.train_no}`))
+  // Build covered set — expand trip train_no to handle "A+B" and "A/XX" notations
+  const coveredSet = new Set<string>()
+  for (const row of tripsRes.rows) {
+    for (const t of expandTrainNo(row.train_no as string)) {
+      coveredSet.add(`${row.date}|${t}`)
+    }
+  }
+  function isCovered(date: string, scheduleTrain: string): boolean {
+    return expandTrainNo(scheduleTrain).some(t => coveredSet.has(`${date}|${t}`))
+  }
 
   // ── Schedule Status rows ──────────────────────────────────────────────────
   type StatusRow = { date: string; dow: string; train_no: string; ac: number; nac: number; done: boolean }
@@ -61,7 +86,7 @@ export async function GET(req: Request) {
     let daySched = 0, dayDone = 0
 
     for (const s of todayTrains) {
-      const done = doneSet.has(`${date}|${s.train_no}`)
+      const done = isCovered(date, s.train_no)
       statusRows.push({ date, dow, train_no: s.train_no, ac: s.ac_count, nac: s.nac_count, done })
       trainOccurrence.set(s.train_no, (trainOccurrence.get(s.train_no) ?? 0) + 1)
       daySched++
