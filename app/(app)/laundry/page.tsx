@@ -10,7 +10,7 @@ function fmtDate(d: string) { const [y,m,day] = d.split('-'); return `${day}-${m
 function safe(v: unknown): number { const n = Number(v); return isNaN(n) ? 0 : n }
 function fmt(v: number) { return v > 0 ? v.toLocaleString('en-IN') : '—' }
 
-type ColDef = { key: string; label: string; sub?: string; primary?: boolean }
+type ColDef = { key: string; label: string; sub?: string; primary?: boolean; ac?: boolean }
 
 const DIRTY_COLS: ColDef[] = [
   { key: 'bed_sheet_normal',    label: 'B.Sheet',  sub: 'Normal' },
@@ -27,17 +27,25 @@ const DIRTY_COLS: ColDef[] = [
 ]
 
 const FRESH_COLS: ColDef[] = [
-  { key: 'bed_sheet_fresh',        label: 'B.Sheet',  sub: 'Fresh',     primary: true },
-  { key: 'bed_sheet_condemned',    label: 'B.Sheet',  sub: 'Condemned' },
-  { key: 'pillow_cover_fresh',     label: 'P.Cover',  sub: 'Fresh',     primary: true },
-  { key: 'pillow_cover_condemned', label: 'P.Cover',  sub: 'Condemned' },
-  { key: 'face_towel_fresh',       label: 'Face',     sub: 'Fresh' },
-  { key: 'face_towel_condemned',   label: 'Face',     sub: 'Condemned' },
-  { key: 'blanket_fresh',          label: 'Blanket',  sub: 'Fresh' },
-  { key: 'blanket_condemned',      label: 'Blanket',  sub: 'Condemned' },
-  { key: 'canvas_bag_fresh',       label: 'Canvas',   sub: 'Fresh' },
-  { key: 'canvas_bag_condemned',   label: 'Canvas',   sub: 'Condemned' },
-  { key: 'packets',                label: 'Packets',  primary: true },
+  { key: 'bed_sheet_fresh',         label: 'Bed Sheet',     sub: 'Fresh',    primary: true },
+  { key: 'bed_sheet_first_ac',      label: 'Bed Sheet',     sub: '1st AC',   ac: true },
+  { key: 'bed_sheet_condemned',     label: 'Bed Sheet',     sub: 'Condmd' },
+  { key: 'pillow_cover_fresh',      label: 'Pillow Cover',  sub: 'Fresh',    primary: true },
+  { key: 'pillow_cover_first_ac',   label: 'Pillow Cover',  sub: '1st AC',   ac: true },
+  { key: 'pillow_cover_condemned',  label: 'Pillow Cover',  sub: 'Condmd' },
+  { key: 'face_towel_fresh',        label: 'Face Towel',    sub: 'Fresh' },
+  { key: 'face_towel_first_ac',     label: 'Face Towel',    sub: '1st AC',   ac: true },
+  { key: 'face_towel_condemned',    label: 'Face Towel',    sub: 'Condmd' },
+  { key: 'bath_towel_fresh',        label: 'Bath Towel',    sub: 'Fresh' },
+  { key: 'bath_towel_first_ac',     label: 'Bath Towel',    sub: '1st AC',   ac: true },
+  { key: 'bath_towel_condemned',    label: 'Bath Towel',    sub: 'Condmd' },
+  { key: 'blanket_fresh',           label: 'Blanket',       sub: 'Fresh' },
+  { key: 'blanket_condemned',       label: 'Blanket',       sub: 'Condmd' },
+  { key: 'blanket_cover_fresh',     label: 'Blkt Cover',    sub: 'Fresh' },
+  { key: 'blanket_cover_condemned', label: 'Blkt Cover',    sub: 'Condmd' },
+  { key: 'canvas_bag_fresh',        label: 'Canvas Bag',    sub: 'Fresh' },
+  { key: 'canvas_bag_condemned',    label: 'Canvas Bag',    sub: 'Condmd' },
+  { key: 'packets',                 label: 'Packets',       primary: true },
 ]
 
 function EntryRow({ e, cols, onDel, td, editHref }: {
@@ -51,7 +59,7 @@ function EntryRow({ e, cols, onDel, td, editHref }: {
     <tr>
       <td style={{ ...td(true), textAlign: 'left', paddingLeft: 20, color: 'var(--text-3)' }}>{fmtDate(e.date)}</td>
       {cols.map(col => (
-        <td key={col.key} style={{ ...td(col.primary), color: col.primary ? 'var(--primary)' : undefined }}>
+        <td key={col.key} style={{ ...td(col.primary), color: col.primary ? 'var(--primary)' : col.ac ? '#7C3AED' : undefined, background: col.ac ? '#EDE9FE11' : undefined }}>
           {fmt(safe(e[col.key]))}
         </td>
       ))}
@@ -207,7 +215,7 @@ export default function LaundryPage() {
                 <tr>
                   <th style={{ ...th, textAlign: 'left', paddingLeft: 20 }}>Date</th>
                   {cols.map(col => (
-                    <th key={col.key} style={{ ...th, color: col.primary ? 'var(--primary)' : undefined }}>
+                    <th key={col.key} style={{ ...th, color: col.primary ? 'var(--primary)' : col.ac ? '#7C3AED' : undefined, background: col.ac ? '#EDE9FE22' : undefined }}>
                       {col.label}{col.sub ? <><br/><span style={{ fontWeight: 400 }}>{col.sub}</span></> : null}
                     </th>
                   ))}
