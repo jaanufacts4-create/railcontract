@@ -81,19 +81,19 @@ function NewFreshEntryPage() {
   }
 
   const inp: React.CSSProperties = {
-    width: '100%', padding: '8px 10px', borderRadius: 8,
+    width: '100%', padding: '5px 8px', borderRadius: 8,
     border: '1.5px solid var(--border)', background: 'var(--surface)',
     color: 'var(--text)', fontFamily: 'var(--font)', fontSize: 14,
     fontWeight: 600, textAlign: 'right' as const, outline: 'none',
   }
   const totalBox: React.CSSProperties = {
-    padding: '8px 10px', borderRadius: 8, background: 'var(--surface-2)',
+    padding: '5px 8px', borderRadius: 8, background: 'var(--surface-2)',
     border: '1.5px solid var(--border)', fontWeight: 800, fontSize: 14,
     color: 'var(--primary)', textAlign: 'right' as const,
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 22, maxWidth: 760 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 760 }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <Link href="/laundry/dirty-fresh" style={{ color: 'var(--text-3)', display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }}>
@@ -106,7 +106,7 @@ function NewFreshEntryPage() {
       </div>
 
       {/* Date */}
-      <div className="card" style={{ padding: 20 }}>
+      <div className="card" style={{ padding: "12px 16px" }}>
         <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.04em', display: 'block', marginBottom: 6 }}>Date</label>
         <input type="date" className="input" style={{ maxWidth: 200 }} value={date} onChange={e => {
           setDate(e.target.value)
@@ -115,11 +115,11 @@ function NewFreshEntryPage() {
       </div>
 
       {/* Items */}
-      <div className="card" style={{ padding: 20 }}>
-        <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.04em', margin: '0 0 16px' }}>
+      <div className="card" style={{ padding: "12px 16px" }}>
+        <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.04em', margin: '0 0 8px' }}>
           Washed Linen Received
         </p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {ITEMS.map(({ label, freshKey, acKey, condKey, has1stAC }) => {
             const fresh = vals[freshKey] ?? 0
             const ac    = has1stAC ? (vals[acKey] ?? 0) : 0
@@ -127,28 +127,28 @@ function NewFreshEntryPage() {
             const total = fresh + ac + cond
             const cols  = has1stAC ? '1fr 1fr 1fr 80px' : '1fr 1fr 80px'
             return (
-              <div key={label} style={{ background: 'var(--surface-2)', borderRadius: 10, padding: '14px 16px' }}>
-                <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', margin: '0 0 10px' }}>{label}</p>
-                <div style={{ display: 'grid', gridTemplateColumns: cols, gap: 10, alignItems: 'end' }}>
+              <div key={label} style={{ background: 'var(--surface-2)', borderRadius: 10, padding: '8px 12px' }}>
+                <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', margin: '0 0 5px' }}>{label}</p>
+                <div style={{ display: 'grid', gridTemplateColumns: cols, gap: 8, alignItems: 'end' }}>
                   <div>
-                    <label style={{ fontSize: 11, color: '#16A34A', fontWeight: 700, display: 'block', marginBottom: 4 }}>Fresh ✓</label>
+                    <label style={{ fontSize: 11, color: '#16A34A', fontWeight: 700, display: 'block', marginBottom: 2 }}>Fresh ✓</label>
                     <input type="number" min={0} style={{ ...inp, borderColor: '#BBF7D0' }} value={fresh || ''}
                       onChange={e => set(freshKey, Number(e.target.value))} />
                   </div>
                   {has1stAC && (
                     <div>
-                      <label style={{ fontSize: 11, color: '#7C3AED', fontWeight: 700, display: 'block', marginBottom: 4 }}>1st AC</label>
+                      <label style={{ fontSize: 11, color: '#7C3AED', fontWeight: 700, display: 'block', marginBottom: 2 }}>1st AC</label>
                       <input type="number" min={0} style={{ ...inp, borderColor: '#DDD6FE' }} value={ac || ''}
                         onChange={e => set(acKey, Number(e.target.value))} />
                     </div>
                   )}
                   <div>
-                    <label style={{ fontSize: 11, color: '#EF4444', fontWeight: 700, display: 'block', marginBottom: 4 }}>Condemned ✗</label>
+                    <label style={{ fontSize: 11, color: '#EF4444', fontWeight: 700, display: 'block', marginBottom: 2 }}>Condemned ✗</label>
                     <input type="number" min={0} style={{ ...inp, borderColor: '#FECACA' }} value={cond || ''}
                       onChange={e => set(condKey, Number(e.target.value))} />
                   </div>
                   <div>
-                    <label style={{ fontSize: 11, color: 'var(--primary)', fontWeight: 700, display: 'block', marginBottom: 4 }}>Total</label>
+                    <label style={{ fontSize: 11, color: 'var(--primary)', fontWeight: 700, display: 'block', marginBottom: 2 }}>Total</label>
                     <div style={totalBox}>{total.toLocaleString('en-IN')}</div>
                   </div>
                 </div>
@@ -157,8 +157,8 @@ function NewFreshEntryPage() {
           })}
 
           {/* Packets */}
-          <div style={{ background: 'var(--surface-2)', borderRadius: 10, padding: '14px 16px' }}>
-            <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', margin: '0 0 10px' }}>Packets</p>
+          <div style={{ background: 'var(--surface-2)', borderRadius: 10, padding: '8px 12px' }}>
+            <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', margin: '0 0 5px' }}>Packets</p>
             <input type="number" min={0} style={{ ...inp, maxWidth: 200 }} value={vals.packets || ''}
               onChange={e => set('packets', Number(e.target.value))} />
           </div>
