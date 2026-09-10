@@ -29,6 +29,7 @@ let _trainSettingsMigrated   = false
 let _mccMonthlyTotalsMigrated = false
 let _monthlyBillsMigrated  = false
 let _freshDataV2Migrated   = false
+let _rawDataV2Migrated     = false
 export async function ensureDB() {
   if (!_migrated) {
     await migrate()
@@ -113,6 +114,10 @@ export async function ensureDB() {
   if (!_freshDataV2Migrated) {
     await migrateFreshDataV2()
     _freshDataV2Migrated = true
+  }
+  if (!_rawDataV2Migrated) {
+    await migrateRawDataV2()
+    _rawDataV2Migrated = true
   }
   // NOTE: ensureIndexes() is NOT called here to avoid Vercel timeout on cold start.
   // Call it once manually via: GET /api/admin/ensure-indexes
@@ -1176,5 +1181,12 @@ async function migrateFreshDataV2() {
     } catch {
       // column already exists — ignore
     }
+  }
+}
+
+async function migrateRawDataV2() {
+  // Add 1st AC columns for Face Towel and Bath Towel in laundry_raw_data
+  for (const col of ['face_towel_1ac INTEGER NOT NULL DEFAULT 0', 'bath_towel_1ac INTEGER NOT NULL DEFAULT 0']) {
+    try { await db.execute(`ALTER TABLE laundry_raw_data ADD COLUMN ${col}`) } catch { /* already exists */ }
   }
 }

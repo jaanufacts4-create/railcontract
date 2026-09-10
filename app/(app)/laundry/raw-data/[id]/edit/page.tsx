@@ -4,16 +4,30 @@ import { useParams, useRouter } from 'next/navigation'
 import { Save, ChevronLeft } from 'lucide-react'
 import Link from 'next/link'
 
+const dualRows = [
+  { label: 'Bed Sheet',    normalKey: 'bed_sheet_normal',    acKey: 'bed_sheet_1ac'    },
+  { label: 'Pillow Cover', normalKey: 'pillow_cover_normal', acKey: 'pillow_cover_1ac' },
+  { label: 'Face Towel',   normalKey: 'face_towel',          acKey: 'face_towel_1ac'   },
+  { label: 'Bath Towel',   normalKey: 'bath_towel',          acKey: 'bath_towel_1ac'   },
+]
+const singleRows = [
+  { label: 'Blanket Cover', key: 'blanket_cover' },
+  { label: 'Blanket',       key: 'blanket'       },
+  { label: 'Canvas Bag',    key: 'canvas_bag'    },
+]
+const ZERO: Record<string, number> = {
+  bed_sheet_normal: 0, bed_sheet_1ac: 0,
+  pillow_cover_normal: 0, pillow_cover_1ac: 0,
+  face_towel: 0, face_towel_1ac: 0,
+  bath_towel: 0, bath_towel_1ac: 0,
+  blanket_cover: 0, blanket: 0, canvas_bag: 0,
+}
+
 export default function EditDirtyPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
-
   const [date, setDate] = useState('')
-  const [vals, setVals] = useState({
-    bed_sheet_normal: 0, bed_sheet_1ac: 0,
-    pillow_cover_normal: 0, pillow_cover_1ac: 0,
-    face_towel: 0, bath_towel: 0, blanket_cover: 0, blanket: 0, canvas_bag: 0,
-  })
+  const [vals, setVals] = useState<Record<string, number>>({ ...ZERO })
   const [loading, setLoading] = useState(true)
   const [saving,  setSaving]  = useState(false)
 
@@ -23,22 +37,14 @@ export default function EditDirtyPage() {
       .then(({ entry }) => {
         if (!entry) { alert('Not found'); router.back(); return }
         setDate(String(entry.date))
-        setVals({
-          bed_sheet_normal:    Number(entry.bed_sheet_normal),
-          bed_sheet_1ac:       Number(entry.bed_sheet_1ac),
-          pillow_cover_normal: Number(entry.pillow_cover_normal),
-          pillow_cover_1ac:    Number(entry.pillow_cover_1ac),
-          face_towel:          Number(entry.face_towel),
-          bath_towel:          Number(entry.bath_towel),
-          blanket_cover:       Number(entry.blanket_cover),
-          blanket:             Number(entry.blanket),
-          canvas_bag:          Number(entry.canvas_bag),
-        })
+        const loaded: Record<string, number> = {}
+        for (const k of Object.keys(ZERO)) loaded[k] = Number(entry[k] ?? 0)
+        setVals(loaded)
         setLoading(false)
       })
   }, [id])
 
-  function set(k: keyof typeof vals, v: number) {
+  function set(k: string, v: number) {
     setVals(prev => ({ ...prev, [k]: Math.max(0, isNaN(v) ? 0 : v) }))
   }
 
@@ -54,74 +60,88 @@ export default function EditDirtyPage() {
   }
 
   const inp: React.CSSProperties = {
-    width: '100%', padding: '8px 10px', borderRadius: 8,
+    width: '100%', padding: '7px 10px', borderRadius: 7,
     border: '1.5px solid var(--border)', background: 'var(--surface)',
     color: 'var(--text)', fontFamily: 'var(--font)', fontSize: 14,
-    fontWeight: 600, textAlign: 'right', outline: 'none',
+    fontWeight: 600, textAlign: 'right', outline: 'none', boxSizing: 'border-box',
   }
-  const totalBox: React.CSSProperties = {
-    padding: '8px 10px', borderRadius: 8, background: 'var(--surface-2)',
-    border: '1.5px solid var(--border)', fontWeight: 800, fontSize: 14,
-    color: 'var(--primary)', textAlign: 'right',
+  const totalCell: React.CSSProperties = {
+    padding: '7px 12px', borderRadius: 7,
+    background: '#FEF3C7', border: '1.5px solid #FCD34D',
+    fontWeight: 800, fontSize: 14, color: '#92400E', textAlign: 'right', minWidth: 70,
+  }
+  const thStyle: React.CSSProperties = {
+    padding: '10px 14px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase',
+    letterSpacing: '.05em', color: '#fff', background: '#B45309', textAlign: 'center', whiteSpace: 'nowrap',
+  }
+  const tdStyle: React.CSSProperties = {
+    padding: '10px 12px', borderBottom: '1px solid var(--border)', verticalAlign: 'middle',
   }
 
   if (loading) return <p style={{ fontSize: 13, color: 'var(--text-4)' }}>Loading…</p>
 
-  const bsTotal = vals.bed_sheet_normal + vals.bed_sheet_1ac
-  const pcTotal = vals.pillow_cover_normal + vals.pillow_cover_1ac
-
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 22, maxWidth: 700 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 22, maxWidth: 860 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <Link href="/laundry" style={{ color: 'var(--text-3)', display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }}>
           <ChevronLeft size={18} />
         </Link>
         <div>
-          <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', letterSpacing: '-.02em', margin: 0 }}>Edit Dirty Linen Entry</h1>
+          <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', letterSpacing: '-.02em', margin: 0 }}>Edit Raw Data Entry</h1>
           <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '2px 0 0' }}>Date: {date}</p>
         </div>
       </div>
 
-      <div className="card" style={{ padding: 20 }}>
-        <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.04em', margin: '0 0 16px' }}>Bed Sheets</p>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
-          <div><label style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 700, display: 'block', marginBottom: 4 }}>Normal</label>
-            <input type="number" min={0} style={inp} value={vals.bed_sheet_normal || ''} onChange={e => set('bed_sheet_normal', Number(e.target.value))} /></div>
-          <div><label style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 700, display: 'block', marginBottom: 4 }}>1st AC</label>
-            <input type="number" min={0} style={inp} value={vals.bed_sheet_1ac || ''} onChange={e => set('bed_sheet_1ac', Number(e.target.value))} /></div>
-          <div><label style={{ fontSize: 11, color: 'var(--primary)', fontWeight: 700, display: 'block', marginBottom: 4 }}>Total (auto)</label>
-            <div style={totalBox}>{bsTotal.toLocaleString('en-IN')}</div></div>
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div style={{ padding: '14px 18px 10px', borderBottom: '1px solid var(--border)' }}>
+          <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.04em', margin: 0 }}>
+            Dirty Linen Dispatched Quantities
+          </p>
         </div>
-      </div>
-
-      <div className="card" style={{ padding: 20 }}>
-        <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.04em', margin: '0 0 16px' }}>Pillow Covers</p>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
-          <div><label style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 700, display: 'block', marginBottom: 4 }}>Normal</label>
-            <input type="number" min={0} style={inp} value={vals.pillow_cover_normal || ''} onChange={e => set('pillow_cover_normal', Number(e.target.value))} /></div>
-          <div><label style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 700, display: 'block', marginBottom: 4 }}>1st AC</label>
-            <input type="number" min={0} style={inp} value={vals.pillow_cover_1ac || ''} onChange={e => set('pillow_cover_1ac', Number(e.target.value))} /></div>
-          <div><label style={{ fontSize: 11, color: 'var(--primary)', fontWeight: 700, display: 'block', marginBottom: 4 }}>Total (auto)</label>
-            <div style={totalBox}>{pcTotal.toLocaleString('en-IN')}</div></div>
-        </div>
-      </div>
-
-      <div className="card" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.04em', margin: 0 }}>Other Items</p>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          {([
-            ['face_towel',   'Face Towel'],
-            ['bath_towel',   'Bath Towel'],
-            ['blanket_cover','Blanket Cover'],
-            ['blanket',      'Blanket'],
-            ['canvas_bag',   'Canvas Bag'],
-          ] as [keyof typeof vals, string][]).map(([k, label]) => (
-            <div key={k}>
-              <label style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 700, display: 'block', marginBottom: 4 }}>{label}</label>
-              <input type="number" min={0} style={inp} value={vals[k] || ''} onChange={e => set(k, Number(e.target.value))} />
-            </div>
-          ))}
-        </div>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr>
+              <th style={{ ...thStyle, textAlign: 'left', background: '#78350F', width: '28%' }}>Item</th>
+              <th style={thStyle}>Normal</th>
+              <th style={thStyle}>1st AC</th>
+              <th style={{ ...thStyle, background: '#92400E' }}>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {dualRows.map((row, i) => {
+              const normal = vals[row.normalKey] ?? 0
+              const ac     = vals[row.acKey] ?? 0
+              const total  = normal + ac
+              return (
+                <tr key={row.label} style={{ background: i % 2 === 0 ? 'var(--surface)' : 'var(--surface-2)' }}>
+                  <td style={{ ...tdStyle, fontWeight: 700, fontSize: 14, color: 'var(--text)', paddingLeft: 18 }}>{row.label}</td>
+                  <td style={{ ...tdStyle, textAlign: 'center' }}>
+                    <input type="number" min={0} style={inp} value={normal || ''}
+                      onChange={e => set(row.normalKey, Number(e.target.value))} />
+                  </td>
+                  <td style={{ ...tdStyle, textAlign: 'center' }}>
+                    <input type="number" min={0} style={{ ...inp, borderColor: '#DDD6FE' }} value={ac || ''}
+                      onChange={e => set(row.acKey, Number(e.target.value))} />
+                  </td>
+                  <td style={{ ...tdStyle, textAlign: 'center' }}>
+                    <div style={totalCell}>{total.toLocaleString('en-IN')}</div>
+                  </td>
+                </tr>
+              )
+            })}
+            <tr><td colSpan={4} style={{ padding: 0, background: 'var(--border)', height: 2 }} /></tr>
+            {singleRows.map((row, i) => (
+              <tr key={row.key} style={{ background: (i + dualRows.length) % 2 === 0 ? 'var(--surface)' : 'var(--surface-2)' }}>
+                <td style={{ ...tdStyle, fontWeight: 700, fontSize: 14, color: 'var(--text)', paddingLeft: 18 }}>{row.label}</td>
+                <td colSpan={2} style={{ ...tdStyle }}>
+                  <input type="number" min={0} style={{ ...inp, maxWidth: 200 }}
+                    value={vals[row.key] || ''} onChange={e => set(row.key, Number(e.target.value))} />
+                </td>
+                <td style={{ ...tdStyle, textAlign: 'center', fontSize: 13, color: 'var(--text-4)' }}>—</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       <div className="card" style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12 }}>
