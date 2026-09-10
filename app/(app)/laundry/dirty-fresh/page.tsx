@@ -10,10 +10,12 @@ type DirtyEntry = {
 }
 type FreshEntry = {
   id: number; date: string
-  bed_sheet_fresh: number; bed_sheet_condemned: number
-  pillow_cover_fresh: number; pillow_cover_condemned: number
-  face_towel_fresh: number; face_towel_condemned: number
+  bed_sheet_fresh: number; bed_sheet_first_ac: number; bed_sheet_condemned: number
+  pillow_cover_fresh: number; pillow_cover_first_ac: number; pillow_cover_condemned: number
+  face_towel_fresh: number; face_towel_first_ac: number; face_towel_condemned: number
+  bath_towel_fresh: number; bath_towel_first_ac: number; bath_towel_condemned: number
   blanket_fresh: number; blanket_condemned: number
+  blanket_cover_fresh: number; blanket_cover_condemned: number
   canvas_bag_fresh: number; canvas_bag_condemned: number
   packets: number
 }
@@ -110,7 +112,16 @@ export default function DirtyFreshPage() {
   })
 
   const DIRTY_KEYS: (keyof DirtyEntry)[] = ['bed_sheet_total', 'pillow_cover_total', 'face_towel', 'blanket', 'canvas_bag']
-  const FRESH_KEYS: (keyof FreshEntry)[] = ['bed_sheet_fresh', 'bed_sheet_condemned', 'pillow_cover_fresh', 'pillow_cover_condemned', 'face_towel_fresh', 'face_towel_condemned', 'blanket_fresh', 'blanket_condemned', 'canvas_bag_fresh', 'canvas_bag_condemned', 'packets']
+  const FRESH_KEYS: (keyof FreshEntry)[] = [
+    'bed_sheet_fresh', 'bed_sheet_first_ac', 'bed_sheet_condemned',
+    'pillow_cover_fresh', 'pillow_cover_first_ac', 'pillow_cover_condemned',
+    'face_towel_fresh', 'face_towel_first_ac', 'face_towel_condemned',
+    'bath_towel_fresh', 'bath_towel_first_ac', 'bath_towel_condemned',
+    'blanket_fresh', 'blanket_condemned',
+    'blanket_cover_fresh', 'blanket_cover_condemned',
+    'canvas_bag_fresh', 'canvas_bag_condemned',
+    'packets',
+  ]
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -153,7 +164,7 @@ export default function DirtyFreshPage() {
                 <tr>
                   <th rowSpan={2} style={{ padding: '8px 12px', fontSize: 11, fontWeight: 700, color: 'var(--text)', background: 'var(--surface-2)', border: '1px solid var(--border)', textAlign: 'left', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>Date</th>
                   <th colSpan={5} style={{ padding: '6px 10px', fontSize: 10, fontWeight: 800, color: '#FFF', background: D_HDR, border: `1.5px solid ${D_LINE}`, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '.05em' }}>🔴 Dirty Linen Dispatched</th>
-                  <th colSpan={11} style={{ padding: '6px 10px', fontSize: 10, fontWeight: 800, color: '#FFF', background: F_HDR, border: `1.5px solid ${F_LINE}`, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '.05em' }}>🟢 Washed Linen Received</th>
+                  <th colSpan={19} style={{ padding: '6px 10px', fontSize: 10, fontWeight: 800, color: '#FFF', background: F_HDR, border: `1.5px solid ${F_LINE}`, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '.05em' }}>🟢 Washed Linen Received</th>
                   <th rowSpan={2} style={{ padding: '6px 8px', background: 'var(--surface-2)', border: '1px solid var(--border)', width: 72 }}></th>
                 </tr>
                 {/* ── Row 2: column labels ── */}
@@ -165,13 +176,21 @@ export default function DirtyFreshPage() {
                   <th style={hdr(D_HDR, D_LINE)}>C.Bag</th>
 
                   <th style={hdr(F_HDR, F_LINE)}>BS Fresh</th>
+                  <th style={hdr('#5B21B6', '#7C3AED')}>BS 1st AC</th>
                   <th style={hdr(C_HDR, C_LINE)}>BS Condmd</th>
                   <th style={hdr(F_HDR, F_LINE)}>PC Fresh</th>
+                  <th style={hdr('#5B21B6', '#7C3AED')}>PC 1st AC</th>
                   <th style={hdr(C_HDR, C_LINE)}>PC Condmd</th>
                   <th style={hdr(F_HDR, F_LINE)}>FT Fresh</th>
+                  <th style={hdr('#5B21B6', '#7C3AED')}>FT 1st AC</th>
                   <th style={hdr(C_HDR, C_LINE)}>FT Condmd</th>
+                  <th style={hdr(F_HDR, F_LINE)}>BT Fresh</th>
+                  <th style={hdr('#5B21B6', '#7C3AED')}>BT 1st AC</th>
+                  <th style={hdr(C_HDR, C_LINE)}>BT Condmd</th>
                   <th style={hdr(F_HDR, F_LINE)}>Blkt Fresh</th>
                   <th style={hdr(C_HDR, C_LINE)}>Blkt Condmd</th>
+                  <th style={hdr(F_HDR, F_LINE)}>BltCvr Fresh</th>
+                  <th style={hdr(C_HDR, C_LINE)}>BltCvr Condmd</th>
                   <th style={hdr(F_HDR, F_LINE)}>CB Fresh</th>
                   <th style={hdr(C_HDR, C_LINE)}>CB Condmd</th>
                   <th style={hdr(P_HDR, P_LINE)}>Packets</th>
@@ -198,16 +217,24 @@ export default function DirtyFreshPage() {
                       <td style={cell(dBg, D_TEXT, D_LINE)}>{d ? num(d.canvas_bag)         : <span style={{ color: '#D97706', opacity: .4 }}>—</span>}</td>
 
                       {/* ── Fresh cols ── */}
-                      <td style={cell(fBg, F_TEXT, F_LINE)}>{f ? num(f.bed_sheet_fresh)      : <span style={{ color: '#16A34A', opacity: .4 }}>—</span>}</td>
-                      <td style={cell(fBg, f && f.bed_sheet_condemned > 0 ? C_TEXT : F_TEXT, C_LINE)}>{f ? num(f.bed_sheet_condemned)   : <span style={{ opacity: .4 }}>—</span>}</td>
-                      <td style={cell(fBg, F_TEXT, F_LINE)}>{f ? num(f.pillow_cover_fresh)   : <span style={{ color: '#16A34A', opacity: .4 }}>—</span>}</td>
+                      <td style={cell(fBg, F_TEXT, F_LINE)}>{f ? num(f.bed_sheet_fresh)           : <span style={{ color: '#16A34A', opacity: .4 }}>—</span>}</td>
+                      <td style={cell(fBg, '#5B21B6', '#7C3AED')}>{f ? num(f.bed_sheet_first_ac)  : <span style={{ opacity: .4 }}>—</span>}</td>
+                      <td style={cell(fBg, f && f.bed_sheet_condemned > 0 ? C_TEXT : F_TEXT, C_LINE)}>{f ? num(f.bed_sheet_condemned)    : <span style={{ opacity: .4 }}>—</span>}</td>
+                      <td style={cell(fBg, F_TEXT, F_LINE)}>{f ? num(f.pillow_cover_fresh)         : <span style={{ color: '#16A34A', opacity: .4 }}>—</span>}</td>
+                      <td style={cell(fBg, '#5B21B6', '#7C3AED')}>{f ? num(f.pillow_cover_first_ac): <span style={{ opacity: .4 }}>—</span>}</td>
                       <td style={cell(fBg, f && f.pillow_cover_condemned > 0 ? C_TEXT : F_TEXT, C_LINE)}>{f ? num(f.pillow_cover_condemned): <span style={{ opacity: .4 }}>—</span>}</td>
-                      <td style={cell(fBg, F_TEXT, F_LINE)}>{f ? num(f.face_towel_fresh)     : <span style={{ color: '#16A34A', opacity: .4 }}>—</span>}</td>
-                      <td style={cell(fBg, f && f.face_towel_condemned > 0 ? C_TEXT : F_TEXT, C_LINE)}>{f ? num(f.face_towel_condemned)  : <span style={{ opacity: .4 }}>—</span>}</td>
-                      <td style={cell(fBg, F_TEXT, F_LINE)}>{f ? num(f.blanket_fresh)        : <span style={{ color: '#16A34A', opacity: .4 }}>—</span>}</td>
-                      <td style={cell(fBg, f && f.blanket_condemned > 0 ? C_TEXT : F_TEXT, C_LINE)}>{f ? num(f.blanket_condemned)       : <span style={{ opacity: .4 }}>—</span>}</td>
-                      <td style={cell(fBg, F_TEXT, F_LINE)}>{f ? num(f.canvas_bag_fresh)     : <span style={{ color: '#16A34A', opacity: .4 }}>—</span>}</td>
-                      <td style={cell(fBg, f && f.canvas_bag_condemned > 0 ? C_TEXT : F_TEXT, C_LINE)}>{f ? num(f.canvas_bag_condemned)  : <span style={{ opacity: .4 }}>—</span>}</td>
+                      <td style={cell(fBg, F_TEXT, F_LINE)}>{f ? num(f.face_towel_fresh)           : <span style={{ color: '#16A34A', opacity: .4 }}>—</span>}</td>
+                      <td style={cell(fBg, '#5B21B6', '#7C3AED')}>{f ? num(f.face_towel_first_ac)  : <span style={{ opacity: .4 }}>—</span>}</td>
+                      <td style={cell(fBg, f && f.face_towel_condemned > 0 ? C_TEXT : F_TEXT, C_LINE)}>{f ? num(f.face_towel_condemned)   : <span style={{ opacity: .4 }}>—</span>}</td>
+                      <td style={cell(fBg, F_TEXT, F_LINE)}>{f ? num(f.bath_towel_fresh)           : <span style={{ color: '#16A34A', opacity: .4 }}>—</span>}</td>
+                      <td style={cell(fBg, '#5B21B6', '#7C3AED')}>{f ? num(f.bath_towel_first_ac)  : <span style={{ opacity: .4 }}>—</span>}</td>
+                      <td style={cell(fBg, f && f.bath_towel_condemned > 0 ? C_TEXT : F_TEXT, C_LINE)}>{f ? num(f.bath_towel_condemned)   : <span style={{ opacity: .4 }}>—</span>}</td>
+                      <td style={cell(fBg, F_TEXT, F_LINE)}>{f ? num(f.blanket_fresh)              : <span style={{ color: '#16A34A', opacity: .4 }}>—</span>}</td>
+                      <td style={cell(fBg, f && f.blanket_condemned > 0 ? C_TEXT : F_TEXT, C_LINE)}>{f ? num(f.blanket_condemned)        : <span style={{ opacity: .4 }}>—</span>}</td>
+                      <td style={cell(fBg, F_TEXT, F_LINE)}>{f ? num(f.blanket_cover_fresh)        : <span style={{ color: '#16A34A', opacity: .4 }}>—</span>}</td>
+                      <td style={cell(fBg, f && f.blanket_cover_condemned > 0 ? C_TEXT : F_TEXT, C_LINE)}>{f ? num(f.blanket_cover_condemned): <span style={{ opacity: .4 }}>—</span>}</td>
+                      <td style={cell(fBg, F_TEXT, F_LINE)}>{f ? num(f.canvas_bag_fresh)           : <span style={{ color: '#16A34A', opacity: .4 }}>—</span>}</td>
+                      <td style={cell(fBg, f && f.canvas_bag_condemned > 0 ? C_TEXT : F_TEXT, C_LINE)}>{f ? num(f.canvas_bag_condemned)   : <span style={{ opacity: .4 }}>—</span>}</td>
                       <td style={cell(fBg, P_TEXT, P_LINE)}>{f ? num(f.packets) : <span style={{ opacity: .4 }}>—</span>}</td>
 
                       {/* ── Actions ── */}
@@ -235,11 +262,15 @@ export default function DirtyFreshPage() {
                   {DIRTY_KEYS.map(k => (
                     <td key={k} style={totCell(D_TOT_BG, D_TOT_CLR, D_LINE)}>{sum(dirty, k).toLocaleString('en-IN')}</td>
                   ))}
-                  {FRESH_KEYS.map((k, i) => {
+                  {FRESH_KEYS.map((k) => {
                     const isC = k.endsWith('_condemned')
+                    const isAC = k.endsWith('_first_ac')
                     const isP = k === 'packets'
+                    const bg = isP ? '#EDE9FE' : isAC ? '#EDE9FE' : F_TOT_BG
+                    const clr = isP ? P_TEXT : isAC ? '#5B21B6' : isC ? C_TEXT : F_TOT_CLR
+                    const ln = isP ? P_LINE : isAC ? '#7C3AED' : isC ? C_LINE : F_LINE
                     return (
-                      <td key={k} style={totCell(isP ? '#EDE9FE' : F_TOT_BG, isP ? P_TEXT : isC ? C_TEXT : F_TOT_CLR, isP ? P_LINE : isC ? C_LINE : F_LINE)}>
+                      <td key={k} style={totCell(bg, clr, ln)}>
                         {sum(fresh, k).toLocaleString('en-IN')}
                       </td>
                     )
