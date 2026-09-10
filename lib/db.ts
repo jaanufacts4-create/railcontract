@@ -28,6 +28,7 @@ let _laundrySettingsMigrated = false
 let _trainSettingsMigrated   = false
 let _mccMonthlyTotalsMigrated = false
 let _monthlyBillsMigrated  = false
+let _freshDataV2Migrated   = false
 export async function ensureDB() {
   if (!_migrated) {
     await migrate()
@@ -108,6 +109,10 @@ export async function ensureDB() {
   if (!_mccMonthlyTotalsMigrated) {
     await migrateMccMonthlyTotals()
     _mccMonthlyTotalsMigrated = true
+  }
+  if (!_freshDataV2Migrated) {
+    await migrateFreshDataV2()
+    _freshDataV2Migrated = true
   }
   // NOTE: ensureIndexes() is NOT called here to avoid Vercel timeout on cold start.
   // Call it once manually via: GET /api/admin/ensure-indexes
@@ -1149,5 +1154,27 @@ async function migrateLaundrySettings() {
       sql:  `INSERT OR IGNORE INTO config (key, value) VALUES (?, ?)`,
       args: [key, value],
     })
+  }
+}
+
+async function migrateFreshDataV2() {
+  // Add 1st AC and new item columns to laundry_fresh_data
+  const newCols = [
+    'bed_sheet_first_ac    INTEGER NOT NULL DEFAULT 0',
+    'pillow_cover_first_ac INTEGER NOT NULL DEFAULT 0',
+    'face_towel_first_ac   INTEGER NOT NULL DEFAULT 0',
+    'bath_towel_fresh      INTEGER NOT NULL DEFAULT 0',
+    'bath_towel_first_ac   INTEGER NOT NULL DEFAULT 0',
+    'bath_towel_condemned  INTEGER NOT NULL DEFAULT 0',
+    'blanket_cover_fresh   INTEGER NOT NULL DEFAULT 0',
+    'blanket_cover_condemned INTEGER NOT NULL DEFAULT 0',
+  ]
+  for (const col of newCols) {
+    const colName = col.trim().split(/\s+/)[0]
+    try {
+      await db.execute(`ALTER TABLE laundry_fresh_data ADD COLUMN ${col}`)
+    } catch {
+      // column already exists — ignore
+    }
   }
 }

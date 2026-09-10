@@ -19,10 +19,12 @@ export async function POST(req: Request) {
   const body = await req.json()
   const {
     date, depot = 'ASR',
-    bed_sheet_fresh, bed_sheet_condemned,
-    pillow_cover_fresh, pillow_cover_condemned,
-    face_towel_fresh, face_towel_condemned,
+    bed_sheet_fresh, bed_sheet_first_ac = 0, bed_sheet_condemned,
+    pillow_cover_fresh, pillow_cover_first_ac = 0, pillow_cover_condemned,
+    face_towel_fresh, face_towel_first_ac = 0, face_towel_condemned,
+    bath_towel_fresh = 0, bath_towel_first_ac = 0, bath_towel_condemned = 0,
     blanket_fresh, blanket_condemned,
+    blanket_cover_fresh = 0, blanket_cover_condemned = 0,
     canvas_bag_fresh, canvas_bag_condemned,
     packets,
   } = body
@@ -39,18 +41,22 @@ export async function POST(req: Request) {
   const { lastInsertRowid } = await db.execute({
     sql: `INSERT INTO laundry_fresh_data
             (date, month_year, depot,
-             bed_sheet_fresh, bed_sheet_condemned,
-             pillow_cover_fresh, pillow_cover_condemned,
-             face_towel_fresh, face_towel_condemned,
+             bed_sheet_fresh, bed_sheet_first_ac, bed_sheet_condemned,
+             pillow_cover_fresh, pillow_cover_first_ac, pillow_cover_condemned,
+             face_towel_fresh, face_towel_first_ac, face_towel_condemned,
+             bath_towel_fresh, bath_towel_first_ac, bath_towel_condemned,
              blanket_fresh, blanket_condemned,
+             blanket_cover_fresh, blanket_cover_condemned,
              canvas_bag_fresh, canvas_bag_condemned, packets)
-          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     args: [
       date, month_year, depot,
-      bed_sheet_fresh ?? 0,    bed_sheet_condemned ?? 0,
-      pillow_cover_fresh ?? 0, pillow_cover_condemned ?? 0,
-      face_towel_fresh ?? 0,   face_towel_condemned ?? 0,
+      bed_sheet_fresh ?? 0,    bed_sheet_first_ac ?? 0,    bed_sheet_condemned ?? 0,
+      pillow_cover_fresh ?? 0, pillow_cover_first_ac ?? 0, pillow_cover_condemned ?? 0,
+      face_towel_fresh ?? 0,   face_towel_first_ac ?? 0,   face_towel_condemned ?? 0,
+      bath_towel_fresh ?? 0,   bath_towel_first_ac ?? 0,   bath_towel_condemned ?? 0,
       blanket_fresh ?? 0,      blanket_condemned ?? 0,
+      blanket_cover_fresh ?? 0, blanket_cover_condemned ?? 0,
       canvas_bag_fresh ?? 0,   canvas_bag_condemned ?? 0,
       packets ?? 0,
     ],

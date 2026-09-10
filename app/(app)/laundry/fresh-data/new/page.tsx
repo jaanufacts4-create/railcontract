@@ -5,19 +5,33 @@ import { Save, ChevronLeft } from 'lucide-react'
 import Link from 'next/link'
 
 function today() { return new Date().toISOString().slice(0, 10) }
-
 function nextDay(d: string) {
   const dt = new Date(d); dt.setDate(dt.getDate() + 1)
   return dt.toISOString().slice(0, 10)
 }
 
+// has1stAC=true → 4 cols: Fresh | 1st AC | Condemned | Total
+// has1stAC=false → 3 cols: Fresh | Condemned | Total
 const ITEMS = [
-  { label: 'Bed Sheets',    freshKey: 'bed_sheet_fresh',    condKey: 'bed_sheet_condemned' },
-  { label: 'Pillow Covers', freshKey: 'pillow_cover_fresh', condKey: 'pillow_cover_condemned' },
-  { label: 'Face Towel',    freshKey: 'face_towel_fresh',   condKey: 'face_towel_condemned' },
-  { label: 'Blanket',       freshKey: 'blanket_fresh',      condKey: 'blanket_condemned' },
-  { label: 'Canvas Bags',   freshKey: 'canvas_bag_fresh',   condKey: 'canvas_bag_condemned' },
+  { label: 'Bed Sheets',     freshKey: 'bed_sheet_fresh',      acKey: 'bed_sheet_first_ac',      condKey: 'bed_sheet_condemned',      has1stAC: true  },
+  { label: 'Pillow Covers',  freshKey: 'pillow_cover_fresh',   acKey: 'pillow_cover_first_ac',   condKey: 'pillow_cover_condemned',   has1stAC: true  },
+  { label: 'Face Towel',     freshKey: 'face_towel_fresh',     acKey: 'face_towel_first_ac',     condKey: 'face_towel_condemned',     has1stAC: true  },
+  { label: 'Bath Towel',     freshKey: 'bath_towel_fresh',     acKey: 'bath_towel_first_ac',     condKey: 'bath_towel_condemned',     has1stAC: true  },
+  { label: 'Blanket',        freshKey: 'blanket_fresh',        acKey: '',                        condKey: 'blanket_condemned',        has1stAC: false },
+  { label: 'Blanket Covers', freshKey: 'blanket_cover_fresh',  acKey: '',                        condKey: 'blanket_cover_condemned',  has1stAC: false },
+  { label: 'Canvas Bags',    freshKey: 'canvas_bag_fresh',     acKey: '',                        condKey: 'canvas_bag_condemned',     has1stAC: false },
 ]
+
+const ZERO_STATE: Record<string, number> = {
+  bed_sheet_fresh: 0,    bed_sheet_first_ac: 0,    bed_sheet_condemned: 0,
+  pillow_cover_fresh: 0, pillow_cover_first_ac: 0, pillow_cover_condemned: 0,
+  face_towel_fresh: 0,   face_towel_first_ac: 0,   face_towel_condemned: 0,
+  bath_towel_fresh: 0,   bath_towel_first_ac: 0,   bath_towel_condemned: 0,
+  blanket_fresh: 0,      blanket_condemned: 0,
+  blanket_cover_fresh: 0, blanket_cover_condemned: 0,
+  canvas_bag_fresh: 0,   canvas_bag_condemned: 0,
+  packets: 0,
+}
 
 function NewFreshEntryPage() {
   const searchParams = useSearchParams()
@@ -36,14 +50,7 @@ function NewFreshEntryPage() {
     return today()
   })
 
-  const [vals, setVals] = useState<Record<string, number>>({
-    bed_sheet_fresh: 0, bed_sheet_condemned: 0,
-    pillow_cover_fresh: 0, pillow_cover_condemned: 0,
-    face_towel_fresh: 0, face_towel_condemned: 0,
-    blanket_fresh: 0, blanket_condemned: 0,
-    canvas_bag_fresh: 0, canvas_bag_condemned: 0,
-    packets: 0,
-  })
+  const [vals, setVals] = useState<Record<string, number>>({ ...ZERO_STATE })
   const [saving, setSaving]     = useState(false)
   const [savedMsg, setSavedMsg] = useState('')
 
@@ -68,7 +75,7 @@ function NewFreshEntryPage() {
     setSaving(false)
     if (typeof window !== 'undefined') localStorage.setItem('laundry_last_month', nd.slice(0, 7))
     setDate(nd)
-    setVals({ bed_sheet_fresh: 0, bed_sheet_condemned: 0, pillow_cover_fresh: 0, pillow_cover_condemned: 0, face_towel_fresh: 0, face_towel_condemned: 0, blanket_fresh: 0, blanket_condemned: 0, canvas_bag_fresh: 0, canvas_bag_condemned: 0, packets: 0 })
+    setVals({ ...ZERO_STATE })
     setSavedMsg(`✅ Saved for ${savedDate} — Now entering: ${nd}`)
     setTimeout(() => setSavedMsg(''), 6000)
   }
@@ -86,7 +93,7 @@ function NewFreshEntryPage() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 22, maxWidth: 700 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 22, maxWidth: 760 }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <Link href="/laundry/dirty-fresh" style={{ color: 'var(--text-3)', display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }}>
@@ -107,32 +114,41 @@ function NewFreshEntryPage() {
         }} />
       </div>
 
-      {/* Fresh + Condemned items */}
+      {/* Items */}
       <div className="card" style={{ padding: 20 }}>
         <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.04em', margin: '0 0 16px' }}>
           Washed Linen Received
         </p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {ITEMS.map(({ label, freshKey, condKey }) => {
+          {ITEMS.map(({ label, freshKey, acKey, condKey, has1stAC }) => {
             const fresh = vals[freshKey] ?? 0
+            const ac    = has1stAC ? (vals[acKey] ?? 0) : 0
             const cond  = vals[condKey]  ?? 0
-            const total = fresh + cond
+            const total = fresh + ac + cond
+            const cols  = has1stAC ? '1fr 1fr 1fr 80px' : '1fr 1fr 80px'
             return (
               <div key={label} style={{ background: 'var(--surface-2)', borderRadius: 10, padding: '14px 16px' }}>
                 <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', margin: '0 0 10px' }}>{label}</p>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, alignItems: 'end' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: cols, gap: 10, alignItems: 'end' }}>
                   <div>
                     <label style={{ fontSize: 11, color: '#16A34A', fontWeight: 700, display: 'block', marginBottom: 4 }}>Fresh ✓</label>
                     <input type="number" min={0} style={{ ...inp, borderColor: '#BBF7D0' }} value={fresh || ''}
                       onChange={e => set(freshKey, Number(e.target.value))} />
                   </div>
+                  {has1stAC && (
+                    <div>
+                      <label style={{ fontSize: 11, color: '#7C3AED', fontWeight: 700, display: 'block', marginBottom: 4 }}>1st AC</label>
+                      <input type="number" min={0} style={{ ...inp, borderColor: '#DDD6FE' }} value={ac || ''}
+                        onChange={e => set(acKey, Number(e.target.value))} />
+                    </div>
+                  )}
                   <div>
                     <label style={{ fontSize: 11, color: '#EF4444', fontWeight: 700, display: 'block', marginBottom: 4 }}>Condemned ✗</label>
                     <input type="number" min={0} style={{ ...inp, borderColor: '#FECACA' }} value={cond || ''}
                       onChange={e => set(condKey, Number(e.target.value))} />
                   </div>
                   <div>
-                    <label style={{ fontSize: 11, color: 'var(--primary)', fontWeight: 700, display: 'block', marginBottom: 4 }}>Total (auto)</label>
+                    <label style={{ fontSize: 11, color: 'var(--primary)', fontWeight: 700, display: 'block', marginBottom: 4 }}>Total</label>
                     <div style={totalBox}>{total.toLocaleString('en-IN')}</div>
                   </div>
                 </div>
@@ -141,8 +157,8 @@ function NewFreshEntryPage() {
           })}
 
           {/* Packets */}
-          <div>
-            <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.04em', display: 'block', marginBottom: 5 }}>Packets</label>
+          <div style={{ background: 'var(--surface-2)', borderRadius: 10, padding: '14px 16px' }}>
+            <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', margin: '0 0 10px' }}>Packets</p>
             <input type="number" min={0} style={{ ...inp, maxWidth: 200 }} value={vals.packets || ''}
               onChange={e => set('packets', Number(e.target.value))} />
           </div>
