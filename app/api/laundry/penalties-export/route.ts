@@ -137,7 +137,7 @@ export async function GET(req: Request) {
       const checked = Number(item.items_checked)
       const dirty   = Number(item.items_dirty)
       const pct     = checked > 0 ? Math.round((dirty / checked) * 100) : 0
-      const pen     = Number(item.penalty)
+      const pen     = dirty === 0 ? 0 : Number(item.penalty)
       totalA += pen
 
       const r = ws.addRow([
