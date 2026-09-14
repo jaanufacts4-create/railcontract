@@ -7,15 +7,15 @@ export async function GET(req: Request) {
   const month_year = searchParams.get('month_year')
   if (!month_year) return NextResponse.json({ error: 'month_year required' }, { status: 400 })
 
-  // ── 1. ASR Washed — laundry_fresh_data ───────────────────────────────────
+  // ── 1. ASR Washed — laundry_fresh_data (Fresh + 1st AC combined) ──────────
   const { rows: freshRows } = await db.execute({
     sql: `SELECT
-            COALESCE(SUM(bed_sheet_fresh),    0) AS bedsheet,
-            COALESCE(SUM(pillow_cover_fresh), 0) AS pillow,
-            COALESCE(SUM(face_towel_fresh),   0) AS face_towel,
-            COALESCE(SUM(blanket_fresh),      0) AS blanket,
-            COALESCE(SUM(canvas_bag_fresh),   0) AS canvas_bag,
-            COALESCE(SUM(packets),            0) AS craft_bag
+            COALESCE(SUM(bed_sheet_fresh    + COALESCE(bed_sheet_first_ac,    0)), 0) AS bedsheet,
+            COALESCE(SUM(pillow_cover_fresh + COALESCE(pillow_cover_first_ac, 0)), 0) AS pillow,
+            COALESCE(SUM(face_towel_fresh   + COALESCE(face_towel_first_ac,   0)), 0) AS face_towel,
+            COALESCE(SUM(blanket_fresh),      0)                                       AS blanket,
+            COALESCE(SUM(canvas_bag_fresh),   0)                                       AS canvas_bag,
+            COALESCE(SUM(packets),            0)                                       AS craft_bag
           FROM laundry_fresh_data WHERE month_year = ?`,
     args: [month_year],
   })
@@ -54,7 +54,7 @@ export async function GET(req: Request) {
     sql: `SELECT
             COALESCE((SELECT SUM(ii.penalty) FROM inspection_items ii
                       JOIN inspections i ON ii.inspection_id = i.id
-                      WHERE i.month_year = ? AND ii.items_dirty > 0), 0)                             AS insp_items,
+                      WHERE i.month_year = ? AND ii.items_dirty > 0), 0)             AS insp_items,
             COALESCE((SELECT SUM(tool_short_count * 500 + cleanliness_fail * 1000 + bedsheet_wrapping_qty * 250)
                       FROM inspection_notes WHERE month_year = ?), 0)         AS insp_notes,
             COALESCE((SELECT SUM(amount) FROM store_inspections WHERE month_year = ?), 0)  AS store_pen,
