@@ -54,7 +54,7 @@ export async function GET(req: Request) {
     sql: `SELECT
             COALESCE((SELECT SUM(ii.penalty) FROM inspection_items ii
                       JOIN inspections i ON ii.inspection_id = i.id
-                      WHERE i.month_year = ?), 0)                             AS insp_items,
+                      WHERE i.month_year = ? AND ii.items_dirty > 0), 0)                             AS insp_items,
             COALESCE((SELECT SUM(tool_short_count * 500 + cleanliness_fail * 1000 + bedsheet_wrapping_qty * 250)
                       FROM inspection_notes WHERE month_year = ?), 0)         AS insp_notes,
             COALESCE((SELECT SUM(amount) FROM store_inspections WHERE month_year = ?), 0)  AS store_pen,
