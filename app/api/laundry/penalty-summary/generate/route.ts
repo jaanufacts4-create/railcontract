@@ -152,27 +152,40 @@ export async function POST(req: Request) {
   // ── ROWS 6-11: Item data ─────────────────────────────────────────────────
   let totAsrW = 0, totFzrW = 0, totA = 0, totAsrNP = 0, totFzrNP = 0, totB = 0, totNet = 0
 
+  // Bedsheet tB needed for craft_bag rule: L10 = L6 / 2
+  const bedsheetIt = items['bedsheet'] ?? { asr_washed: 0, fzr_washed: 0, asr_no_pay: 0, fzr_no_pay: 0 }
+  const bedsheetTB = bedsheetIt.asr_no_pay + bedsheetIt.fzr_no_pay
+
   ITEMS.forEach(({ label, key }, idx) => {
     const row = 6 + idx
     ws.getRow(row).height = 20
-    const it  = items[key] ?? { asr_washed: 0, fzr_washed: 0, asr_no_pay: 0, fzr_no_pay: 0 }
-    const tA  = it.asr_washed + it.fzr_washed
-    const tB  = it.asr_no_pay + it.fzr_no_pay
+    const raw = items[key] ?? { asr_washed: 0, fzr_washed: 0, asr_no_pay: 0, fzr_no_pay: 0 }
+
+    // Canvas bag: washed = 0 (G11 = I11 = 0)
+    const asrW = key === 'canvas_bag' ? 0 : raw.asr_washed
+    const fzrW = key === 'canvas_bag' ? 0 : raw.fzr_washed
+
+    // Craft bag: no-payment = bedsheet tB / 2 (L10 = L6 / 2)
+    const asrNP = key === 'craft_bag' ? bedsheetTB / 2 : raw.asr_no_pay
+    const fzrNP = key === 'craft_bag' ? 0              : raw.fzr_no_pay
+
+    const tA  = asrW + fzrW
+    const tB  = asrNP + fzrNP
     const net = Math.max(0, tA - tB)
-    totAsrW += it.asr_washed; totFzrW += it.fzr_washed; totA += tA
-    totAsrNP += it.asr_no_pay; totFzrNP += it.fzr_no_pay; totB += tB; totNet += net
+    totAsrW += asrW; totFzrW += fzrW; totA += tA
+    totAsrNP += asrNP; totFzrNP += fzrNP; totB += tB; totNet += net
 
     const rowBg = idx % 2 === 0 ? 'FFEAF0FB' : 'FFFFFFFF'
 
     v(row, 1, idx + 1);           bg(row, 1,  rowBg); al(row, 1,  'center'); bd(row, 1)
     v(row, 2, label);             bg(row, 2,  rowBg); al(row, 2,  'left');   bd(row, 2); ft(row, 2, true)
-    v(row, 7,  it.asr_washed,  '#,##0'); bg(row, 7,  rowBg); al(row, 7,  'center'); bd(row, 7)
-    v(row, 8,  it.fzr_washed,  '#,##0'); bg(row, 8,  'FFFFFF99'); al(row, 8,  'center'); bd(row, 8)  // yellow = manual
-    v(row, 9,  tA,             '#,##0'); bg(row, 9,  rowBg); al(row, 9,  'center'); bd(row, 9); ft(row, 9, true)
-    v(row, 10, it.asr_no_pay,  '#,##0'); bg(row, 10, rowBg); al(row, 10, 'center'); bd(row, 10)
-    v(row, 11, it.fzr_no_pay,  '#,##0'); bg(row, 11, 'FFFFFF99'); al(row, 11, 'center'); bd(row, 11)  // yellow = manual
-    v(row, 12, tB,             '#,##0'); bg(row, 12, rowBg); al(row, 12, 'center'); bd(row, 12); ft(row, 12, true)
-    v(row, 13, net,            '#,##0'); bg(row, 13, rowBg); al(row, 13, 'center'); bd(row, 13); ft(row, 13, true, 'FF1F4E79')
+    v(row, 7,  asrW,  '#,##0'); bg(row, 7,  rowBg); al(row, 7,  'center'); bd(row, 7)
+    v(row, 8,  fzrW,  '#,##0'); bg(row, 8,  'FFFFFF99'); al(row, 8,  'center'); bd(row, 8)  // yellow = manual
+    v(row, 9,  tA,    '#,##0'); bg(row, 9,  rowBg); al(row, 9,  'center'); bd(row, 9); ft(row, 9, true)
+    v(row, 10, asrNP, '#,##0'); bg(row, 10, rowBg); al(row, 10, 'center'); bd(row, 10)
+    v(row, 11, fzrNP, '#,##0'); bg(row, 11, 'FFFFFF99'); al(row, 11, 'center'); bd(row, 11)  // yellow = manual
+    v(row, 12, tB,    '#,##0'); bg(row, 12, rowBg); al(row, 12, 'center'); bd(row, 12); ft(row, 12, true)
+    v(row, 13, net,   '#,##0'); bg(row, 13, rowBg); al(row, 13, 'center'); bd(row, 13); ft(row, 13, true, 'FF1F4E79')
   })
 
   // ── ROW 12: Grand Total ──────────────────────────────────────────────────
