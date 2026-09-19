@@ -330,8 +330,8 @@ export default function TripsPage() {
   })
 
   const totals = visible.reduce(
-    (a, t) => ({ ac: a.ac + t.ac_count, nac: a.nac + t.nac_count, ext: a.ext + t.ext_count }),
-    { ac: 0, nac: 0, ext: 0 }
+    (a, t) => ({ ac: a.ac + t.ac_count, nac: a.nac + t.nac_count, ext: a.ext + t.ext_count, int: a.int + t.int_count }),
+    { ac: 0, nac: 0, ext: 0, int: 0 }
   )
 
   const penaltyTotals = visible.reduce(
@@ -453,6 +453,7 @@ export default function TripsPage() {
             <StatChip label="AC"    value={totals.ac}      color="#3B82F6" />
             <StatChip label="NAC"   value={totals.nac}     color="#22C55E" />
             <StatChip label="Ext"   value={totals.ext}     color="#F59E0B" />
+            <StatChip label="Int"   value={totals.int}     color="#7C3AED" />
             {!loading && visible.length > 0 && (
               <>
                 <div style={{ width: 1, height: 24, background: 'var(--border-md)', margin: '0 2px' }} />
@@ -525,6 +526,7 @@ export default function TripsPage() {
                   <th style={{ color: '#3B82F6' }}>AC</th>
                   <th style={{ color: '#22C55E' }}>NAC</th>
                   <th style={{ color: '#F59E0B' }}>Ext</th>
+                  <th style={{ color: '#7C3AED' }}>Int</th>
                   <th style={{ color: '#EF4444', fontSize: 11 }}>Rat. Pen.</th>
                   <th style={{ color: '#8B5CF6', fontSize: 11 }}>Int. Pen.</th>
                   <th style={{ color: '#F59E0B', fontSize: 11 }}>MP Pen.</th>
@@ -566,6 +568,11 @@ export default function TripsPage() {
                     <td>
                       {t.ext_count > 0
                         ? <span className="badge badge-yellow">{t.ext_count}</span>
+                        : <span style={{ color: 'var(--text-4)' }}>—</span>}
+                    </td>
+                    <td>
+                      {t.int_count > 0
+                        ? <span className="badge" style={{ background: 'rgba(124,58,237,.12)', color: '#7C3AED', fontWeight: 700 }}>{t.int_count}</span>
                         : <span style={{ color: 'var(--text-4)' }}>—</span>}
                     </td>
                     {(['normal','intensive','manpower','annex'] as const).map(key => (
