@@ -1,0 +1,255 @@
+import { NextResponse } from 'next/server'
+import { db, ensureDB } from '@/lib/db'
+import ExcelJS from 'exceljs'
+
+const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+
+function addDays(dateStr: string, n: number): string {
+  const d = new Date(dateStr)
+  d.setUTCDate(d.getUTCDate() + n)
+  return d.toISOString().slice(0, 10)
+}
+
+function dateRange(from: string, to: string): string[] {
+  const dates: string[] = []
+  let cur = from
+  while (cur <= to) { dates.push(cur); cur = addDays(cur, 1) }
+  return dates
+}
+
+function normalizeTrainNo(tn: string): string {
+  return tn.split('+').map(p => p.trim().replace(/^0+(\d)/, '$1')).join('+')
+}
+
+function fmtDate(iso: string): string {
+  const [y, m, d] = iso.split('-')
+  return `${d}-${m}-${y}`
+}
+
+/**
+ * GET /api/schedule/analyze/export?from=2026-08-01&to=2026-08-31
+ */
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url)
+  const from = searchParams.get('from')
+  const to   = searchParams.get('to')
+  if (!from || !to) return NextResponse.json({ error: 'from and to required' }, { status: 400 })
+  if (from > to)    return NextResponse.json({ error: 'from must be ≤ to' },    { status: 400 })
+
+  const dates = dateRange(from, to)
+  if (dates.length > 366) return NextResponse.json({ error: 'Max 366 days' }, { status: 400 })
+
+  const totalDays = dates.length
+
+  await ensureDB()
+
+  // ── Schedule ──────────────────────────────────────────────────────────────
+  const schedRows = await db.execute(
+    'SELECT train_no, days, ac_count, nac_count FROM train_schedule ORDER BY train_no'
+  )
+  const schedule = schedRows.rows.map(r => ({
+    train_no:  normalizeTrainNo(r.train_no as string),
+    days:      JSON.parse(r.days as string) as string[],
+    ac_count:  r.ac_count  as number,
+    nac_count: r.nac_count as number,
+  }))
+
+  function countOccurrences(trainDays: string[]): number {
+    if (trainDays.includes('Daily')) return totalDays
+    let count = 0
+    for (const d of dates) {
+      const [dy, dm, dd] = d.split('-').map(Number)
+      const dow = DAYS[new Date(Date.UTC(dy, dm - 1, dd)).getUTCDay()]
+      if (trainDays.includes(dow)) count++
+    }
+    return count
+  }
+
+  // ── Actual trips ──────────────────────────────────────────────────────────
+  const tripRows = await db.execute(
+    `SELECT train_no, SUM(ac_count) as total_ac, SUM(nac_count) as total_nac, COUNT(*) as trip_count
+     FROM trips
+     WHERE date >= ? AND date <= ?
+     GROUP BY train_no`,
+    [from, to]
+  )
+  const actualMap = new Map<string, { ac: number; nac: number; trips: number }>()
+  for (const r of tripRows.rows) {
+    const tn = normalizeTrainNo(r.train_no as string)
+    actualMap.set(tn, {
+      ac:    (r.total_ac   as number) ?? 0,
+      nac:   (r.total_nac  as number) ?? 0,
+      trips: (r.trip_count as number) ?? 0,
+    })
+  }
+
+  // ── Build rows ────────────────────────────────────────────────────────────
+  type Row = {
+    train_no: string; days: string[]; occurrences: number
+    exp_ac: number; exp_nac: number
+    act_ac: number; act_nac: number; act_trips: number
+    diff_ac: number; diff_nac: number
+  }
+
+  const rows: Row[] = schedule.map(t => {
+    const occ    = countOccurrences(t.days)
+    const actual = actualMap.get(t.train_no) ?? { ac: 0, nac: 0, trips: 0 }
+    const expAc  = t.ac_count  * occ
+    const expNac = t.nac_count * occ
+    return {
+      train_no: t.train_no, days: t.days, occurrences: occ,
+      exp_ac: expAc, exp_nac: expNac,
+      act_ac: actual.ac, act_nac: actual.nac, act_trips: actual.trips,
+      diff_ac: actual.ac - expAc, diff_nac: actual.nac - expNac,
+    }
+  })
+
+  const totals = rows.reduce(
+    (a, r) => ({
+      occurrences: a.occurrences + r.occurrences,
+      exp_ac:      a.exp_ac  + r.exp_ac,
+      exp_nac:     a.exp_nac + r.exp_nac,
+      act_ac:      a.act_ac  + r.act_ac,
+      act_nac:     a.act_nac + r.act_nac,
+      act_trips:   a.act_trips + r.act_trips,
+      diff_ac:     a.diff_ac  + r.diff_ac,
+      diff_nac:    a.diff_nac + r.diff_nac,
+    }),
+    { occurrences: 0, exp_ac: 0, exp_nac: 0, act_ac: 0, act_nac: 0, act_trips: 0, diff_ac: 0, diff_nac: 0 }
+  )
+
+  // ── Build Excel ───────────────────────────────────────────────────────────
+  const wb = new ExcelJS.Workbook()
+  wb.creator = 'RailPay'
+
+  const ws = wb.addWorksheet('Data Analysis')
+
+  const thin   = { style: 'thin'   as const, color: { argb: 'FFCCCCCC' } }
+  const medium = { style: 'medium' as const, color: { argb: 'FF888888' } }
+  const bord   = { top: thin,   left: thin,   bottom: thin,   right: thin   }
+  const bordM  = { top: medium, left: medium, bottom: medium, right: medium }
+
+  ws.columns = [
+    { width: 14 }, // Train No
+    { width: 18 }, // Running Days
+    { width: 12 }, // Occurrences
+    { width: 11 }, // Exp AC
+    { width: 11 }, // Exp NAC
+    { width: 11 }, // Act AC
+    { width: 11 }, // Act NAC
+    { width: 11 }, // Act Trips
+    { width: 12 }, // Diff AC
+    { width: 12 }, // Diff NAC
+  ]
+
+  // Title
+  ws.mergeCells(1, 1, 1, 10)
+  const title = ws.getCell(1, 1)
+  title.value = `Schedule Data Analysis — ${fmtDate(from)} to ${fmtDate(to)} (${totalDays} days)`
+  title.font  = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } }
+  title.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E79' } }
+  title.alignment = { horizontal: 'center', vertical: 'middle' }
+  title.border = bordM
+  ws.getRow(1).height = 26
+
+  // Column groups header (row 2)
+  ws.mergeCells(2, 1, 2, 3)
+  ws.mergeCells(2, 4, 2, 5)
+  ws.mergeCells(2, 6, 2, 8)
+  ws.mergeCells(2, 9, 2, 10)
+
+  const grpLabels = [
+    { col: 1, text: 'Train', argb: 'FF2E4057' },
+    { col: 4, text: 'Expected',  argb: 'FF1A5276' },
+    { col: 6, text: 'Actual',    argb: 'FF145A32' },
+    { col: 9, text: 'Difference (Actual − Expected)', argb: 'FF7B241C' },
+  ]
+  for (const g of grpLabels) {
+    const c = ws.getCell(2, g.col)
+    c.value = g.text
+    c.font  = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 }
+    c.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: g.argb } }
+    c.alignment = { horizontal: 'center', vertical: 'middle' }
+    c.border = bord
+  }
+  ws.getRow(2).height = 16
+
+  // Sub-headers (row 3)
+  const hdrs = [
+    'Train No', 'Running Days', 'Occurrences',
+    'Exp AC', 'Exp NAC',
+    'Act AC', 'Act NAC', 'Act Trips',
+    'Diff AC', 'Diff NAC',
+  ]
+  hdrs.forEach((h, i) => {
+    const cell = ws.getCell(3, i + 1)
+    cell.value = h
+    cell.font  = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 }
+    cell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2E75B6' } }
+    cell.alignment = { horizontal: 'center', vertical: 'middle' }
+    cell.border = bord
+  })
+  ws.getRow(3).height = 17
+
+  // Data rows
+  let dataRow = 4
+  for (const r of rows) {
+    const isOk = r.diff_ac === 0 && r.diff_nac === 0
+    const bg   = isOk ? 'FFE8F5E9' : (r.diff_ac < 0 || r.diff_nac < 0 ? 'FFFEECEC' : 'FFFFF8E1')
+
+    const vals: (string | number)[] = [
+      r.train_no,
+      r.days.join(', '),
+      r.occurrences,
+      r.exp_ac, r.exp_nac,
+      r.act_ac, r.act_nac, r.act_trips,
+      r.diff_ac, r.diff_nac,
+    ]
+    vals.forEach((val, i) => {
+      const cell = ws.getCell(dataRow, i + 1)
+      cell.value = val
+      cell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } }
+      cell.alignment = { horizontal: i < 2 ? 'left' : 'center', vertical: 'middle' }
+      cell.border = bord
+      // Color diff cells
+      if (i === 8) {
+        if (r.diff_ac < 0)  cell.font = { color: { argb: 'FFB91C1C' }, bold: true }
+        if (r.diff_ac > 0)  cell.font = { color: { argb: 'FF166534' }, bold: true }
+      }
+      if (i === 9) {
+        if (r.diff_nac < 0) cell.font = { color: { argb: 'FFB91C1C' }, bold: true }
+        if (r.diff_nac > 0) cell.font = { color: { argb: 'FF166534' }, bold: true }
+      }
+    })
+    ws.getRow(dataRow).height = 15
+    dataRow++
+  }
+
+  // Totals row
+  const totalVals: (string | number)[] = [
+    'TOTAL', '', totals.occurrences,
+    totals.exp_ac, totals.exp_nac,
+    totals.act_ac, totals.act_nac, totals.act_trips,
+    totals.diff_ac, totals.diff_nac,
+  ]
+  totalVals.forEach((val, i) => {
+    const cell = ws.getCell(dataRow, i + 1)
+    cell.value = val
+    cell.font  = { bold: true, size: 11, color: { argb: i === 8 || i === 9
+      ? (totals[i === 8 ? 'diff_ac' : 'diff_nac'] < 0 ? 'FFB91C1C' : totals[i === 8 ? 'diff_ac' : 'diff_nac'] > 0 ? 'FF166534' : 'FF1F4E79')
+      : 'FFFFFFFF' } }
+    cell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E79' } }
+    cell.alignment = { horizontal: i < 2 ? 'left' : 'center', vertical: 'middle' }
+    cell.border = bordM
+  })
+  ws.getRow(dataRow).height = 18
+
+  const [fy, fm] = from.split('-')
+  const buf = await wb.xlsx.writeBuffer()
+  return new NextResponse(Buffer.from(buf), {
+    headers: {
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="Schedule_Analysis_${fy}-${fm}.xlsx"`,
+    },
+  })
+}
