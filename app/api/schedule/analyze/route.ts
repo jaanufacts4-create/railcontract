@@ -20,9 +20,14 @@ function normalizeTrainNo(tn: string): string {
   return tn.split('+').map(p => p.trim().replace(/^0+(\d)/, '$1')).join('+')
 }
 
+function fmtDate(iso: string): string {
+  const [y, m, d] = iso.split('-')
+  return `${d}-${m}-${y}`
+}
+
 /**
  * GET /api/schedule/analyze?from=2026-08-01&to=2026-08-31
- * Returns train-wise expected vs actual AC/NAC.
+ * Returns train-wise expected vs actual AC/NAC with missing dates.
  */
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
@@ -38,7 +43,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: `DB connection failed: ${e}` }, { status: 503 })
   }
 
-  // ── 1. Load schedule ──────────────────────────────────────────────────────
+  // ── 1. Load schedule ────────────────────────────────────────────
   const schedRows = await db.execute(
     'SELECT train_no, days, ac_count, nac_count FROM train_schedule ORDER BY train_no'
   )
@@ -49,40 +54,37 @@ export async function GET(req: Request) {
     nac_count: r.nac_count as number,
   }))
 
-  // ── 2. Count expected occurrences per train ───────────────────────────────
   const totalDays = dates.length
 
-  function countOccurrences(trainDays: string[]): number {
-    if (trainDays.includes('Daily')) return totalDays
-    let count = 0
-    for (const d of dates) {
+  // ── 2. Expected dates per train ───────────────────────────────────────
+  function getExpectedDates(trainDays: string[]): string[] {
+    if (trainDays.includes('Daily')) return [...dates]
+    return dates.filter(d => {
       const [dy, dm, dd] = d.split('-').map(Number)
       const dow = DAYS[new Date(Date.UTC(dy, dm - 1, dd)).getUTCDay()]
-      if (trainDays.includes(dow)) count++
-    }
-    return count
+      return trainDays.includes(dow)
+    })
   }
 
-  // ── 3. Load actual trips in date range (count only) ──────────────────────
+  // ── 3. Load actual trip dates in range ────────────────────────────────────
   let tripRows: Awaited<ReturnType<typeof db.execute>>
   try {
     tripRows = await db.execute(
-      `SELECT train_no, COUNT(*) as trip_count
-       FROM trips
-       WHERE "date" >= '${from}' AND "date" <= '${to}'
-       GROUP BY train_no`
+      `SELECT train_no, "date" FROM trips WHERE "date" >= '${from}' AND "date" <= '${to}'`
     )
   } catch (e) {
     return NextResponse.json({ error: `Trips query failed: ${e}` }, { status: 500 })
   }
-  // actual AC/NAC = trip_count × schedule coach counts
-  const tripCountMap = new Map<string, number>()
+
+  // Build map: train_no -> Set<date> (unique dates that had at least one trip)
+  const tripDatesMap = new Map<string, Set<string>>()
   for (const r of tripRows.rows) {
     const tn = normalizeTrainNo(r.train_no as string)
-    tripCountMap.set(tn, (r.trip_count as number) ?? 0)
+    if (!tripDatesMap.has(tn)) tripDatesMap.set(tn, new Set())
+    tripDatesMap.get(tn)!.add(r.date as string)
   }
 
-  // ── 4. Build result rows ──────────────────────────────────────────────────
+  // ── 4. Build result rows ────────────────────────────────────────────────────
   type TrainResult = {
     train_no:      string
     days:          string[]
@@ -94,30 +96,36 @@ export async function GET(req: Request) {
     act_trips:     number
     diff_ac:       number
     diff_nac:      number
+    missing_dates: string[]   // DD-MM-YYYY format
   }
 
   const rows: TrainResult[] = schedule.map(t => {
-    const occ      = countOccurrences(t.days)
-    const actTrips = tripCountMap.get(t.train_no) ?? 0
-    const expAc    = t.ac_count  * occ
-    const expNac   = t.nac_count * occ
-    const actAc    = t.ac_count  * actTrips
-    const actNac   = t.nac_count * actTrips
+    const expDates     = getExpectedDates(t.days)
+    const occ          = expDates.length
+    const actDateSet   = tripDatesMap.get(t.train_no) ?? new Set<string>()
+    const actTrips     = actDateSet.size
+    const missingDates = expDates.filter(d => !actDateSet.has(d)).map(fmtDate)
+
+    const expAc  = t.ac_count  * occ
+    const expNac = t.nac_count * occ
+    const actAc  = t.ac_count  * actTrips
+    const actNac = t.nac_count * actTrips
     return {
-      train_no:    t.train_no,
-      days:        t.days,
-      occurrences: occ,
-      exp_ac:      expAc,
-      exp_nac:     expNac,
-      act_ac:      actAc,
-      act_nac:     actNac,
-      act_trips:   actTrips,
-      diff_ac:     actAc  - expAc,
-      diff_nac:    actNac - expNac,
+      train_no:      t.train_no,
+      days:          t.days,
+      occurrences:   occ,
+      exp_ac:        expAc,
+      exp_nac:       expNac,
+      act_ac:        actAc,
+      act_nac:       actNac,
+      act_trips:     actTrips,
+      diff_ac:       actAc  - expAc,
+      diff_nac:      actNac - expNac,
+      missing_dates: missingDates,
     }
   })
 
-  // ── 5. Grand totals ───────────────────────────────────────────────────────
+  // ── 5. Grand totals ─────────────────────────────────────────────────────────────
   const totals = rows.reduce(
     (acc, r) => ({
       occurrences: acc.occurrences + r.occurrences,

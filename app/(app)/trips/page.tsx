@@ -18,6 +18,7 @@ type AnalyzeRow = {
   exp_ac: number; exp_nac: number
   act_ac: number; act_nac: number; act_trips: number
   diff_ac: number; diff_nac: number
+  missing_dates: string[]
 }
 type AnalyzeTotals = {
   occurrences: number; exp_ac: number; exp_nac: number
@@ -61,6 +62,90 @@ function diffBg(v: number) {
   return 'transparent'
 }
 
+
+// ── Missing Dates Modal ───────────────────────────────────────────────────────
+function MissingDatesModal({ trainNo, dates, onClose }: {
+  trainNo: string
+  dates: string[]
+  onClose: () => void
+}) {
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 1000,
+        background: 'rgba(0,0,0,.55)', backdropFilter: 'blur(3px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          borderRadius: 16, padding: 0, minWidth: 320, maxWidth: 480, width: '90vw',
+          boxShadow: '0 20px 60px rgba(0,0,0,.4)',
+          overflow: 'hidden',
+        }}
+      >
+        {/* Header */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '16px 20px',
+          background: 'rgba(185,28,28,.08)',
+          borderBottom: '1px solid rgba(185,28,28,.2)',
+        }}>
+          <div>
+            <p style={{ fontSize: 11, fontWeight: 700, color: '#B91C1C', textTransform: 'uppercase', letterSpacing: '.06em', margin: 0 }}>
+              Missing Trips
+            </p>
+            <p style={{ fontSize: 16, fontWeight: 800, color: 'var(--text)', margin: '2px 0 0' }}>
+              Train {trainNo}
+            </p>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+            <span style={{
+              fontSize: 22, fontWeight: 800, color: '#B91C1C',
+              background: 'rgba(185,28,28,.12)', borderRadius: 10,
+              padding: '2px 12px',
+            }}>{dates.length}</span>
+            <span style={{ fontSize: 10, color: '#B91C1C', fontWeight: 600 }}>dates missing</span>
+          </div>
+        </div>
+
+        {/* Date list */}
+        <div style={{ maxHeight: 320, overflowY: 'auto', padding: '12px 20px' }}>
+          {dates.length === 0 ? (
+            <p style={{ color: '#166534', fontWeight: 600, fontSize: 13, textAlign: 'center', padding: '20px 0' }}>
+              ✓ No missing trips
+            </p>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 6 }}>
+              {dates.map(d => (
+                <div key={d} style={{
+                  padding: '5px 10px', borderRadius: 8,
+                  background: 'rgba(185,28,28,.07)',
+                  border: '1px solid rgba(185,28,28,.18)',
+                  fontSize: 12, fontWeight: 600, color: '#B91C1C',
+                  textAlign: 'center', letterSpacing: '.02em',
+                }}>
+                  {d}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border)', textAlign: 'right' }}>
+          <button onClick={onClose} className="btn btn-secondary" style={{ fontSize: 12 }}>
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Data Analyzer Tab ─────────────────────────────────────────────────────────
 function DataAnalyzerTab() {
   const today        = new Date().toISOString().slice(0, 10)
@@ -73,6 +158,7 @@ function DataAnalyzerTab() {
   const [error,     setError]     = useState('')
   const [exporting, setExporting] = useState(false)
   const [expError,  setExpError]  = useState('')
+  const [modal, setModal] = useState<{ trainNo: string; dates: string[] } | null>(null)
 
   async function analyze() {
     if (!from || !to) { setError('Select From and To dates'); return }
@@ -122,6 +208,7 @@ function DataAnalyzerTab() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 960 }}>
+      {modal && <MissingDatesModal trainNo={modal.trainNo} dates={modal.dates} onClose={() => setModal(null)} />}
       {/* Controls */}
       <div className="card" style={{ padding: 20 }}>
         <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', margin: '0 0 12px', textTransform: 'uppercase', letterSpacing: '.04em' }}>
@@ -207,7 +294,31 @@ function DataAnalyzerTab() {
                       <td style={td()}>{r.exp_nac}</td>
                       <td style={td()}>{r.act_ac}</td>
                       <td style={td()}>{r.act_nac}</td>
-                      <td style={td()}>{r.act_trips}</td>
+                      <td style={{ ...td(), padding: 0 }}>
+                        <button
+                          onClick={() => r.missing_dates.length > 0 && setModal({ trainNo: r.train_no, dates: r.missing_dates })}
+                          title={r.missing_dates.length > 0 ? `Click to see ${r.missing_dates.length} missing date(s)` : 'All trips present'}
+                          style={{
+                            width: '100%', height: '100%', minHeight: 32,
+                            background: 'none', border: 'none', padding: '7px 10px',
+                            cursor: r.missing_dates.length > 0 ? 'pointer' : 'default',
+                            fontSize: 12, fontWeight: 600,
+                            color: r.missing_dates.length > 0 ? '#B91C1C' : 'var(--text)',
+                            textDecoration: r.missing_dates.length > 0 ? 'underline dotted' : 'none',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+                          }}
+                        >
+                          {r.act_trips}
+                          {r.missing_dates.length > 0 && (
+                            <span style={{
+                              fontSize: 10, background: 'rgba(185,28,28,.12)',
+                              color: '#B91C1C', borderRadius: 4, padding: '1px 4px', fontWeight: 700,
+                            }}>
+                              -{r.missing_dates.length}
+                            </span>
+                          )}
+                        </button>
+                      </td>
                       <td style={{ ...td(), fontWeight: r.diff_ac !== 0 ? 700 : 400, color: diffColor(r.diff_ac), background: diffBg(r.diff_ac) }}>
                         {r.diff_ac > 0 ? `+${r.diff_ac}` : r.diff_ac}
                       </td>

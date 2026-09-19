@@ -43,7 +43,7 @@ export async function GET(req: Request) {
 
   await ensureDB()
 
-  // ── Schedule ──────────────────────────────────────────────────────────────
+  // ── Schedule ───────────────────────────────────────────────────────────────────────
   const schedRows = await db.execute(
     'SELECT train_no, days, ac_count, nac_count FROM train_schedule ORDER BY train_no'
   )
@@ -54,50 +54,52 @@ export async function GET(req: Request) {
     nac_count: r.nac_count as number,
   }))
 
-  function countOccurrences(trainDays: string[]): number {
-    if (trainDays.includes('Daily')) return totalDays
-    let count = 0
-    for (const d of dates) {
+  function getExpectedDates(trainDays: string[]): string[] {
+    if (trainDays.includes('Daily')) return [...dates]
+    return dates.filter(d => {
       const [dy, dm, dd] = d.split('-').map(Number)
       const dow = DAYS[new Date(Date.UTC(dy, dm - 1, dd)).getUTCDay()]
-      if (trainDays.includes(dow)) count++
-    }
-    return count
+      return trainDays.includes(dow)
+    })
   }
 
-  // ── Actual trips ──────────────────────────────────────────────────────────
+  // ── Actual trip dates ─────────────────────────────────────────────────────────────
   const tripRows = await db.execute(
-    `SELECT train_no, COUNT(*) as trip_count
-     FROM trips
-     WHERE "date" >= '${from}' AND "date" <= '${to}'
-     GROUP BY train_no`
+    `SELECT train_no, "date" FROM trips WHERE "date" >= '${from}' AND "date" <= '${to}'`
   )
-  const tripCountMap = new Map<string, number>()
+  const tripDatesMap = new Map<string, Set<string>>()
   for (const r of tripRows.rows) {
     const tn = normalizeTrainNo(r.train_no as string)
-    tripCountMap.set(tn, (r.trip_count as number) ?? 0)
+    if (!tripDatesMap.has(tn)) tripDatesMap.set(tn, new Set())
+    tripDatesMap.get(tn)!.add(r.date as string)
   }
 
-  // ── Build rows ────────────────────────────────────────────────────────────
+  // ── Build rows ────────────────────────────────────────────────────────────────────────────
   type Row = {
     train_no: string; days: string[]; occurrences: number
     exp_ac: number; exp_nac: number
     act_ac: number; act_nac: number; act_trips: number
     diff_ac: number; diff_nac: number
+    missing_dates: string[]
   }
 
   const rows: Row[] = schedule.map(t => {
-    const occ      = countOccurrences(t.days)
-    const actTrips = tripCountMap.get(t.train_no) ?? 0
-    const expAc    = t.ac_count  * occ
-    const expNac   = t.nac_count * occ
-    const actAc    = t.ac_count  * actTrips
-    const actNac   = t.nac_count * actTrips
+    const expDates     = getExpectedDates(t.days)
+    const occ          = expDates.length
+    const actDateSet   = tripDatesMap.get(t.train_no) ?? new Set<string>()
+    const actTrips     = actDateSet.size
+    const missingDates = expDates.filter(d => !actDateSet.has(d)).map(fmtDate)
+
+    const expAc  = t.ac_count  * occ
+    const expNac = t.nac_count * occ
+    const actAc  = t.ac_count  * actTrips
+    const actNac = t.nac_count * actTrips
     return {
       train_no: t.train_no, days: t.days, occurrences: occ,
       exp_ac: expAc, exp_nac: expNac,
       act_ac: actAc, act_nac: actNac, act_trips: actTrips,
       diff_ac: actAc - expAc, diff_nac: actNac - expNac,
+      missing_dates: missingDates,
     }
   })
 
@@ -115,7 +117,7 @@ export async function GET(req: Request) {
     { occurrences: 0, exp_ac: 0, exp_nac: 0, act_ac: 0, act_nac: 0, act_trips: 0, diff_ac: 0, diff_nac: 0 }
   )
 
-  // ── Build Excel ───────────────────────────────────────────────────────────
+  // ── Build Excel ───────────────────────────────────────────────────────────────────────
   const wb = new ExcelJS.Workbook()
   wb.creator = 'RailPay'
 
@@ -126,6 +128,7 @@ export async function GET(req: Request) {
   const bord   = { top: thin,   left: thin,   bottom: thin,   right: thin   }
   const bordM  = { top: medium, left: medium, bottom: medium, right: medium }
 
+  // 11 columns now (added Missing Dates)
   ws.columns = [
     { width: 14 }, // Train No
     { width: 18 }, // Running Days
@@ -137,10 +140,11 @@ export async function GET(req: Request) {
     { width: 11 }, // Act Trips
     { width: 12 }, // Diff AC
     { width: 12 }, // Diff NAC
+    { width: 40 }, // Missing Dates
   ]
 
   // Title
-  ws.mergeCells(1, 1, 1, 10)
+  ws.mergeCells(1, 1, 1, 11)
   const title = ws.getCell(1, 1)
   title.value = `Schedule Data Analysis — ${fmtDate(from)} to ${fmtDate(to)} (${totalDays} days)`
   title.font  = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } }
@@ -154,12 +158,14 @@ export async function GET(req: Request) {
   ws.mergeCells(2, 4, 2, 5)
   ws.mergeCells(2, 6, 2, 8)
   ws.mergeCells(2, 9, 2, 10)
+  // col 11: Missing Dates stands alone
 
   const grpLabels = [
-    { col: 1, text: 'Train', argb: 'FF2E4057' },
-    { col: 4, text: 'Expected',  argb: 'FF1A5276' },
-    { col: 6, text: 'Actual',    argb: 'FF145A32' },
-    { col: 9, text: 'Difference (Actual − Expected)', argb: 'FF7B241C' },
+    { col: 1,  text: 'Train',                           argb: 'FF2E4057' },
+    { col: 4,  text: 'Expected',                        argb: 'FF1A5276' },
+    { col: 6,  text: 'Actual',                          argb: 'FF145A32' },
+    { col: 9,  text: 'Difference (Actual − Expected)', argb: 'FF7B241C' },
+    { col: 11, text: 'Missing Trip Dates',              argb: 'FF4A235A' },
   ]
   for (const g of grpLabels) {
     const c = ws.getCell(2, g.col)
@@ -177,13 +183,14 @@ export async function GET(req: Request) {
     'Exp AC', 'Exp NAC',
     'Act AC', 'Act NAC', 'Act Trips',
     'Diff AC', 'Diff NAC',
+    'Missing Dates',
   ]
   hdrs.forEach((h, i) => {
     const cell = ws.getCell(3, i + 1)
     cell.value = h
     cell.font  = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 }
     cell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2E75B6' } }
-    cell.alignment = { horizontal: 'center', vertical: 'middle' }
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }
     cell.border = bord
   })
   ws.getRow(3).height = 17
@@ -194,6 +201,8 @@ export async function GET(req: Request) {
     const isOk = r.diff_ac === 0 && r.diff_nac === 0
     const bg   = isOk ? 'FFE8F5E9' : (r.diff_ac < 0 || r.diff_nac < 0 ? 'FFFEECEC' : 'FFFFF8E1')
 
+    const missingText = r.missing_dates.length > 0 ? r.missing_dates.join(', ') : ''
+
     const vals: (string | number)[] = [
       r.train_no,
       r.days.join(', '),
@@ -201,14 +210,18 @@ export async function GET(req: Request) {
       r.exp_ac, r.exp_nac,
       r.act_ac, r.act_nac, r.act_trips,
       r.diff_ac, r.diff_nac,
+      missingText,
     ]
     vals.forEach((val, i) => {
       const cell = ws.getCell(dataRow, i + 1)
       cell.value = val
       cell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } }
-      cell.alignment = { horizontal: i < 2 ? 'left' : 'center', vertical: 'middle' }
+      cell.alignment = {
+        horizontal: i === 0 || i === 1 || i === 10 ? 'left' : 'center',
+        vertical: 'middle',
+        wrapText: i === 10,
+      }
       cell.border = bord
-      // Color diff cells
       if (i === 8) {
         if (r.diff_ac < 0)  cell.font = { color: { argb: 'FFB91C1C' }, bold: true }
         if (r.diff_ac > 0)  cell.font = { color: { argb: 'FF166534' }, bold: true }
@@ -217,8 +230,13 @@ export async function GET(req: Request) {
         if (r.diff_nac < 0) cell.font = { color: { argb: 'FFB91C1C' }, bold: true }
         if (r.diff_nac > 0) cell.font = { color: { argb: 'FF166534' }, bold: true }
       }
+      // Missing dates column: red text if there are missing dates
+      if (i === 10 && r.missing_dates.length > 0) {
+        cell.font = { color: { argb: 'FFB91C1C' }, size: 9 }
+      }
     })
-    ws.getRow(dataRow).height = 15
+    // Row height: taller if missing dates wrap
+    ws.getRow(dataRow).height = r.missing_dates.length > 3 ? Math.min(15 + r.missing_dates.length * 4, 80) : 15
     dataRow++
   }
 
@@ -228,6 +246,7 @@ export async function GET(req: Request) {
     totals.exp_ac, totals.exp_nac,
     totals.act_ac, totals.act_nac, totals.act_trips,
     totals.diff_ac, totals.diff_nac,
+    '',
   ]
   totalVals.forEach((val, i) => {
     const cell = ws.getCell(dataRow, i + 1)
@@ -236,7 +255,7 @@ export async function GET(req: Request) {
       ? (totals[i === 8 ? 'diff_ac' : 'diff_nac'] < 0 ? 'FFB91C1C' : totals[i === 8 ? 'diff_ac' : 'diff_nac'] > 0 ? 'FF166534' : 'FF1F4E79')
       : 'FFFFFFFF' } }
     cell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E79' } }
-    cell.alignment = { horizontal: i < 2 ? 'left' : 'center', vertical: 'middle' }
+    cell.alignment = { horizontal: i < 2 || i === 10 ? 'left' : 'center', vertical: 'middle' }
     cell.border = bordM
   })
   ws.getRow(dataRow).height = 18
