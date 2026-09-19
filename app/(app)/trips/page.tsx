@@ -570,14 +570,45 @@ export default function TripsPage() {
         )}
         {visible.length > 0 && (
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            <StatChip label="Normal Trips" value={totals.normalCount} color="#2563EB" />
-            <StatChip label="AC"           value={totals.normalAc}    color="#3B82F6" />
-            <StatChip label="NAC"          value={totals.normalNac}   color="#22C55E" />
-            <StatChip label="Ext."         value={totals.normalExt}   color="#F59E0B" />
-            <StatChip label="Int. Trips"   value={totals.intCount}    color="#7C3AED" />
-            <StatChip label="Int AC"       value={totals.intAc}       color="#6D28D9" />
-            <StatChip label="Int NAC"      value={totals.intNac}      color="#5B21B6" />
-            <StatChip label="Int. Ext"     value={totals.intExt}      color="#4C1D95" />
+            {/* ── Grouped summary table ── */}
+            <div style={{ display:'flex', gap:0, border:'1px solid var(--border-md)', borderRadius:10, overflow:'hidden', fontSize:12 }}>
+              {/* Normal group */}
+              <div style={{ display:'flex', flexDirection:'column', borderRight:'1px solid var(--border-md)' }}>
+                <div style={{ background:'#EFF6FF', color:'#1D4ED8', fontWeight:700, textAlign:'center', padding:'4px 16px', borderBottom:'1px solid #BFDBFE', letterSpacing:'.02em' }}>
+                  Normal Trips — {totals.normalCount}
+                </div>
+                <div style={{ display:'flex' }}>
+                  {([
+                    { label:'AC',   val: totals.normalAc,  color:'#2563EB' },
+                    { label:'NAC',  val: totals.normalNac, color:'#16A34A' },
+                    { label:'Ext.', val: totals.normalExt, color:'#D97706' },
+                  ] as {label:string;val:number;color:string}[]).map(({ label, val, color }, i) => (
+                    <div key={label} style={{ padding:'5px 14px', textAlign:'center', borderRight: i < 2 ? '1px solid var(--border)' : undefined }}>
+                      <div style={{ color:'var(--text-3)', fontWeight:600, marginBottom:2 }}>{label}</div>
+                      <div style={{ fontWeight:700, color }}>{val}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {/* Intensive group */}
+              <div style={{ display:'flex', flexDirection:'column' }}>
+                <div style={{ background:'#F5F3FF', color:'#6D28D9', fontWeight:700, textAlign:'center', padding:'4px 16px', borderBottom:'1px solid #DDD6FE', letterSpacing:'.02em' }}>
+                  Intensive Trips — {totals.intCount}
+                </div>
+                <div style={{ display:'flex' }}>
+                  {([
+                    { label:'Int AC',   val: totals.intAc,  color:'#7C3AED' },
+                    { label:'Int NAC',  val: totals.intNac, color:'#6D28D9' },
+                    { label:'Int. Ext', val: totals.intExt, color:'#5B21B6' },
+                  ] as {label:string;val:number;color:string}[]).map(({ label, val, color }, i) => (
+                    <div key={label} style={{ padding:'5px 14px', textAlign:'center', borderRight: i < 2 ? '1px solid var(--border)' : undefined }}>
+                      <div style={{ color:'var(--text-3)', fontWeight:600, marginBottom:2 }}>{label}</div>
+                      <div style={{ fontWeight:700, color }}>{val}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
             {!loading && visible.length > 0 && (
               <>
                 <div style={{ width: 1, height: 24, background: 'var(--border-md)', margin: '0 2px' }} />
