@@ -441,8 +441,20 @@ export default function TripsPage() {
   })
 
   const totals = visible.reduce(
-    (a, t) => ({ ac: a.ac + t.ac_count, nac: a.nac + t.nac_count, ext: a.ext + t.ext_count, int: a.int + t.int_count }),
-    { ac: 0, nac: 0, ext: 0, int: 0 }
+    (a, t) => {
+      const isInt = t.int_count > 0
+      return {
+        normalCount: a.normalCount + (isInt ? 0 : 1),
+        normalAc:    a.normalAc   + (isInt ? 0 : t.ac_count),
+        normalNac:   a.normalNac  + (isInt ? 0 : t.nac_count),
+        normalExt:   a.normalExt  + (isInt ? 0 : t.ext_count),
+        intCount:    a.intCount   + (isInt ? 1 : 0),
+        intAc:       a.intAc      + (isInt ? t.ac_count  : 0),
+        intNac:      a.intNac     + (isInt ? t.nac_count : 0),
+        intExt:      a.intExt     + (isInt ? t.ext_count : 0),
+      }
+    },
+    { normalCount:0, normalAc:0, normalNac:0, normalExt:0, intCount:0, intAc:0, intNac:0, intExt:0 }
   )
 
   const penaltyTotals = visible.reduce(
@@ -560,11 +572,14 @@ export default function TripsPage() {
         )}
         {visible.length > 0 && (
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            <StatChip label="Trips" value={visible.length} color="#2563EB" />
-            <StatChip label="AC"    value={totals.ac}      color="#3B82F6" />
-            <StatChip label="NAC"   value={totals.nac}     color="#22C55E" />
-            <StatChip label="Ext"   value={totals.ext}     color="#F59E0B" />
-            <StatChip label="Int"   value={totals.int}     color="#7C3AED" />
+            <StatChip label="Normal Trips" value={totals.normalCount} color="#2563EB" />
+            <StatChip label="AC"           value={totals.normalAc}    color="#3B82F6" />
+            <StatChip label="NAC"          value={totals.normalNac}   color="#22C55E" />
+            <StatChip label="Ext."         value={totals.normalExt}   color="#F59E0B" />
+            <StatChip label="Int. Trips"   value={totals.intCount}    color="#7C3AED" />
+            <StatChip label="Int AC"       value={totals.intAc}       color="#6D28D9" />
+            <StatChip label="Int NAC"      value={totals.intNac}      color="#5B21B6" />
+            <StatChip label="Int. Ext"     value={totals.intExt}      color="#4C1D95" />
             {!loading && visible.length > 0 && (
               <>
                 <div style={{ width: 1, height: 24, background: 'var(--border-md)', margin: '0 2px' }} />
