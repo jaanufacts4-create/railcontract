@@ -443,7 +443,7 @@ export default function TripsPage() {
 
   const totals = visible.reduce(
     (a, t) => ({
-      normalCount: a.normalCount + (t.int_count === 0 ? 1 : 0),
+      normalCount: a.normalCount + 1,
       normalAc:    a.normalAc    + t.ac_count,
       normalNac:   a.normalNac   + t.nac_count,
       normalExt:   a.normalExt   + t.ext_count,
