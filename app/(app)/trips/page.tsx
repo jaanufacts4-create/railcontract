@@ -1,7 +1,8 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Plus, Download, Search, X, Train, AirVent, LayoutList } from 'lucide-react'
+import { Plus, Download, Search, X, Train, LayoutList, GitCompare } from 'lucide-react'
+import WLCompareModule from '@/components/WLCompareModule'
 
 type Trip = {
   id: number; date: string; train_no: string
@@ -31,6 +32,14 @@ function StatChip({ label, value, color }: { label: string; value: number; color
 }
 
 export default function TripsPage() {
+  const [activeTab, setActiveTab] = useState<'trips' | 'wl'>(() => {
+    try { return (localStorage.getItem('trips_tab') as 'trips' | 'wl') || 'trips' } catch { return 'trips' }
+  })
+  function switchTab(t: 'trips' | 'wl') {
+    setActiveTab(t)
+    try { localStorage.setItem('trips_tab', t) } catch { /* ignore */ }
+  }
+
   const [monthYear,   setMonthYear]   = useState(() => {
     try { return localStorage.getItem('trips_month') || new Date().toISOString().slice(0, 7) } catch { return new Date().toISOString().slice(0, 7) }
   })
@@ -136,19 +145,60 @@ export default function TripsPage() {
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
         <div>
           <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', letterSpacing: '-.02em', margin: 0 }}>Trips</h1>
-          <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '3px 0 0' }}>Manage and track all cleaning trips</p>
+          <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '3px 0 0' }}>Manage trips and compare WL placement</p>
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           <input type="month" className="input" style={{ width: 160 }}
             value={monthYear} onChange={e => handleMonthChange(e.target.value)} />
-          <a href={`/api/export/trips?month_year=${monthYear}`} target="_blank" className="btn btn-secondary">
-            <Download size={14} /> Export
-          </a>
-          <Link href={`/trips/new?month=${monthYear}`} className="btn btn-primary">
-            <Plus size={14} /> New Trip
-          </Link>
+          {activeTab === 'trips' && (
+            <>
+              <a href={`/api/export/trips?month_year=${monthYear}`} target="_blank" className="btn btn-secondary">
+                <Download size={14} /> Export
+              </a>
+              <Link href={`/trips/new?month=${monthYear}`} className="btn btn-primary">
+                <Plus size={14} /> New Trip
+              </Link>
+            </>
+          )}
         </div>
       </div>
+
+      {/* Tab bar */}
+      <div style={{
+        display: 'flex', gap: 4,
+        borderBottom: '2px solid var(--border)',
+        marginBottom: -8,
+      }}>
+        {([
+          { key: 'trips', label: 'Trips',      icon: <LayoutList size={13} /> },
+          { key: 'wl',    label: 'WL Compare', icon: <GitCompare size={13} /> },
+        ] as { key: 'trips' | 'wl'; label: string; icon: React.ReactNode }[]).map(tab => (
+          <button key={tab.key} onClick={() => switchTab(tab.key)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '8px 16px', border: 'none', cursor: 'pointer',
+              fontSize: 13, fontWeight: activeTab === tab.key ? 700 : 500,
+              color: activeTab === tab.key ? 'var(--primary)' : 'var(--text-3)',
+              background: 'transparent',
+              borderBottom: activeTab === tab.key ? '2px solid var(--primary)' : '2px solid transparent',
+              marginBottom: -2,
+              transition: 'color .15s',
+            }}>
+            {tab.icon} {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ══ WL Compare Tab ══ */}
+      {activeTab === 'wl' && (
+        <WLCompareModule
+          initialDate={`${monthYear}-01`}
+          onDateChange={() => {}}
+        />
+      )}
+
+      {/* ══ Trips Tab ══ */}
+      {activeTab === 'trips' && <>
 
       {/* Filters row */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
@@ -244,7 +294,7 @@ export default function TripsPage() {
       {!loading && visible.length > 0 && (
         <div className="card" style={{ overflow: 'hidden', padding: 0 }}>
           <div style={{ overflowX: 'auto' }}>
-            <table className="table-grid">
+            <table className="table-grid" style={{ minWidth: 900 }}>
               <thead>
                 <tr>
                   <th style={{ textAlign: 'left', paddingLeft: 20 }}>Date</th>
@@ -355,6 +405,9 @@ export default function TripsPage() {
           </div>
         </div>
       )}
+
+      </>}
+
     </div>
   )
 }
