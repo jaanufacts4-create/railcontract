@@ -34,7 +34,9 @@ export async function GET(req: Request) {
   const dates = dateRange(from, to)
   if (dates.length > 366) return NextResponse.json({ error: 'Max 366 days' }, { status: 400 })
 
-  await ensureDB()
+  try { await ensureDB() } catch (e) {
+    return NextResponse.json({ error: `DB connection failed: ${e}` }, { status: 503 })
+  }
 
   // ── 1. Load schedule ──────────────────────────────────────────────────────
   const schedRows = await db.execute(
@@ -48,9 +50,6 @@ export async function GET(req: Request) {
   }))
 
   // ── 2. Count expected occurrences per train ───────────────────────────────
-  // Replicate VBA logic:
-  //   If Daily → occurrences = total days in range
-  //   Else    → count days whose weekday name is in the train's days array
   const totalDays = dates.length
 
   function countOccurrences(trainDays: string[]): number {
@@ -65,12 +64,17 @@ export async function GET(req: Request) {
   }
 
   // ── 3. Load actual trips in date range ────────────────────────────────────
-  const tripRows = await db.execute(
-    `SELECT train_no, SUM(ac_count) as total_ac, SUM(nac_count) as total_nac, COUNT(*) as trip_count
-     FROM trips
-     WHERE date >= '${from}' AND date <= '${to}'
-     GROUP BY train_no`
-  )
+  let tripRows: Awaited<ReturnType<typeof db.execute>>
+  try {
+    tripRows = await db.execute(
+      `SELECT train_no, SUM(ac_count) as total_ac, SUM(nac_count) as total_nac, COUNT(*) as trip_count
+       FROM trips
+       WHERE "date" >= '${from}' AND "date" <= '${to}'
+       GROUP BY train_no`
+    )
+  } catch (e) {
+    return NextResponse.json({ error: `Trips query failed: ${e}` }, { status: 500 })
+  }
   const actualMap = new Map<string, { ac: number; nac: number; trips: number }>()
   for (const r of tripRows.rows) {
     const tn = normalizeTrainNo(r.train_no as string)
