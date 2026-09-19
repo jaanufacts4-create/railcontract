@@ -139,8 +139,9 @@ export async function GET(req: Request) {
         if (sorted !== tn) wlPrimarySet.add(sorted)
       }
     } else {
-      // Non-numeric — only show if Primary type (S-type / secondary ignored)
-      if (isPrimary(typeCol)) specialSet.add(tn)
+      // Non-numeric (S/STOCK, special trains, etc.) — show all in Special Entries
+      // Only skip pure "S" (secondary placeholder) which is already caught above
+      specialSet.add(tn)
     }
   }
 

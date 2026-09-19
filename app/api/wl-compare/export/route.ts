@@ -89,11 +89,13 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Failed to fetch WL sheet' }, { status: 502 })
   }
 
-  // ── 2. Parse CSV → wlByDate Map ───────────────────────────────────────────
-  // wlAllByDate  — ALL valid trains (any type, used for "matched" check)
-  // wlPriByDate  — Primary only     (used for "extra in WL" check)
-  const wlAllByDate = new Map<string, Set<string>>()
-  const wlPriByDate = new Map<string, Set<string>>()
+  // ── 2. Parse CSV → wlByDate Maps ─────────────────────────────────────────
+  // wlAllByDate     — ALL valid numeric trains (any type, used for "matched" check)
+  // wlPriByDate     — Primary numeric only     (used for "extra in WL" check)
+  // wlSpecialByDate — Non-numeric entries like S/STOCK (shown separately)
+  const wlAllByDate     = new Map<string, Set<string>>()
+  const wlPriByDate     = new Map<string, Set<string>>()
+  const wlSpecialByDate = new Map<string, Set<string>>()
 
   const lines = csv.split('\n').slice(1)
   for (const line of lines) {
@@ -107,8 +109,14 @@ export async function GET(req: Request) {
     if (!parsedDate || parsedDate < from || parsedDate > to) continue
 
     const tn = normalizeTrainNo(trainCol.replace(/\s*\+\s*/g, '+'))
-    if (!tn || tn.toUpperCase() === 'S') continue
-    if (!isValidTrainNo(tn)) continue
+    if (!tn || tn.toUpperCase() === 'S') continue   // skip secondary "S" placeholder
+
+    if (!isValidTrainNo(tn)) {
+      // Non-numeric entries: S/STOCK, special trains, etc. — collect all
+      if (!wlSpecialByDate.has(parsedDate)) wlSpecialByDate.set(parsedDate, new Set())
+      wlSpecialByDate.get(parsedDate)!.add(tn)
+      continue
+    }
 
     if (!wlAllByDate.has(parsedDate)) wlAllByDate.set(parsedDate, new Set())
     for (const key of expandTrain(tn)) wlAllByDate.get(parsedDate)!.add(key)
@@ -138,15 +146,17 @@ export async function GET(req: Request) {
   type DayResult = {
     date: string; dow: string
     scheduled: { train_no: string; ac: number; nac: number; matched: boolean }[]
-    extra: string[]     // in WL Primary but not in schedule
+    extra: string[]     // in WL Primary numeric but not in schedule
+    special: string[]   // S/STOCK and other non-numeric WL entries
     matchedCount: number; missingCount: number
   }
 
   const results: DayResult[] = dates.map(date => {
     const [dy, dm, dd] = date.split('-').map(Number)
     const dow = DAYS[new Date(Date.UTC(dy, dm - 1, dd)).getUTCDay()]
-    const wlAll = wlAllByDate.get(date) ?? new Set<string>()
-    const wlPri = wlPriByDate.get(date) ?? new Set<string>()
+    const wlAll     = wlAllByDate.get(date)     ?? new Set<string>()
+    const wlPri     = wlPriByDate.get(date)     ?? new Set<string>()
+    const wlSpecial = wlSpecialByDate.get(date) ?? new Set<string>()
 
     const scheduled = allScheduled
       .filter(t => t.days.includes('Daily') || t.days.includes(dow))
@@ -160,11 +170,12 @@ export async function GET(req: Request) {
     const schedSet = new Set<string>()
     for (const t of scheduled) for (const k of expandTrain(t.train_no)) schedSet.add(k)
 
-    const extra = [...wlPri].filter(t => !t.includes('+') && !schedSet.has(t)).sort()
+    const extra   = [...wlPri].filter(t => !t.includes('+') && !schedSet.has(t)).sort()
+    const special = [...wlSpecial].sort()
     const matchedCount = scheduled.filter(t => t.matched).length
     const missingCount = scheduled.filter(t => !t.matched).length
 
-    return { date, dow, scheduled, extra, matchedCount, missingCount }
+    return { date, dow, scheduled, extra, special, matchedCount, missingCount }
   })
 
   // ── 5. Build Excel ────────────────────────────────────────────────────────
@@ -180,6 +191,7 @@ export async function GET(req: Request) {
     { width: 12 }, // Matched
     { width: 12 }, // Missing
     { width: 14 }, // Extra in WL
+    { width: 14 }, // S/STOCK
   ]
 
   const thin   = { style: 'thin'   as const, color: { argb: 'FFCCCCCC' } }
@@ -188,7 +200,7 @@ export async function GET(req: Request) {
   const bordM  = { top: medium, left: medium, bottom: medium, right: medium }
 
   // Title
-  ws1.mergeCells(1, 1, 1, 6)
+  ws1.mergeCells(1, 1, 1, 7)
   const titleCell = ws1.getCell(1, 1)
   titleCell.value = `WL Placement Comparison — ${fmtDate(from)} to ${fmtDate(to)}`
   titleCell.font  = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } }
@@ -198,7 +210,7 @@ export async function GET(req: Request) {
   ws1.getRow(1).height = 26
 
   // Header
-  const hdrLabels = ['Date', 'Day', 'Scheduled', 'Matched', 'Missing', 'Extra in WL']
+  const hdrLabels = ['Date', 'Day', 'Scheduled', 'Matched', 'Missing', 'Extra in WL', 'S/STOCK']
   hdrLabels.forEach((lbl, i) => {
     const cell = ws1.getCell(2, i + 1)
     cell.value = lbl
@@ -216,7 +228,7 @@ export async function GET(req: Request) {
     const cells = [
       fmtDate(r.date), r.dow,
       r.scheduled.length, r.matchedCount,
-      r.missingCount, r.extra.length,
+      r.missingCount, r.extra.length, r.special.length,
     ]
     cells.forEach((val, i) => {
       const cell = ws1.getCell(sumRow, i + 1)
@@ -224,8 +236,9 @@ export async function GET(req: Request) {
       cell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } }
       cell.alignment = { horizontal: i < 2 ? 'left' : 'center', vertical: 'middle' }
       cell.border = bord
-      if (i === 4 && r.missingCount > 0) cell.font = { color: { argb: 'FFB91C1C' }, bold: true }
-      if (i === 5 && r.extra.length > 0)  cell.font = { color: { argb: 'FFB45309' }, bold: true }
+      if (i === 4 && r.missingCount > 0)  cell.font = { color: { argb: 'FFB91C1C' }, bold: true }
+      if (i === 5 && r.extra.length > 0)   cell.font = { color: { argb: 'FFB45309' }, bold: true }
+      if (i === 6 && r.special.length > 0) cell.font = { color: { argb: 'FF5B21B6' }, bold: true }
     })
     ws1.getRow(sumRow).height = 16
     sumRow++
@@ -236,10 +249,10 @@ export async function GET(req: Request) {
   ws2.columns = [
     { width: 13 }, // Date
     { width: 12 }, // Day
-    { width: 14 }, // Train No
+    { width: 18 }, // Train / Stock
     { width: 10 }, // AC
     { width: 10 }, // NAC
-    { width: 16 }, // Status
+    { width: 18 }, // Status
   ]
 
   // Title
@@ -282,7 +295,7 @@ export async function GET(req: Request) {
       ws2.getRow(detRow).height = 15
       detRow++
     }
-    // Extra in WL rows
+    // Extra in WL rows (numeric, Primary, not in schedule)
     for (const tn of r.extra) {
       const vals = [fmtDate(r.date), r.dow, tn, '—', '—', '⚠ Extra in WL']
       vals.forEach((val, i) => {
@@ -292,6 +305,20 @@ export async function GET(req: Request) {
         cell.alignment = { horizontal: i > 2 ? 'center' : 'left', vertical: 'middle' }
         cell.border = bord
         if (i === 5) cell.font = { color: { argb: 'FFB45309' }, bold: true }
+      })
+      ws2.getRow(detRow).height = 15
+      detRow++
+    }
+    // S/STOCK and other special entries
+    for (const tn of r.special) {
+      const vals = [fmtDate(r.date), r.dow, tn, '—', '—', '⚙ S/STOCK']
+      vals.forEach((val, i) => {
+        const cell = ws2.getCell(detRow, i + 1)
+        cell.value = val
+        cell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3E8FF' } }
+        cell.alignment = { horizontal: i > 2 ? 'center' : 'left', vertical: 'middle' }
+        cell.border = bord
+        if (i === 5) cell.font = { color: { argb: 'FF5B21B6' }, bold: true }
       })
       ws2.getRow(detRow).height = 15
       detRow++
