@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
-import { GitCompare, Loader2 } from 'lucide-react'
+import { GitCompare, Loader2, Download } from 'lucide-react'
 
 type SheetWarning = { type: string; message: string; row?: string }
 type SchedTrain   = { train_no: string; ac_count: number; nac_count: number }
@@ -21,6 +21,13 @@ export default function WLCompareModule({ initialDate, onDateChange }: { initial
   const [result,  setResult]  = useState<WLResult | null>(null)
   const [error,   setError]   = useState('')
 
+  // Date-range export state
+  const firstOfMonth = today.slice(0, 8) + '01'
+  const [expFrom,      setExpFrom]      = useState(firstOfMonth)
+  const [expTo,        setExpTo]        = useState(today)
+  const [exporting,    setExporting]    = useState(false)
+  const [exportError,  setExportError]  = useState('')
+
   function handleDateChange(d: string) {
     setDate(d)
     onDateChange?.(d)
@@ -34,6 +41,32 @@ export default function WLCompareModule({ initialDate, onDateChange }: { initial
       if (data.error) { setError(data.error) } else { setResult(data) }
     } catch { setError('Network error') }
     setLoading(false)
+  }
+
+  async function downloadExcel() {
+    if (!expFrom || !expTo) { setExportError('Select From and To dates'); return }
+    if (expFrom > expTo)    { setExportError('From must be ≤ To'); return }
+    setExporting(true); setExportError('')
+    try {
+      const res = await fetch(`/api/wl-compare/export?from=${expFrom}&to=${expTo}`)
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}))
+        setExportError(j.error ?? `Error ${res.status}`)
+        setExporting(false)
+        return
+      }
+      const blob = await res.blob()
+      const url  = URL.createObjectURL(blob)
+      const a    = document.createElement('a')
+      a.href     = url
+      const [fy, fm] = expFrom.split('-')
+      a.download = `WL_Compare_${fy}-${fm}.xlsx`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch { setExportError('Network error') }
+    setExporting(false)
   }
 
   const pill = (text: string, color: string, bg: string) => (
@@ -63,7 +96,7 @@ export default function WLCompareModule({ initialDate, onDateChange }: { initial
 
   return (
     <div style={{ maxWidth: 700 }}>
-      {/* Date picker + button */}
+      {/* ── Single-date compare ── */}
       <div className="card" style={{ padding: 20, marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12 }}>
           <div style={{ flex: 1 }}>
@@ -77,6 +110,33 @@ export default function WLCompareModule({ initialDate, onDateChange }: { initial
             {loading ? 'Fetching…' : 'Compare WL Sheet'}
           </button>
         </div>
+      </div>
+
+      {/* ── Date-range Excel export ── */}
+      <div className="card" style={{ padding: 20, marginBottom: 16, borderLeft: '3px solid var(--accent)' }}>
+        <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', margin: '0 0 10px', textTransform: 'uppercase', letterSpacing: '.04em' }}>
+          Download Excel — Date Range
+        </p>
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', display: 'block', marginBottom: 6 }}>From</label>
+            <input type="date" className="input" value={expFrom} onChange={e => setExpFrom(e.target.value)} style={{ width: 150 }} />
+          </div>
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', display: 'block', marginBottom: 6 }}>To</label>
+            <input type="date" className="input" value={expTo} onChange={e => setExpTo(e.target.value)} style={{ width: 150 }} />
+          </div>
+          <button onClick={downloadExcel} disabled={exporting} className="btn btn-primary" style={{ height: 38 }}>
+            {exporting ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Download size={14} />}
+            {exporting ? 'Generating…' : 'Download Excel'}
+          </button>
+        </div>
+        {exportError && (
+          <p style={{ fontSize: 12, color: 'var(--danger)', margin: '8px 0 0' }}>⚠ {exportError}</p>
+        )}
+        <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '8px 0 0' }}>
+          Max 62 days · 2 sheets: Summary + Detail
+        </p>
       </div>
 
       {error && (
