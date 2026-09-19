@@ -22,7 +22,10 @@ export async function GET(req: Request) {
             ON tm.train_no=t.train_no AND tm.position=cs.position
        WHERE cs.trip_id=t.id AND cs.position>0 AND tm.coach_type IN ${NAC_TYPES}) AS nac_count,
       (SELECT COUNT(*) FROM coach_scores WHERE trip_id=t.id AND position<0)        AS ext_count,
-      (SELECT COUNT(*) FROM intensive_scores WHERE trip_id=t.id)                   AS int_count
+      (SELECT COUNT(*) FROM intensive_scores WHERE trip_id=t.id)                   AS int_count,
+      (SELECT COUNT(*) FROM intensive_scores WHERE trip_id=t.id AND coach_type IN ('LWFCZAC','LWACCN','LWCBAC','LWACZAC','VB','AC')) AS int_ac_count,
+      (SELECT COUNT(*) FROM intensive_scores WHERE trip_id=t.id AND coach_type IN ('GSLRD','LWSCN','LWS','LWSCZAC','NAC'))          AS int_nac_count,
+      (SELECT COUNT(*) FROM intensive_scores WHERE trip_id=t.id AND coach_type='EXT')                                               AS int_ext_count
     FROM trips t
     ${monthYear ? 'WHERE t.month_year=?' : ''}
     ORDER BY t.date ASC, t.id ASC

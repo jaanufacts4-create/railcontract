@@ -8,6 +8,7 @@ type Trip = {
   id: number; date: string; train_no: string
   wl_no: string | null; acwp: number; supervisor: string; month_year: string
   ac_count: number; nac_count: number; ext_count: number; int_count: number
+  int_ac_count: number; int_nac_count: number; int_ext_count: number
 }
 type PenaltyBreakdown = { normal: number; intensive: number; manpower: number; annex: number; total: number }
 type PenaltyMap = Record<number, PenaltyBreakdown>
@@ -441,19 +442,16 @@ export default function TripsPage() {
   })
 
   const totals = visible.reduce(
-    (a, t) => {
-      const isInt = t.int_count > 0
-      return {
-        normalCount: a.normalCount + (isInt ? 0 : 1),
-        normalAc:    a.normalAc   + (isInt ? 0 : t.ac_count),
-        normalNac:   a.normalNac  + (isInt ? 0 : t.nac_count),
-        normalExt:   a.normalExt  + (isInt ? 0 : t.ext_count),
-        intCount:    a.intCount   + (isInt ? 1 : 0),
-        intAc:       a.intAc      + (isInt ? t.ac_count  : 0),
-        intNac:      a.intNac     + (isInt ? t.nac_count : 0),
-        intExt:      a.intExt     + (isInt ? t.ext_count : 0),
-      }
-    },
+    (a, t) => ({
+      normalCount: a.normalCount + (t.int_count === 0 ? 1 : 0),
+      normalAc:    a.normalAc    + t.ac_count,
+      normalNac:   a.normalNac   + t.nac_count,
+      normalExt:   a.normalExt   + t.ext_count,
+      intCount:    a.intCount    + (t.int_count > 0 ? 1 : 0),
+      intAc:       a.intAc       + (t.int_ac_count  ?? 0),
+      intNac:      a.intNac      + (t.int_nac_count ?? 0),
+      intExt:      a.intExt      + (t.int_ext_count ?? 0),
+    }),
     { normalCount:0, normalAc:0, normalNac:0, normalExt:0, intCount:0, intAc:0, intNac:0, intExt:0 }
   )
 
