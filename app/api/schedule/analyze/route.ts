@@ -68,9 +68,8 @@ export async function GET(req: Request) {
   const tripRows = await db.execute(
     `SELECT train_no, SUM(ac_count) as total_ac, SUM(nac_count) as total_nac, COUNT(*) as trip_count
      FROM trips
-     WHERE date >= ? AND date <= ?
-     GROUP BY train_no`,
-    [from, to]
+     WHERE date >= '${from}' AND date <= '${to}'
+     GROUP BY train_no`
   )
   const actualMap = new Map<string, { ac: number; nac: number; trips: number }>()
   for (const r of tripRows.rows) {
