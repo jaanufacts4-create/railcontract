@@ -569,7 +569,7 @@ export default function TripsPage() {
           </button>
         )}
         {visible.length > 0 && (
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             {/* ── Grouped summary table ── */}
             <div style={{ display:'flex', gap:0, border:'1px solid var(--border-md)', borderRadius:10, overflow:'hidden', fontSize:12 }}>
               {/* Normal group */}
