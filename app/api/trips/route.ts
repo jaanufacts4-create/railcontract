@@ -14,13 +14,13 @@ export async function GET(req: Request) {
     SELECT
       t.id, t.date, t.train_no, t.wl_no, t.acwp, t.supervisor, t.month_year, t.created_at,
       (SELECT COUNT(*) FROM coach_scores cs
-       JOIN (SELECT train_no, position, MAX(coach_type) as coach_type FROM train_master GROUP BY train_no, position) tm
+       LEFT JOIN (SELECT train_no, position, MAX(coach_type) as coach_type FROM train_master GROUP BY train_no, position) tm
             ON tm.train_no=t.train_no AND tm.position=cs.position
-       WHERE cs.trip_id=t.id AND cs.position>0 AND tm.coach_type IN ${AC_TYPES}) AS ac_count,
+       WHERE cs.trip_id=t.id AND cs.position>0 AND COALESCE(tm.coach_type,'GSLRD') IN ${AC_TYPES}) AS ac_count,
       (SELECT COUNT(*) FROM coach_scores cs
-       JOIN (SELECT train_no, position, MAX(coach_type) as coach_type FROM train_master GROUP BY train_no, position) tm
+       LEFT JOIN (SELECT train_no, position, MAX(coach_type) as coach_type FROM train_master GROUP BY train_no, position) tm
             ON tm.train_no=t.train_no AND tm.position=cs.position
-       WHERE cs.trip_id=t.id AND cs.position>0 AND tm.coach_type IN ${NAC_TYPES}) AS nac_count,
+       WHERE cs.trip_id=t.id AND cs.position>0 AND COALESCE(tm.coach_type,'GSLRD') IN ${NAC_TYPES}) AS nac_count,
       (SELECT COUNT(*) FROM coach_scores WHERE trip_id=t.id AND position<0)        AS ext_count,
       (SELECT COUNT(*) FROM intensive_scores WHERE trip_id=t.id)                   AS int_count,
       (SELECT COUNT(*) FROM intensive_scores WHERE trip_id=t.id AND coach_type IN ('LWFCZAC','LWACCN','LWCBAC','LWACZAC','VB','AC')) AS int_ac_count,
