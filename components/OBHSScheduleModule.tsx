@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { Plus, Train, Trash2, Save, ChevronDown, ChevronUp, Pencil, X, Download } from 'lucide-react'
 
 type OBHSTrain = {
@@ -137,6 +137,7 @@ export default function OBHSScheduleModule({ apiBase, reportApi }: {
   const [entrySaving,  setEntrySaving]  = useState(false)
   const [msg,          setMsg]          = useState('')
   const [downloading,  setDownloading]  = useState(false)
+  const entriesRef = useRef<HTMLDivElement>(null)
 
   const train = trains.find(t=>t.train_no===selected)??null
 
@@ -193,7 +194,7 @@ export default function OBHSScheduleModule({ apiBase, reportApi }: {
       : await fetch(`${apiBase}/entries`,
           {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
     setEntrySaving(false)
-    if (res.ok) { setShowForm(false); setEditingEntry(null); loadEntries() }
+    if (res.ok) { setShowForm(false); setEditingEntry(null); await loadEntries(); setTimeout(()=>entriesRef.current?.scrollIntoView({behavior:'smooth',block:'start'}),100) }
     else { const d=await res.json(); setMsg(d.error??'Error saving') }
   }
 
@@ -433,7 +434,7 @@ export default function OBHSScheduleModule({ apiBase, reportApi }: {
             )}
 
             {/* Entries table */}
-            <div className="card" style={{padding:0,overflow:'hidden'}}>
+            <div ref={entriesRef} className="card" style={{padding:0,overflow:'hidden'}}>
               <div style={{padding:'12px 18px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid var(--border)'}}>
                 <span style={{fontSize:13,fontWeight:700,color:'var(--text)'}}>
                   Entries — {new Date(monthYear+'-02').toLocaleString('default',{month:'long',year:'numeric'})}
