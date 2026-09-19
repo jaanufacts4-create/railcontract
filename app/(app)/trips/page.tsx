@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Plus, Download, Search, X, Train, LayoutList, GitCompare } from 'lucide-react'
+import { Plus, Download, Search, X, Train, LayoutList, GitCompare, BarChart3, Loader2 } from 'lucide-react'
 import WLCompareModule from '@/components/WLCompareModule'
 
 type Trip = {
@@ -11,6 +11,23 @@ type Trip = {
 }
 type PenaltyBreakdown = { normal: number; intensive: number; manpower: number; annex: number; total: number }
 type PenaltyMap = Record<number, PenaltyBreakdown>
+
+// ── Data Analyzer types ────────────────────────────────────────────────────────
+type AnalyzeRow = {
+  train_no: string; days: string[]; occurrences: number
+  exp_ac: number; exp_nac: number
+  act_ac: number; act_nac: number; act_trips: number
+  diff_ac: number; diff_nac: number
+}
+type AnalyzeTotals = {
+  occurrences: number; exp_ac: number; exp_nac: number
+  act_ac: number; act_nac: number; act_trips: number
+  diff_ac: number; diff_nac: number
+}
+type AnalyzeResult = {
+  from: string; to: string; totalDays: number
+  rows: AnalyzeRow[]; totals: AnalyzeTotals
+}
 
 function fmtDate(d: string) {
   const [y, m, day] = d.split('-')
@@ -31,11 +48,210 @@ function StatChip({ label, value, color }: { label: string; value: number; color
   )
 }
 
-export default function TripsPage() {
-  const [activeTab, setActiveTab] = useState<'trips' | 'wl'>(() => {
-    try { return (localStorage.getItem('trips_tab') as 'trips' | 'wl') || 'trips' } catch { return 'trips' }
+
+// ── Data Analyzer helpers ──────────────────────────────────────────────────────
+function diffColor(v: number) {
+  if (v < 0) return '#B91C1C'
+  if (v > 0) return '#166534'
+  return 'var(--text-3)'
+}
+function diffBg(v: number) {
+  if (v < 0) return 'rgba(239,68,68,.08)'
+  if (v > 0) return 'rgba(34,197,94,.08)'
+  return 'transparent'
+}
+
+// ── Data Analyzer Tab ─────────────────────────────────────────────────────────
+function DataAnalyzerTab() {
+  const today        = new Date().toISOString().slice(0, 10)
+  const firstOfMonth = today.slice(0, 8) + '01'
+
+  const [from,      setFrom]      = useState(firstOfMonth)
+  const [to,        setTo]        = useState(today)
+  const [loading,   setLoading]   = useState(false)
+  const [result,    setResult]    = useState<AnalyzeResult | null>(null)
+  const [error,     setError]     = useState('')
+  const [exporting, setExporting] = useState(false)
+  const [expError,  setExpError]  = useState('')
+
+  async function analyze() {
+    if (!from || !to) { setError('Select From and To dates'); return }
+    if (from > to)    { setError('From must be ≤ To'); return }
+    setLoading(true); setResult(null); setError('')
+    try {
+      const r = await fetch(`/api/schedule/analyze?from=${from}&to=${to}`)
+      const d = await r.json()
+      if (d.error) setError(d.error)
+      else setResult(d)
+    } catch { setError('Network error') }
+    setLoading(false)
+  }
+
+  async function downloadExcel() {
+    if (!from || !to) { setExpError('Select From and To dates'); return }
+    if (from > to)    { setExpError('From must be ≤ To'); return }
+    setExporting(true); setExpError('')
+    try {
+      const res = await fetch(`/api/schedule/analyze/export?from=${from}&to=${to}`)
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}))
+        setExpError(j.error ?? `Error ${res.status}`)
+        setExporting(false); return
+      }
+      const blob = await res.blob()
+      const url  = URL.createObjectURL(blob)
+      const a    = document.createElement('a')
+      const [fy, fm] = from.split('-')
+      a.href = url; a.download = `Schedule_Analysis_${fy}-${fm}.xlsx`
+      document.body.appendChild(a); a.click()
+      document.body.removeChild(a); URL.revokeObjectURL(url)
+    } catch { setExpError('Network error') }
+    setExporting(false)
+  }
+
+  const th: React.CSSProperties = {
+    fontSize: 11, fontWeight: 700, color: 'var(--text-3)',
+    textTransform: 'uppercase', letterSpacing: '.04em',
+    padding: '8px 10px', background: 'var(--surface-2)',
+    borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap',
+  }
+  const td = (align: 'left' | 'center' | 'right' = 'center'): React.CSSProperties => ({
+    padding: '7px 10px', fontSize: 12, textAlign: align,
+    borderBottom: '1px solid var(--border)',
   })
-  function switchTab(t: 'trips' | 'wl') {
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 960 }}>
+      {/* Controls */}
+      <div className="card" style={{ padding: 20 }}>
+        <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', margin: '0 0 12px', textTransform: 'uppercase', letterSpacing: '.04em' }}>
+          Date Range
+        </p>
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', display: 'block', marginBottom: 6 }}>From</label>
+            <input type="date" className="input" value={from} onChange={e => setFrom(e.target.value)} style={{ width: 150 }} />
+          </div>
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', display: 'block', marginBottom: 6 }}>To</label>
+            <input type="date" className="input" value={to} onChange={e => setTo(e.target.value)} style={{ width: 150 }} />
+          </div>
+          <button onClick={analyze} disabled={loading} className="btn btn-primary" style={{ height: 38 }}>
+            {loading ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <BarChart3 size={14} />}
+            {loading ? 'Analyzing…' : 'Analyze'}
+          </button>
+          <button onClick={downloadExcel} disabled={exporting} className="btn btn-secondary" style={{ height: 38 }}>
+            {exporting ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Download size={14} />}
+            {exporting ? 'Generating…' : 'Download Excel'}
+          </button>
+        </div>
+        {(error || expError) && (
+          <p style={{ fontSize: 12, color: 'var(--danger)', margin: '8px 0 0' }}>⚠ {error || expError}</p>
+        )}
+        <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '8px 0 0' }}>
+          Expected = schedule AC/NAC × occurrences in range · Actual = sum from trips
+        </p>
+      </div>
+
+      {result && (
+        <>
+          {/* Summary chips */}
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            {[
+              { label: 'Total Days',  value: result.totalDays,        color: '#2563EB', bg: 'rgba(37,99,235,.08)' },
+              { label: 'Exp AC',      value: result.totals.exp_ac,    color: '#2563EB', bg: 'rgba(37,99,235,.08)' },
+              { label: 'Act AC',      value: result.totals.act_ac,    color: '#166534', bg: 'rgba(34,197,94,.08)'  },
+              { label: 'Diff AC',     value: result.totals.diff_ac,   color: diffColor(result.totals.diff_ac), bg: diffBg(result.totals.diff_ac) },
+              { label: 'Exp NAC',     value: result.totals.exp_nac,   color: '#22C55E', bg: 'rgba(34,197,94,.08)' },
+              { label: 'Act NAC',     value: result.totals.act_nac,   color: '#166534', bg: 'rgba(34,197,94,.08)' },
+              { label: 'Diff NAC',    value: result.totals.diff_nac,  color: diffColor(result.totals.diff_nac), bg: diffBg(result.totals.diff_nac) },
+              { label: 'Total Trips', value: result.totals.act_trips, color: '#6D28D9', bg: 'rgba(109,40,217,.08)' },
+            ].map(c => (
+              <div key={c.label} style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center',
+                padding: '8px 16px', borderRadius: 10,
+                background: c.bg, border: `1px solid ${c.color}30`,
+                minWidth: 80,
+              }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: c.color, letterSpacing: '.04em', textTransform: 'uppercase' }}>{c.label}</span>
+                <span style={{ fontSize: 18, fontWeight: 800, color: c.color }}>{c.value}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Table */}
+          <div className="card" style={{ overflow: 'hidden', padding: 0 }}>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="table-grid" style={{ minWidth: 760, width: '100%' }}>
+                <thead>
+                  <tr>
+                    <th style={{ ...th, textAlign: 'left' }}>Train No</th>
+                    <th style={th}>Running Days</th>
+                    <th style={th}>Occur.</th>
+                    <th style={{ ...th, color: '#1E40AF' }}>Exp AC</th>
+                    <th style={{ ...th, color: '#166534' }}>Exp NAC</th>
+                    <th style={{ ...th, color: '#1E40AF' }}>Act AC</th>
+                    <th style={{ ...th, color: '#166534' }}>Act NAC</th>
+                    <th style={th}>Act Trips</th>
+                    <th style={th}>Diff AC</th>
+                    <th style={th}>Diff NAC</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {result.rows.map(r => (
+                    <tr key={r.train_no} style={{ background: r.diff_ac === 0 && r.diff_nac === 0 ? 'transparent' : r.diff_ac < 0 || r.diff_nac < 0 ? 'rgba(239,68,68,.04)' : 'rgba(34,197,94,.04)' }}>
+                      <td style={{ ...td('left'), fontWeight: 700, color: 'var(--text)' }}>{r.train_no}</td>
+                      <td style={{ ...td('left'), color: 'var(--text-3)', fontSize: 11 }}>{r.days.join(', ')}</td>
+                      <td style={td()}>{r.occurrences}</td>
+                      <td style={td()}>{r.exp_ac}</td>
+                      <td style={td()}>{r.exp_nac}</td>
+                      <td style={td()}>{r.act_ac}</td>
+                      <td style={td()}>{r.act_nac}</td>
+                      <td style={td()}>{r.act_trips}</td>
+                      <td style={{ ...td(), fontWeight: r.diff_ac !== 0 ? 700 : 400, color: diffColor(r.diff_ac), background: diffBg(r.diff_ac) }}>
+                        {r.diff_ac > 0 ? `+${r.diff_ac}` : r.diff_ac}
+                      </td>
+                      <td style={{ ...td(), fontWeight: r.diff_nac !== 0 ? 700 : 400, color: diffColor(r.diff_nac), background: diffBg(r.diff_nac) }}>
+                        {r.diff_nac > 0 ? `+${r.diff_nac}` : r.diff_nac}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr style={{ background: 'var(--surface-2)', fontWeight: 700 }}>
+                    <td style={{ ...td('left'), fontWeight: 800, fontSize: 11, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--text-2)' }} colSpan={2}>TOTAL</td>
+                    <td style={td()}>{result.totals.occurrences}</td>
+                    <td style={td()}>{result.totals.exp_ac}</td>
+                    <td style={td()}>{result.totals.exp_nac}</td>
+                    <td style={td()}>{result.totals.act_ac}</td>
+                    <td style={td()}>{result.totals.act_nac}</td>
+                    <td style={td()}>{result.totals.act_trips}</td>
+                    <td style={{ ...td(), fontWeight: 800, color: diffColor(result.totals.diff_ac) }}>
+                      {result.totals.diff_ac > 0 ? `+${result.totals.diff_ac}` : result.totals.diff_ac}
+                    </td>
+                    <td style={{ ...td(), fontWeight: 800, color: diffColor(result.totals.diff_nac) }}>
+                      {result.totals.diff_nac > 0 ? `+${result.totals.diff_nac}` : result.totals.diff_nac}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+
+          <p style={{ fontSize: 11, color: 'var(--text-4)', margin: 0 }}>
+            Diff = Actual − Expected · <span style={{ color: '#B91C1C' }}>Red = shortfall</span> · <span style={{ color: '#166534' }}>Green = surplus</span>
+          </p>
+        </>
+      )}
+    </div>
+  )
+}
+
+export default function TripsPage() {
+  const [activeTab, setActiveTab] = useState<'trips' | 'wl' | 'analyzer'>(() => {
+    try { return (localStorage.getItem('trips_tab') as 'trips' | 'wl' | 'analyzer') || 'trips' } catch { return 'trips' }
+  })
+  function switchTab(t: 'trips' | 'wl' | 'analyzer') {
     setActiveTab(t)
     try { localStorage.setItem('trips_tab', t) } catch { /* ignore */ }
   }
@@ -170,9 +386,10 @@ export default function TripsPage() {
         marginBottom: -8,
       }}>
         {([
-          { key: 'trips', label: 'Trips',      icon: <LayoutList size={13} /> },
-          { key: 'wl',    label: 'WL Compare', icon: <GitCompare size={13} /> },
-        ] as { key: 'trips' | 'wl'; label: string; icon: React.ReactNode }[]).map(tab => (
+          { key: 'trips',    label: 'Trips',         icon: <LayoutList size={13} /> },
+          { key: 'wl',       label: 'WL Compare',    icon: <GitCompare size={13} /> },
+          { key: 'analyzer', label: 'Data Analyzer', icon: <BarChart3 size={13} /> },
+        ] as { key: 'trips' | 'wl' | 'analyzer'; label: string; icon: React.ReactNode }[]).map(tab => (
           <button key={tab.key} onClick={() => switchTab(tab.key)}
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
@@ -196,6 +413,9 @@ export default function TripsPage() {
           onDateChange={() => {}}
         />
       )}
+
+      {/* ══ Data Analyzer Tab ══ */}
+      {activeTab === 'analyzer' && <DataAnalyzerTab />}
 
       {/* ══ Trips Tab ══ */}
       {activeTab === 'trips' && <>
