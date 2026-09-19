@@ -63,11 +63,11 @@ export async function GET(req: Request) {
     return count
   }
 
-  // ── 3. Load actual trips in date range ────────────────────────────────────
+  // ── 3. Load actual trips in date range (count only) ──────────────────────
   let tripRows: Awaited<ReturnType<typeof db.execute>>
   try {
     tripRows = await db.execute(
-      `SELECT train_no, SUM(ac_count) as total_ac, SUM(nac_count) as total_nac, COUNT(*) as trip_count
+      `SELECT train_no, COUNT(*) as trip_count
        FROM trips
        WHERE "date" >= '${from}' AND "date" <= '${to}'
        GROUP BY train_no`
@@ -75,14 +75,11 @@ export async function GET(req: Request) {
   } catch (e) {
     return NextResponse.json({ error: `Trips query failed: ${e}` }, { status: 500 })
   }
-  const actualMap = new Map<string, { ac: number; nac: number; trips: number }>()
+  // actual AC/NAC = trip_count × schedule coach counts
+  const tripCountMap = new Map<string, number>()
   for (const r of tripRows.rows) {
     const tn = normalizeTrainNo(r.train_no as string)
-    actualMap.set(tn, {
-      ac:    (r.total_ac    as number) ?? 0,
-      nac:   (r.total_nac   as number) ?? 0,
-      trips: (r.trip_count  as number) ?? 0,
-    })
+    tripCountMap.set(tn, (r.trip_count as number) ?? 0)
   }
 
   // ── 4. Build result rows ──────────────────────────────────────────────────
@@ -100,21 +97,23 @@ export async function GET(req: Request) {
   }
 
   const rows: TrainResult[] = schedule.map(t => {
-    const occ    = countOccurrences(t.days)
-    const actual = actualMap.get(t.train_no) ?? { ac: 0, nac: 0, trips: 0 }
-    const expAc  = t.ac_count  * occ
-    const expNac = t.nac_count * occ
+    const occ      = countOccurrences(t.days)
+    const actTrips = tripCountMap.get(t.train_no) ?? 0
+    const expAc    = t.ac_count  * occ
+    const expNac   = t.nac_count * occ
+    const actAc    = t.ac_count  * actTrips
+    const actNac   = t.nac_count * actTrips
     return {
       train_no:    t.train_no,
       days:        t.days,
       occurrences: occ,
       exp_ac:      expAc,
       exp_nac:     expNac,
-      act_ac:      actual.ac,
-      act_nac:     actual.nac,
-      act_trips:   actual.trips,
-      diff_ac:     actual.ac  - expAc,
-      diff_nac:    actual.nac - expNac,
+      act_ac:      actAc,
+      act_nac:     actNac,
+      act_trips:   actTrips,
+      diff_ac:     actAc  - expAc,
+      diff_nac:    actNac - expNac,
     }
   })
 
