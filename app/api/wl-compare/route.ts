@@ -42,6 +42,13 @@ function parseCSVLine(line: string): string[] {
 }
 
 /**
+ * Strip leading zeros from each part: "04654" → "4654", "04654+04652" → "4654+4652"
+ */
+function normalizeTrainNo(tn: string): string {
+  return tn.split('+').map(p => p.trim().replace(/^0+(\d)/, '$1')).join('+')
+}
+
+/**
  * Expand a train entry into individual parts and canonical sorted key.
  * "54613+54611" → ["54613", "54611", "54611+54613"]  (sorted key for order-independent match)
  */
@@ -96,8 +103,8 @@ export async function GET(req: Request) {
     if (!parsedDate) continue
     if (parsedDate !== date) continue
 
-    // Normalize spaces around +: "54613 + 54611" → "54613+54611"
-    const tn = trainCol.replace(/\s*\+\s*/g, '+')
+    // Normalize spaces around + then strip leading zeros: "04654" → "4654"
+    const tn = normalizeTrainNo(trainCol.replace(/\s*\+\s*/g, '+'))
 
     // "S" in train column = Secondary entry — skip silently
     if (tn.toUpperCase() === 'S') continue
@@ -161,7 +168,7 @@ export async function GET(req: Request) {
       return d.includes('Daily') || d.includes(dow)
     })
     .map(r => ({
-      train_no:  r.train_no  as string,
+      train_no:  normalizeTrainNo(r.train_no as string),
       ac_count:  r.ac_count  as number,
       nac_count: r.nac_count as number,
     }))

@@ -37,6 +37,11 @@ function parseCSVLine(line: string): string[] {
   return result
 }
 
+/** Strip leading zeros from each part: "04654" → "4654" */
+function normalizeTrainNo(tn: string): string {
+  return tn.split('+').map(p => p.trim().replace(/^0+(\d)/, '$1')).join('+')
+}
+
 function expandTrain(tn: string): string[] {
   const parts = tn.split('+').map(p => p.trim()).filter(Boolean)
   if (parts.length <= 1) return [tn]
@@ -101,7 +106,7 @@ export async function GET(req: Request) {
     const parsedDate = parseSheetDate(rawDate)
     if (!parsedDate || parsedDate < from || parsedDate > to) continue
 
-    const tn = trainCol.replace(/\s*\+\s*/g, '+')
+    const tn = normalizeTrainNo(trainCol.replace(/\s*\+\s*/g, '+'))
     if (!tn || tn.toUpperCase() === 'S') continue
     if (!isValidTrainNo(tn)) continue
 
@@ -123,7 +128,7 @@ export async function GET(req: Request) {
     'SELECT train_no, days, ac_count, nac_count FROM train_schedule ORDER BY train_no'
   )
   const allScheduled = schedRows.rows.map(r => ({
-    train_no:  r.train_no  as string,
+    train_no:  normalizeTrainNo(r.train_no as string),
     days:      JSON.parse(r.days as string) as string[],
     ac_count:  r.ac_count  as number,
     nac_count: r.nac_count as number,
