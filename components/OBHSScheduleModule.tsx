@@ -596,7 +596,7 @@ export default function OBHSScheduleModule({ apiBase, reportApi }: {
                               color:t.ehk_present?'#16a34a':'#DC2626'}}>{t.ehk_present?'Yes':'No'}</span></td>
                             <td style={{color:t.janitors_available<importPreview.required_janitors?'#F97316':'var(--text-3)'}}>{t.janitors_available}</td>
                             <td style={{color:t.ac_short>0?'#F97316':'var(--text-4)',fontWeight:t.ac_short>0?700:400}}>{t.ac_short>0?t.ac_short:'—'}</td>
-                            <td style={{fontWeight:600}}>{t.psi_pct.toFixed(1)}%</td>
+                            <td style={{fontWeight:600}}>{t.psi_pct.toFixed(2)}%</td>
                             <td>{t.flag==='ok'
                               ? <span style={{fontSize:11,color:'#16a34a',fontWeight:700}}>✓ New</span>
                               : t.flag==='exists'
@@ -666,7 +666,7 @@ export default function OBHSScheduleModule({ apiBase, reportApi }: {
                               color:e.ehk_present?'#16a34a':'#DC2626'}}>{e.ehk_present?'Yes':'No'}</span></td>
                             <td style={{color:e.ac_short>0?'#F97316':'var(--text-4)'}}>{e.ac_short>0?e.ac_short:'—'}</td>
                             <td style={{color:e.nac_short>0?'#F97316':'var(--text-4)'}}>{e.nac_short>0?e.nac_short:'—'}</td>
-                            <td style={{fontWeight:600}}>{e.psi_pct.toFixed(1)}%</td>
+                            <td style={{fontWeight:600}}>{e.psi_pct.toFixed(2)}%</td>
                             <td><span style={{fontSize:11,fontWeight:700,padding:'1px 6px',borderRadius:5,
                               background:c.psiLabel==='Nil'?'rgba(34,197,94,.12)':c.psiLabel==='No Pay'?'rgba(239,68,68,.12)':'rgba(245,158,11,.12)',
                               color:c.psiLabel==='Nil'?'#16a34a':c.psiLabel==='No Pay'?'#DC2626':'#B45309'}}>{c.psiLabel}</span></td>
