@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { Plus, Train, Trash2, Save, ChevronDown, ChevronUp, Pencil, X, Download } from 'lucide-react'
+import { Plus, Train, Trash2, Save, ChevronDown, ChevronUp, Pencil, X, Download, Upload, AlertTriangle, CheckCircle2 } from 'lucide-react'
 
 type OBHSTrain = {
   id: number; train_no: string; days: string
@@ -72,6 +72,24 @@ const BLANK = {
   aa_penalty:0, ab_penalty:0, ac_penalty:0, ad_penalty:0, ae_penalty:0, af_penalty:0,
 }
 
+type ImportTripRow = {
+  date:               string
+  ehk_present:        number
+  janitors_available: number
+  ac_short:           number
+  nac_short:          number
+  psi_pct:            number
+  manpower_raw:       string
+  flag:               'ok' | 'exists' | 'wrong_day'
+}
+type ImportPreview = {
+  sheet_name:        string
+  train_no:          string
+  month_year:        string
+  required_janitors: number
+  trips:             ImportTripRow[]
+}
+
 function TrainForm({ initial, onSave, onCancel, saving }: {
   initial?: Partial<OBHSTrain>; onSave:(d:Partial<OBHSTrain>)=>void; onCancel:()=>void; saving:boolean
 }) {
@@ -137,7 +155,16 @@ export default function OBHSScheduleModule({ apiBase, reportApi }: {
   const [entrySaving,  setEntrySaving]  = useState(false)
   const [msg,          setMsg]          = useState('')
   const [downloading,  setDownloading]  = useState(false)
-  const entriesRef = useRef<HTMLDivElement>(null)
+  const entriesRef   = useRef<HTMLDivElement>(null)
+
+  // ── Excel Import state ────────────────────────────────────────────
+  const importFileRef   = useRef<HTMLInputElement>(null)
+  const [importLoading, setImportLoading]   = useState(false)
+  const [importPreview, setImportPreview]   = useState<ImportPreview|null>(null)
+  const [importError,   setImportError]     = useState('')
+  const [importSelected,setImportSelected]  = useState<Set<number>>(new Set())
+  const [importing,     setImporting]       = useState(false)
+  const [importDone,    setImportDone]      = useState('')
 
   const train = trains.find(t=>t.train_no===selected)??null
 
@@ -201,6 +228,56 @@ export default function OBHSScheduleModule({ apiBase, reportApi }: {
   async function deleteEntry(id: number) {
     if (!confirm('Delete this entry?')) return
     await fetch(`${apiBase}/entries/${id}`,{method:'DELETE'}); loadEntries()
+  }
+
+  async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file || !selected) return
+    e.target.value = ''   // reset so same file can be re-selected
+    setImportLoading(true); setImportError(''); setImportPreview(null); setImportDone('')
+    const fd = new FormData()
+    fd.append('file', file)
+    fd.append('train_no', selected)
+    fd.append('month_year', monthYear)
+    try {
+      const res = await fetch(`${apiBase}/import-preview`, { method: 'POST', body: fd })
+      const data = await res.json()
+      if (!res.ok) { setImportError(data.error ?? 'Parse failed'); return }
+      const preview = data as ImportPreview
+      // Pre-select all rows that are 'ok'
+      const sel = new Set<number>()
+      preview.trips.forEach((t, i) => { if (t.flag === 'ok') sel.add(i) })
+      setImportSelected(sel)
+      setImportPreview(preview)
+    } catch { setImportError('Network error — please try again') }
+    finally { setImportLoading(false) }
+  }
+
+  async function executeImport() {
+    if (!importPreview || !selected) return
+    setImporting(true); setImportDone('')
+    const toImport = importPreview.trips.filter((_, i) => importSelected.has(i))
+    let ok = 0, skip = 0
+    for (const t of toImport) {
+      const res = await fetch(`${apiBase}/entries`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          train_no: selected, month_year: monthYear,
+          date: t.date, ehk_present: t.ehk_present,
+          ac_short: t.ac_short, nac_short: t.nac_short,
+          psi_pct: t.psi_pct,
+          w_penalty:0,x_penalty:0,aa_penalty:0,ab_penalty:0,
+          ac_penalty:0,ad_penalty:0,ae_penalty:0,af_penalty:0,
+        }),
+      })
+      if (res.ok) ok++; else skip++
+    }
+    setImporting(false)
+    setImportDone(`✅ Imported ${ok} entries${skip>0?`, ${skip} skipped (already exist)`:''}.`)
+    setImportPreview(null)
+    await loadEntries()
+    setTimeout(() => entriesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
   }
 
   async function downloadReport() {
@@ -433,13 +510,119 @@ export default function OBHSScheduleModule({ apiBase, reportApi }: {
               </div>
             )}
 
+            {/* Import error */}
+            {importError&&(
+              <div style={{display:'flex',alignItems:'center',gap:10,padding:'12px 16px',background:'rgba(239,68,68,.08)',border:'1px solid rgba(239,68,68,.3)',borderRadius:10,fontSize:13,color:'#DC2626'}}>
+                <AlertTriangle size={16}/> {importError}
+                <button onClick={()=>setImportError('')} style={{marginLeft:'auto',background:'none',border:'none',cursor:'pointer',color:'#DC2626'}}><X size={14}/></button>
+              </div>
+            )}
+
+            {/* Import done banner */}
+            {importDone&&(
+              <div style={{display:'flex',alignItems:'center',gap:10,padding:'12px 16px',background:'rgba(34,197,94,.08)',border:'1px solid rgba(34,197,94,.3)',borderRadius:10,fontSize:13,color:'#16a34a'}}>
+                <CheckCircle2 size={16}/> {importDone}
+                <button onClick={()=>setImportDone('')} style={{marginLeft:'auto',background:'none',border:'none',cursor:'pointer',color:'#16a34a'}}><X size={14}/></button>
+              </div>
+            )}
+
+            {/* Import preview */}
+            {importPreview&&(
+              <div className="card" style={{padding:0,overflow:'hidden',border:'2px solid #6D28D9'}}>
+                <div style={{padding:'12px 18px',background:'#F5F3FF',borderBottom:'1px solid #DDD6FE',display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:8}}>
+                  <div>
+                    <span style={{fontSize:13,fontWeight:700,color:'#5B21B6'}}>📥 Excel Preview — {importPreview.sheet_name}</span>
+                    <span style={{fontSize:12,color:'#7C3AED',marginLeft:10}}>
+                      Required janitors: {importPreview.required_janitors} · {importSelected.size} of {importPreview.trips.filter(t=>t.flag!=='exists').length} importable selected
+                    </span>
+                  </div>
+                  <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                    <button className="btn btn-sm" disabled={importing}
+                      style={{background:'#7C3AED',color:'#fff',border:'none',cursor:'pointer',display:'flex',alignItems:'center',gap:5,padding:'5px 12px',borderRadius:7,fontSize:12,fontWeight:600,opacity:importSelected.size===0||importing?0.5:1}}
+                      onClick={executeImport}>
+                      <Upload size={12}/> {importing?'Importing…':'Import Selected'}
+                    </button>
+                    <button onClick={()=>{setImportPreview(null);setImportError('')}}
+                      style={{background:'none',border:'none',cursor:'pointer',color:'#7C3AED'}}><X size={16}/></button>
+                  </div>
+                </div>
+                <div style={{overflowX:'auto'}}>
+                  <table className="table-grid" style={{fontSize:12}}>
+                    <thead>
+                      <tr>
+                        <th style={{width:36,textAlign:'center'}}>
+                          <input type="checkbox"
+                            checked={importSelected.size===importPreview.trips.filter(t=>t.flag!=='exists').length && importSelected.size>0}
+                            onChange={e=>{
+                              if(e.target.checked) {
+                                const all=new Set<number>(); importPreview.trips.forEach((t,i)=>{if(t.flag!=='exists')all.add(i)}); setImportSelected(all)
+                              } else setImportSelected(new Set())
+                            }}/>
+                        </th>
+                        <th style={{textAlign:'left',paddingLeft:8}}>Date</th>
+                        <th>Manpower</th>
+                        <th>EHK</th>
+                        <th>Available</th>
+                        <th>AC Short</th>
+                        <th>PSI%</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {importPreview.trips.map((t,i)=>{
+                        const isOk    = t.flag==='ok'
+                        const checked = importSelected.has(i)
+                        return (
+                          <tr key={i} style={{opacity:t.flag!=='ok'?0.55:1,background:checked?'rgba(109,40,217,.04)':''}}>
+                            <td style={{textAlign:'center'}}>
+                                {t.flag!=='exists'
+                                ? <input type="checkbox" checked={checked} onChange={e=>{
+                                    setImportSelected(prev=>{const s=new Set(prev); e.target.checked?s.add(i):s.delete(i); return s})
+                                  }}/>
+                                : <span style={{color:'#94A3B8',fontSize:10}}>—</span>}
+                            </td>
+                            <td style={{textAlign:'left',paddingLeft:8,fontWeight:600,color:'var(--text-2)'}}>{t.date.slice(8)}/{t.date.slice(5,7)}</td>
+                            <td style={{color:'#6D28D9',fontWeight:600}}>{t.manpower_raw}</td>
+                            <td><span style={{fontSize:11,fontWeight:700,padding:'1px 6px',borderRadius:5,
+                              background:t.ehk_present?'rgba(34,197,94,.15)':'rgba(239,68,68,.15)',
+                              color:t.ehk_present?'#16a34a':'#DC2626'}}>{t.ehk_present?'Yes':'No'}</span></td>
+                            <td style={{color:t.janitors_available<importPreview.required_janitors?'#F97316':'var(--text-3)'}}>{t.janitors_available}</td>
+                            <td style={{color:t.ac_short>0?'#F97316':'var(--text-4)',fontWeight:t.ac_short>0?700:400}}>{t.ac_short>0?t.ac_short:'—'}</td>
+                            <td style={{fontWeight:600}}>{t.psi_pct.toFixed(1)}%</td>
+                            <td>{t.flag==='ok'
+                              ? <span style={{fontSize:11,color:'#16a34a',fontWeight:700}}>✓ New</span>
+                              : t.flag==='exists'
+                              ? <span style={{fontSize:11,color:'#94A3B8',fontWeight:700}}>Already saved</span>
+                              : <span style={{fontSize:11,color:'#F59E0B',fontWeight:700}}>⚠ Wrong day</span>}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <div style={{padding:'8px 16px',background:'#FAF5FF',borderTop:'1px solid #EDE9FE',fontSize:11,color:'#7C3AED'}}>
+                  💡 Only rows marked "New" can be imported. "Already saved" rows are skipped. "Wrong day" rows may still be imported by ticking them manually after changing the flag — or ignore them.
+                </div>
+              </div>
+            )}
+
             {/* Entries table */}
             <div ref={entriesRef} className="card" style={{padding:0,overflow:'hidden'}}>
               <div style={{padding:'12px 18px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid var(--border)'}}>
                 <span style={{fontSize:13,fontWeight:700,color:'var(--text)'}}>
                   Entries — {new Date(monthYear+'-02').toLocaleString('default',{month:'long',year:'numeric'})}
                 </span>
-                {!showForm&&<button className="btn btn-primary btn-sm" onClick={openAddForm}><Plus size={13}/> Add Entry</button>}
+                <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                  {!showForm&&<button className="btn btn-primary btn-sm" onClick={openAddForm}><Plus size={13}/> Add Entry</button>}
+                  <button className="btn btn-secondary btn-sm" disabled={importLoading}
+                    onClick={()=>importFileRef.current?.click()}
+                    style={{display:'flex',alignItems:'center',gap:5}}>
+                    <Upload size={13}/> {importLoading?'Parsing…':'Import Excel'}
+                  </button>
+                  <input ref={importFileRef} type="file" accept=".xlsx,.xls"
+                    style={{display:'none'}} onChange={handleImportFile}/>
+                </div>
               </div>
               {loading?(
                 <div style={{padding:24,textAlign:'center',fontSize:13,color:'var(--text-4)'}}>Loading...</div>
