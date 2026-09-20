@@ -111,7 +111,7 @@ function TrainForm({ initial, onSave, onCancel, saving }: {
   )
   return (
     <div style={{display:'flex',flexDirection:'column',gap:10}}>
-      {!initial && inp('Train No.','train_no','text')}
+      {inp('Train No.','train_no','text')}
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
         {inp('EHK Stations','ehk_ws','number','1')}
         {inp('AC Stations','ac_ws','number','1')}
@@ -183,8 +183,14 @@ export default function OBHSScheduleModule({ apiBase, reportApi }: {
   async function saveTrain(data: Partial<OBHSTrain>) {
     setTrainSaving(true)
     if (editingTrain) {
-      await fetch(`${apiBase}/trains/${encodeURIComponent(editingTrain.train_no)}`,
+      const res = await fetch(`${apiBase}/trains/${encodeURIComponent(editingTrain.train_no)}`,
         {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
+      if (res.ok) {
+        const json = await res.json()
+        // If train_no was renamed, keep it selected under new name
+        if (selected === editingTrain.train_no && json.train_no && json.train_no !== editingTrain.train_no)
+          setSelected(json.train_no)
+      }
       setEditingTrain(null)
     } else {
       const r = await fetch(`${apiBase}/trains`,
