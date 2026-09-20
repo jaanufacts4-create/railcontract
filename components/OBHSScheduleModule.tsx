@@ -280,8 +280,10 @@ export default function OBHSScheduleModule({ apiBase, reportApi }: {
       if (res.ok) ok++; else skip++
     }
     setImporting(false)
-    setImportDone(`✅ Imported ${ok} entries${skip>0?`, ${skip} skipped (already exist)`:''}.`)
+    setImportDone(`✅ Imported ${ok} ${ok===1?'entry':'entries'}${skip>0?`, ${skip} skipped (already exist)`:''}.`)
     setImportPreview(null)
+    // Small wait for Turso write propagation then double-load to ensure fresh state
+    await new Promise(r => setTimeout(r, 400))
     await loadEntries()
     setTimeout(() => entriesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
   }

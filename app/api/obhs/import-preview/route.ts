@@ -3,9 +3,31 @@ import ExcelJS from 'exceljs'
 import { db, ensureDB } from '@/lib/db'
 
 function parseManpower(raw: string): { ehk: number; janitors: number } | null {
-  const m = raw.toString().trim().match(/^\((\d+)\+(\d+)\)$/)
+  // Tolerant: allow spaces inside parens, e.g. "( 1 + 10 )"
+  const m = raw.toString().trim().match(/^\(\s*(\d+)\s*\+\s*(\d+)\s*\)$/)
   if (!m) return null
   return { ehk: parseInt(m[1]), janitors: parseInt(m[2]) }
+}
+
+// Extracts numeric value from a cell — handles plain numbers AND ExcelJS formula result objects
+function getCellNumber(cell: ExcelJS.Cell): number | null {
+  const v = cell.value
+  if (typeof v === 'number') return v
+  // ExcelJS formula cells: { formula: '...', result: 85.23 }
+  if (v && typeof v === 'object' && 'result' in v) {
+    const r = (v as { result: unknown }).result
+    if (typeof r === 'number') return r
+  }
+  if (typeof v === 'string') { const n = parseFloat(v); return isNaN(n) ? null : n }
+  return null
+}
+
+// Returns { year, month (1-based), day } using LOCAL date parsing to avoid timezone shifts
+function parseDateParts(d: Date): { y: number; m: number; d: number } {
+  // Excel dates are "wall clock" dates — interpret them as local, not UTC
+  // Using toLocaleDateString with en-CA gives YYYY-MM-DD in local time
+  const parts = d.toLocaleDateString('en-CA').split('-').map(Number)
+  return { y: parts[0], m: parts[1], d: parts[2] }
 }
 
 function getDateFromCell(cell: ExcelJS.Cell): Date | null {
@@ -13,11 +35,11 @@ function getDateFromCell(cell: ExcelJS.Cell): Date | null {
     return cell.value
   }
   const raw = cell.value?.toString()?.trim() ?? ''
-  // Handle "02-05-2026 04:00:00" or "2026-05-02" formats
+  // "02-05-2026 04:00:00" → parse as local date string
   const m1 = raw.match(/^(\d{2})-(\d{2})-(\d{4})/)
-  if (m1) return new Date(`${m1[3]}-${m1[2]}-${m1[1]}`)
+  if (m1) return new Date(`${m1[3]}-${m1[2]}-${m1[1]}T00:00:00`)
   const m2 = raw.match(/^(\d{4})-(\d{2})-(\d{2})/)
-  if (m2) return new Date(raw.slice(0, 10))
+  if (m2) return new Date(raw.slice(0, 10) + 'T00:00:00')
   return null
 }
 
@@ -102,34 +124,36 @@ export async function POST(req: NextRequest) {
       if (d && d.getFullYear() >= 2020) { depDate = d; break }
     }
     if (!depDate) return
-    if (depDate.getMonth() + 1 !== targetMonth || depDate.getFullYear() !== targetYear) return
 
-    // ── Find manpower column — rightmost "(N+N)" string ────────────
+    // Use local-time parts to avoid UTC timezone shifts
+    const dp = parseDateParts(depDate)
+    if (dp.m !== targetMonth || dp.y !== targetYear) return
+
+    // ── Find manpower column — rightmost "(N+N)" string (tolerant of spaces) ──
     let manpowerRaw  = ''
     let manpowerCol  = -1
-    const lastCol    = Math.min(row.actualCellCount + 2, 20)
+    const lastCol    = Math.min(row.actualCellCount + 3, 25)
     for (let c = lastCol; c >= 8; c--) {
       const val = row.getCell(c).value?.toString()?.trim() ?? ''
-      if (/^\(\d+\+\d+\)$/.test(val)) { manpowerRaw = val; manpowerCol = c; break }
+      if (/^\(\s*\d+\s*\+\s*\d+\s*\)$/.test(val)) { manpowerRaw = val; manpowerCol = c; break }
     }
     if (!manpowerRaw || manpowerCol < 0) return  // not a trip-start row
 
-    // ── Average PSI% — 1 column before manpower ───────────────────
+    // ── Average PSI% — try col before manpower, then one further left ──────
     let psi_pct = 0
-    const psiCell = row.getCell(manpowerCol - 1)
-    const psiRaw  = psiCell.value
-    if (typeof psiRaw === 'number') {
-      // ExcelJS stores "%" cells as decimals (0.85 = 85%), plain numbers as-is
-      psi_pct = psiRaw <= 1 && psiRaw >= 0 ? Math.round(psiRaw * 10000) / 100 : Math.round(psiRaw * 100) / 100
-    } else if (typeof psiRaw === 'string') {
-      const n = parseFloat(psiRaw)
-      if (!isNaN(n)) psi_pct = n <= 1 ? Math.round(n * 10000) / 100 : Math.round(n * 100) / 100
+    for (const offset of [1, 2]) {
+      const n = getCellNumber(row.getCell(manpowerCol - offset))
+      if (n !== null && n > 0) {
+        // ExcelJS stores "%" cells as decimals (0.85 = 85%), plain numbers as-is
+        psi_pct = n <= 1 ? Math.round(n * 10000) / 100 : Math.round(n * 100) / 100
+        break
+      }
     }
 
     const mp = parseManpower(manpowerRaw)
     if (!mp) return
 
-    const dd      = String(depDate.getDate()).padStart(2, '0')
+    const dd      = String(dp.d).padStart(2, '0')
     const mm      = String(targetMonth).padStart(2, '0')
     const dateStr = `${targetYear}-${mm}-${dd}`
 
