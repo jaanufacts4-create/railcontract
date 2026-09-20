@@ -55,7 +55,9 @@ export async function POST(req: NextRequest) {
   const existingDates = new Set(existing.map(r => r.date as string))
 
   // ── Parse Excel ────────────────────────────────────────────────────
-  const buffer   = Buffer.from(await file.arrayBuffer())
+  // Cast needed: newer Node types return Buffer<ArrayBuffer> but ExcelJS expects Buffer
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const buffer   = Buffer.from(await file.arrayBuffer()) as any
   const workbook = new ExcelJS.Workbook()
   await workbook.xlsx.load(buffer)
 
