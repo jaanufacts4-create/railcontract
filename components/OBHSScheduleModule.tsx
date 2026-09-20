@@ -353,7 +353,7 @@ export default function OBHSScheduleModule({ apiBase, reportApi }: {
       </div>
 
       {/* Right */}
-      <div style={{flex:1,display:'flex',flexDirection:'column',gap:14,minWidth:0,overflow:'auto'}}>
+      <div style={{flex:1,display:'flex',flexDirection:'column',gap:10,minWidth:0,overflow:'auto'}}>
         {/* Header */}
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:10}}>
           <div>
@@ -409,7 +409,7 @@ export default function OBHSScheduleModule({ apiBase, reportApi }: {
 
             {/* Totals bar */}
             {totals&&entries.length>0&&(
-              <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+              <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
                 {[
                   {label:'Trips',val:entries.length.toString(),color:'#2563EB'},
                   {label:'AC Hrs',val:fmtHrs(totals.acHrs),color:'#3B82F6'},
@@ -420,11 +420,11 @@ export default function OBHSScheduleModule({ apiBase, reportApi }: {
                   {label:'EHK Penalty',val:fmt(totals.ehkPenalty),color:'#8B5CF6'},
                   {label:'Total Penalty',val:fmt(totals.totalPenalty),color:'#DC2626'},
                 ].map(c=>(
-                  <div key={c.label} style={{display:'flex',alignItems:'center',gap:7,
-                    background:'var(--surface)',border:'1px solid var(--border)',borderRadius:10,padding:'6px 12px'}}>
-                    <div style={{width:6,height:6,borderRadius:'50%',background:c.color}}/>
-                    <span style={{fontSize:11,color:'var(--text-3)',fontWeight:600}}>{c.label}</span>
-                    <span style={{fontSize:13,fontWeight:700,color:'var(--text)'}}>{c.val}</span>
+                  <div key={c.label} style={{display:'flex',alignItems:'center',gap:5,
+                    background:'var(--surface)',border:'1px solid var(--border)',borderRadius:8,padding:'4px 10px'}}>
+                    <div style={{width:5,height:5,borderRadius:'50%',background:c.color}}/>
+                    <span style={{fontSize:10,color:'var(--text-3)',fontWeight:600}}>{c.label}</span>
+                    <span style={{fontSize:12,fontWeight:700,color:'var(--text)'}}>{c.val}</span>
                   </div>
                 ))}
               </div>
@@ -554,7 +554,7 @@ export default function OBHSScheduleModule({ apiBase, reportApi }: {
                       style={{background:'none',border:'none',cursor:'pointer',color:'#7C3AED'}}><X size={16}/></button>
                   </div>
                 </div>
-                <div style={{overflow:'auto',maxHeight:'calc(100vh - 380px)'}}>
+                <div style={{overflowY:'scroll',maxHeight:'calc(100vh - 300px)',scrollbarWidth:'thin'}}>
                   <table className="table-grid" style={{fontSize:12}}>
                     <thead>
                       <tr>
@@ -639,7 +639,7 @@ export default function OBHSScheduleModule({ apiBase, reportApi }: {
                   No entries for this month — click <strong>Add Entry</strong> to start
                 </div>
               ):(
-                <div style={{overflow:'auto',maxHeight:'calc(100vh - 380px)'}}>
+                <div style={{overflowY:'scroll',maxHeight:'calc(100vh - 300px)',scrollbarWidth:'thin'}}>
                   <table className="table-grid" style={{fontSize:12}}>
                     <thead>
                       <tr style={{position:'sticky',top:0,zIndex:1}}>
