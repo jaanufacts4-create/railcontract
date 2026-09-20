@@ -554,7 +554,7 @@ export default function OBHSScheduleModule({ apiBase, reportApi }: {
                       style={{background:'none',border:'none',cursor:'pointer',color:'#7C3AED'}}><X size={16}/></button>
                   </div>
                 </div>
-                <div style={{overflowX:'auto'}}>
+                <div style={{overflow:'auto',maxHeight:'calc(100vh - 380px)'}}>
                   <table className="table-grid" style={{fontSize:12}}>
                     <thead>
                       <tr>
@@ -639,10 +639,10 @@ export default function OBHSScheduleModule({ apiBase, reportApi }: {
                   No entries for this month — click <strong>Add Entry</strong> to start
                 </div>
               ):(
-                <div style={{overflowX:'auto'}}>
+                <div style={{overflow:'auto',maxHeight:'calc(100vh - 380px)'}}>
                   <table className="table-grid" style={{fontSize:12}}>
                     <thead>
-                      <tr>
+                      <tr style={{position:'sticky',top:0,zIndex:1}}>
                         <th style={{textAlign:'left',paddingLeft:16}}>Date</th>
                         <th>EHK</th><th>AC♠</th><th>NAC♠</th><th>PSI%</th><th>Slab</th>
                         <th>AC Hrs</th><th>NAC Hrs</th>
