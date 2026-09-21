@@ -81,14 +81,17 @@ export async function GET(req: Request) {
     act_ac: number; act_nac: number; act_trips: number
     diff_ac: number; diff_nac: number
     missing_dates: string[]
+    extra_dates: string[]
   }
 
   const rows: Row[] = schedule.map(t => {
     const expDates     = getExpectedDates(t.days)
+    const expDatesSet  = new Set(expDates)
     const occ          = expDates.length
     const actDateSet   = tripDatesMap.get(t.train_no) ?? new Set<string>()
     const actTrips     = actDateSet.size
     const missingDates = expDates.filter(d => !actDateSet.has(d)).map(fmtDate)
+    const extraDates   = [...actDateSet].filter(d => !expDatesSet.has(d)).map(fmtDate).sort()
 
     const expAc  = t.ac_count  * occ
     const expNac = t.nac_count * occ
@@ -100,6 +103,7 @@ export async function GET(req: Request) {
       act_ac: actAc, act_nac: actNac, act_trips: actTrips,
       diff_ac: actAc - expAc, diff_nac: actNac - expNac,
       missing_dates: missingDates,
+      extra_dates:   extraDates,
     }
   })
 
@@ -128,7 +132,7 @@ export async function GET(req: Request) {
   const bord   = { top: thin,   left: thin,   bottom: thin,   right: thin   }
   const bordM  = { top: medium, left: medium, bottom: medium, right: medium }
 
-  // 11 columns now (added Missing Dates)
+  // 12 columns (added Extra Trips)
   ws.columns = [
     { width: 14 }, // Train No
     { width: 18 }, // Running Days
@@ -140,11 +144,12 @@ export async function GET(req: Request) {
     { width: 11 }, // Act Trips
     { width: 12 }, // Diff AC
     { width: 12 }, // Diff NAC
-    { width: 40 }, // Missing Dates
+    { width: 36 }, // Missing Dates
+    { width: 36 }, // Extra Trips
   ]
 
   // Title
-  ws.mergeCells(1, 1, 1, 11)
+  ws.mergeCells(1, 1, 1, 12)
   const title = ws.getCell(1, 1)
   title.value = `Schedule Data Analysis — ${fmtDate(from)} to ${fmtDate(to)} (${totalDays} days)`
   title.font  = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } }
@@ -158,7 +163,7 @@ export async function GET(req: Request) {
   ws.mergeCells(2, 4, 2, 5)
   ws.mergeCells(2, 6, 2, 8)
   ws.mergeCells(2, 9, 2, 10)
-  // col 11: Missing Dates stands alone
+  // cols 11-12: Missing Dates & Extra Trips stand alone
 
   const grpLabels = [
     { col: 1,  text: 'Train',                           argb: 'FF2E4057' },
@@ -166,6 +171,7 @@ export async function GET(req: Request) {
     { col: 6,  text: 'Actual',                          argb: 'FF145A32' },
     { col: 9,  text: 'Difference (Actual − Expected)', argb: 'FF7B241C' },
     { col: 11, text: 'Missing Trip Dates',              argb: 'FF4A235A' },
+    { col: 12, text: 'Extra Trips',                     argb: 'FF7D6608' },
   ]
   for (const g of grpLabels) {
     const c = ws.getCell(2, g.col)
@@ -183,7 +189,7 @@ export async function GET(req: Request) {
     'Exp AC', 'Exp NAC',
     'Act AC', 'Act NAC', 'Act Trips',
     'Diff AC', 'Diff NAC',
-    'Missing Dates',
+    'Missing Dates', 'Extra Dates',
   ]
   hdrs.forEach((h, i) => {
     const cell = ws.getCell(3, i + 1)
@@ -202,6 +208,7 @@ export async function GET(req: Request) {
     const bg   = isOk ? 'FFE8F5E9' : (r.diff_ac < 0 || r.diff_nac < 0 ? 'FFFEECEC' : 'FFFFF8E1')
 
     const missingText = r.missing_dates.length > 0 ? r.missing_dates.join(', ') : ''
+    const extraText   = r.extra_dates.length   > 0 ? r.extra_dates.join(', ')   : ''
 
     const vals: (string | number)[] = [
       r.train_no,
@@ -210,16 +217,16 @@ export async function GET(req: Request) {
       r.exp_ac, r.exp_nac,
       r.act_ac, r.act_nac, r.act_trips,
       r.diff_ac, r.diff_nac,
-      missingText,
+      missingText, extraText,
     ]
     vals.forEach((val, i) => {
       const cell = ws.getCell(dataRow, i + 1)
       cell.value = val
       cell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } }
       cell.alignment = {
-        horizontal: i === 0 || i === 1 || i === 10 ? 'left' : 'center',
+        horizontal: i === 0 || i === 1 || i === 10 || i === 11 ? 'left' : 'center',
         vertical: 'middle',
-        wrapText: i === 10,
+        wrapText: i === 10 || i === 11,
       }
       cell.border = bord
       if (i === 8) {
@@ -230,13 +237,17 @@ export async function GET(req: Request) {
         if (r.diff_nac < 0) cell.font = { color: { argb: 'FFB91C1C' }, bold: true }
         if (r.diff_nac > 0) cell.font = { color: { argb: 'FF166534' }, bold: true }
       }
-      // Missing dates column: red text if there are missing dates
+      // Missing dates column: red text
       if (i === 10 && r.missing_dates.length > 0) {
         cell.font = { color: { argb: 'FFB91C1C' }, size: 9 }
       }
+      // Extra dates column: amber text (trips on unscheduled days)
+      if (i === 11 && r.extra_dates.length > 0) {
+        cell.font = { color: { argb: 'FFB45309' }, size: 9 }
+      }
     })
     // Row height: taller if missing dates wrap
-    ws.getRow(dataRow).height = r.missing_dates.length > 3 ? Math.min(15 + r.missing_dates.length * 4, 80) : 15
+    ws.getRow(dataRow).height = (r.missing_dates.length + r.extra_dates.length) > 3 ? Math.min(15 + (r.missing_dates.length + r.extra_dates.length) * 4, 80) : 15
     dataRow++
   }
 
@@ -246,7 +257,7 @@ export async function GET(req: Request) {
     totals.exp_ac, totals.exp_nac,
     totals.act_ac, totals.act_nac, totals.act_trips,
     totals.diff_ac, totals.diff_nac,
-    '',
+    '', '',
   ]
   totalVals.forEach((val, i) => {
     const cell = ws.getCell(dataRow, i + 1)
@@ -255,7 +266,7 @@ export async function GET(req: Request) {
       ? (totals[i === 8 ? 'diff_ac' : 'diff_nac'] < 0 ? 'FFB91C1C' : totals[i === 8 ? 'diff_ac' : 'diff_nac'] > 0 ? 'FF166534' : 'FF1F4E79')
       : 'FFFFFFFF' } }
     cell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E79' } }
-    cell.alignment = { horizontal: i < 2 || i === 10 ? 'left' : 'center', vertical: 'middle' }
+    cell.alignment = { horizontal: i < 2 || i === 10 || i === 11 ? 'left' : 'center', vertical: 'middle' }
     cell.border = bordM
   })
   ws.getRow(dataRow).height = 18

@@ -97,14 +97,17 @@ export async function GET(req: Request) {
     diff_ac:       number
     diff_nac:      number
     missing_dates: string[]   // DD-MM-YYYY format
+    extra_dates:   string[]   // trips on non-scheduled days
   }
 
   const rows: TrainResult[] = schedule.map(t => {
     const expDates     = getExpectedDates(t.days)
+    const expDatesSet  = new Set(expDates)
     const occ          = expDates.length
     const actDateSet   = tripDatesMap.get(t.train_no) ?? new Set<string>()
     const actTrips     = actDateSet.size
     const missingDates = expDates.filter(d => !actDateSet.has(d)).map(fmtDate)
+    const extraDates   = [...actDateSet].filter(d => !expDatesSet.has(d)).map(fmtDate).sort()
 
     const expAc  = t.ac_count  * occ
     const expNac = t.nac_count * occ
@@ -122,6 +125,7 @@ export async function GET(req: Request) {
       diff_ac:       actAc  - expAc,
       diff_nac:      actNac - expNac,
       missing_dates: missingDates,
+      extra_dates:   extraDates,
     }
   })
 

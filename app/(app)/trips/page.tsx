@@ -20,6 +20,7 @@ type AnalyzeRow = {
   act_ac: number; act_nac: number; act_trips: number
   diff_ac: number; diff_nac: number
   missing_dates: string[]
+  extra_dates: string[]
 }
 type AnalyzeTotals = {
   occurrences: number; exp_ac: number; exp_nac: number
@@ -159,7 +160,7 @@ function DataAnalyzerTab() {
   const [error,     setError]     = useState('')
   const [exporting, setExporting] = useState(false)
   const [expError,  setExpError]  = useState('')
-  const [modal, setModal] = useState<{ trainNo: string; dates: string[] } | null>(null)
+  const [modal, setModal] = useState<{ trainNo: string; dates: string[]; extra_dates: string[] } | null>(null)
 
   async function analyze() {
     if (!from || !to) { setError('Select From and To dates'); return }
@@ -283,6 +284,7 @@ function DataAnalyzerTab() {
                     <th style={th}>Act Trips</th>
                     <th style={th}>Diff AC</th>
                     <th style={th}>Diff NAC</th>
+                    <th style={{ ...th, color: '#B45309' }}>Extra Trips</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -297,7 +299,7 @@ function DataAnalyzerTab() {
                       <td style={td()}>{r.act_nac}</td>
                       <td style={{ ...td(), padding: 0 }}>
                         <button
-                          onClick={() => r.missing_dates.length > 0 && setModal({ trainNo: r.train_no, dates: r.missing_dates })}
+                          onClick={() => r.missing_dates.length > 0 && setModal({ trainNo: r.train_no, dates: r.missing_dates, extra_dates: r.extra_dates ?? [] })}
                           title={r.missing_dates.length > 0 ? `Click to see ${r.missing_dates.length} missing date(s)` : 'All trips present'}
                           style={{
                             width: '100%', height: '100%', minHeight: 32,
@@ -326,6 +328,15 @@ function DataAnalyzerTab() {
                       <td style={{ ...td(), fontWeight: r.diff_nac !== 0 ? 700 : 400, color: diffColor(r.diff_nac), background: diffBg(r.diff_nac) }}>
                         {r.diff_nac > 0 ? `+${r.diff_nac}` : r.diff_nac}
                       </td>
+                      <td style={{ ...td('left'), fontSize: 11 }}>
+                        {(r.extra_dates ?? []).length > 0 ? (
+                          <span style={{ color: '#B45309', fontWeight: 600 }}>
+                            +{r.extra_dates.length} · {r.extra_dates.join(', ')}
+                          </span>
+                        ) : (
+                          <span style={{ color: 'var(--text-4)' }}>—</span>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -344,6 +355,7 @@ function DataAnalyzerTab() {
                     <td style={{ ...td(), fontWeight: 800, color: diffColor(result.totals.diff_nac) }}>
                       {result.totals.diff_nac > 0 ? `+${result.totals.diff_nac}` : result.totals.diff_nac}
                     </td>
+                    <td style={td()}></td>
                   </tr>
                 </tfoot>
               </table>
@@ -351,7 +363,7 @@ function DataAnalyzerTab() {
           </div>
 
           <p style={{ fontSize: 11, color: 'var(--text-4)', margin: 0 }}>
-            Diff = Actual − Expected · <span style={{ color: '#B91C1C' }}>Red = shortfall</span> · <span style={{ color: '#166534' }}>Green = surplus</span>
+            Diff = Actual − Expected · <span style={{ color: '#B91C1C' }}>Red = shortfall</span> · <span style={{ color: '#166534' }}>Green = surplus</span> · <span style={{ color: '#B45309' }}>Amber = trips on non-scheduled day</span>
           </p>
         </>
       )}
