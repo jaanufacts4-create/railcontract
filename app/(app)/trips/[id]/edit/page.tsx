@@ -121,7 +121,7 @@ export default function EditTripPage() {
 
         // penalties
         const penMap: Penalties = {}
-        for (const p of (data.penalties ?? [])) penMap[p.type] = p.amount
+        for (const p of (data.penalties ?? [])) penMap[Number(p.penalty_type)] = Number(p.amount)
         setPenalties(penMap)
       })
       .catch(e => setFetchError(e.message))
