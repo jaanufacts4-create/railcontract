@@ -47,6 +47,10 @@ function ScheduleTab() {
   async function saveForm() {
     if (!form.train_no.trim() || form.days.length === 0) return
     setSaving(true)
+    // If train_no changed during edit, delete old record first
+    if (editing && editing !== '__new__' && editing !== form.train_no.trim()) {
+      await fetch(`/api/schedule?train_no=${encodeURIComponent(editing)}`, { method: 'DELETE' })
+    }
     await fetch('/api/schedule', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(form),
@@ -90,7 +94,7 @@ function ScheduleTab() {
           </h2>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 16 }}>
             {[
-              { label: 'Train No.',   field: 'train_no',  type: 'text',   disabled: !isAdding },
+              { label: 'Train No.',   field: 'train_no',  type: 'text',   disabled: false },
               { label: 'AC Coaches',  field: 'ac_count',  type: 'number', disabled: false },
               { label: 'NAC Coaches', field: 'nac_count', type: 'number', disabled: false },
             ].map(({ label, field, type, disabled }) => (
