@@ -391,9 +391,11 @@ export default function TripsPage() {
     try { localStorage.setItem('trips_tab', t) } catch { /* ignore */ }
   }
 
-  const [monthYear,   setMonthYear]   = useState(() => {
-    try { return localStorage.getItem('trips_month') || new Date().toISOString().slice(0, 7) } catch { return new Date().toISOString().slice(0, 7) }
-  })
+  const [monthYear,   setMonthYear]   = useState(() => new Date().toISOString().slice(0, 7))
+  // Restore saved month from localStorage AFTER hydration (avoids SSR mismatch)
+  useEffect(() => {
+    try { const saved = localStorage.getItem('trips_month'); if (saved) setMonthYear(saved) } catch { /* ignore */ }
+  }, [])
   const handleMonthChange = (v: string) => {
     setMonthYear(v)
     try { localStorage.setItem('trips_month', v) } catch { /* ignore */ }
