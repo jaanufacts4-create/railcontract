@@ -117,6 +117,7 @@ export async function ensureDB() {
   }
   if (!_rawDataV2Migrated) {
     await migrateRawDataV2()
+    await migrateTripCoachCount()
     _rawDataV2Migrated = true
   }
   // NOTE: ensureIndexes() is NOT called here to avoid Vercel timeout on cold start.
@@ -258,6 +259,8 @@ export async function migrate() {
       acwp       INTEGER NOT NULL DEFAULT 0,  -- 0=No, 1=Yes
       supervisor TEXT    NOT NULL DEFAULT '',
       month_year TEXT    NOT NULL,       -- YYYY-MM
+      ac_count   INTEGER NOT NULL DEFAULT 0,
+      nac_count  INTEGER NOT NULL DEFAULT 0,
       created_at TEXT    NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -1188,5 +1191,12 @@ async function migrateRawDataV2() {
   // Add 1st AC columns for Face Towel and Bath Towel in laundry_raw_data
   for (const col of ['face_towel_1ac INTEGER NOT NULL DEFAULT 0', 'bath_towel_1ac INTEGER NOT NULL DEFAULT 0']) {
     try { await db.execute(`ALTER TABLE laundry_raw_data ADD COLUMN ${col}`) } catch { /* already exists */ }
+  }
+}
+
+async function migrateTripCoachCount() {
+  // Add ac_count / nac_count to trips table (missing from original schema)
+  for (const col of ['ac_count INTEGER NOT NULL DEFAULT 0', 'nac_count INTEGER NOT NULL DEFAULT 0']) {
+    try { await db.execute(`ALTER TABLE trips ADD COLUMN ${col}`) } catch { /* already exists */ }
   }
 }
