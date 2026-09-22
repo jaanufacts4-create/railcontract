@@ -40,46 +40,68 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     intensive_coaches?: Array<{ position: number; coach_type: string; score: number; ext_score: number }>
   }
 
-  await db.execute({ sql: 'UPDATE trips SET date=?, wl_no=?, acwp=?, supervisor=?, month_year=?, int_acwp=?, ac_count=?, nac_count=? WHERE id=?',
-    args: [body.date, body.wl_no ?? null, body.acwp ? 1 : 0, body.supervisor, body.date.slice(0, 7), body.int_acwp ? 1 : 0, body.ac_count ?? 0, body.nac_count ?? 0, id] })
+  try {
+    // ── 1. Update main trip row ──
+    await db.execute({
+      sql: 'UPDATE trips SET date=?, wl_no=?, acwp=?, supervisor=?, month_year=?, int_acwp=?, ac_count=?, nac_count=? WHERE id=?',
+      args: [body.date, body.wl_no ?? null, body.acwp ? 1 : 0, body.supervisor, body.date.slice(0, 7), body.int_acwp ? 1 : 0, body.ac_count ?? 0, body.nac_count ?? 0, id],
+    })
 
-  // Delete & reinsert child records
-  await db.execute({ sql: 'DELETE FROM coach_scores WHERE trip_id=?', args: [id] })
-  for (const [pos, score] of Object.entries(body.scores)) {
-    const c = body.criteria?.[pos] ?? [0,0,0,0,0]
-    await db.execute({ sql: 'INSERT INTO coach_scores (trip_id, position, score, c0, c1, c2, c3, c4) VALUES (?,?,?,?,?,?,?,?)',
-      args: [id, Number(pos), score, c[0], c[1], c[2], c[3], c[4]] })
-  }
-  if (!body.acwp && body.ext_scores) {
-    for (const [pos, score] of Object.entries(body.ext_scores)) {
-      await db.execute({ sql: 'INSERT INTO coach_scores (trip_id, position, score) VALUES (?,?,?)',
-        args: [id, -Number(pos), score] })
+    // ── 2. Coach scores ──
+    await db.execute({ sql: 'DELETE FROM coach_scores WHERE trip_id=?', args: [id] })
+    for (const [pos, score] of Object.entries(body.scores)) {
+      const c = body.criteria?.[pos] ?? [0, 0, 0, 0, 0]
+      await db.execute({
+        sql: 'INSERT INTO coach_scores (trip_id, position, score, c0, c1, c2, c3, c4) VALUES (?,?,?,?,?,?,?,?)',
+        args: [id, Number(pos), score, c[0] ?? 0, c[1] ?? 0, c[2] ?? 0, c[3] ?? 0, c[4] ?? 0],
+      })
     }
-  }
-
-  await db.execute({ sql: 'DELETE FROM manpower WHERE trip_id=?', args: [id] })
-  for (const [section, mp] of Object.entries(body.manpower)) {
-    await db.execute({ sql: 'INSERT INTO manpower (trip_id, section, required, deployed) VALUES (?,?,?,?)',
-      args: [id, section, mp.required, mp.deployed] })
-  }
-
-  await db.execute({ sql: 'DELETE FROM annex_penalties WHERE trip_id=?', args: [id] })
-  for (const [type, amount] of Object.entries(body.penalties)) {
-    if (Number(amount) > 0) {
-      await db.execute({ sql: 'INSERT INTO annex_penalties (trip_id, penalty_type, amount) VALUES (?,?,?)',
-        args: [id, Number(type), amount] })
+    if (!body.acwp && body.ext_scores) {
+      for (const [pos, score] of Object.entries(body.ext_scores)) {
+        await db.execute({
+          sql: 'INSERT INTO coach_scores (trip_id, position, score) VALUES (?,?,?)',
+          args: [id, -Number(pos), score],
+        })
+      }
     }
-  }
 
-  await db.execute({ sql: 'DELETE FROM intensive_scores WHERE trip_id=?', args: [id] })
-  for (const ic of body.intensive_coaches ?? []) {
-    await db.execute({ sql: 'INSERT INTO intensive_scores (trip_id, position, coach_type, score, ext_score) VALUES (?,?,?,?,?)',
-      args: [id, ic.position, ic.coach_type, ic.score, ic.ext_score ?? 0] })
-  }
+    // ── 3. Manpower ──
+    await db.execute({ sql: 'DELETE FROM manpower WHERE trip_id=?', args: [id] })
+    for (const [section, mp] of Object.entries(body.manpower)) {
+      await db.execute({
+        sql: 'INSERT INTO manpower (trip_id, section, required, deployed) VALUES (?,?,?,?)',
+        args: [id, section, mp.required ?? 0, mp.deployed ?? 0],
+      })
+    }
 
-  return NextResponse.json({ ok: true })
+    // ── 4. Penalties ──
+    await db.execute({ sql: 'DELETE FROM annex_penalties WHERE trip_id=?', args: [id] })
+    for (const [type, amount] of Object.entries(body.penalties)) {
+      if (Number(amount) > 0) {
+        await db.execute({
+          sql: 'INSERT INTO annex_penalties (trip_id, penalty_type, amount) VALUES (?,?,?)',
+          args: [id, Number(type), amount],
+        })
+      }
+    }
+
+    // ── 5. Intensive scores ──
+    await db.execute({ sql: 'DELETE FROM intensive_scores WHERE trip_id=?', args: [id] })
+    for (const ic of body.intensive_coaches ?? []) {
+      await db.execute({
+        sql: 'INSERT INTO intensive_scores (trip_id, position, coach_type, score, ext_score) VALUES (?,?,?,?,?)',
+        args: [id, ic.position, ic.coach_type, ic.score, ic.ext_score ?? 0],
+      })
+    }
+
+    return NextResponse.json({ ok: true })
+  } catch (e: unknown) {
+    console.error('[PUT /api/trips/:id] error:', e)
+    return NextResponse.json({ error: String(e) }, { status: 500 })
+  }
 }
 
+// ────────────────────────────────────────────────────────────────
 /** DELETE /api/trips/:id */
 export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
   await ensureDB()
