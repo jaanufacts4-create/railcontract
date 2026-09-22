@@ -70,19 +70,25 @@ export async function GET(req: Request) {
   let tripRows: Awaited<ReturnType<typeof db.execute>>
   try {
     tripRows = await db.execute(
-      `SELECT train_no, "date" FROM trips WHERE "date" >= '${from}' AND "date" <= '${to}'`
+      `SELECT train_no, "date", ac_count, nac_count FROM trips WHERE "date" >= '${from}' AND "date" <= '${to}'`
     )
   } catch (e) {
     return NextResponse.json({ error: `Trips query failed: ${e}` }, { status: 500 })
   }
 
-  // Build map: train_no -> Set<date> (unique dates that had at least one trip)
-  const tripDatesMap = new Map<string, Set<string>>()
+  // Build map: train_no -> { dates: Set<date>, sumAc, sumNac, mismatches }
+  type TripAgg = { dates: Set<string>; sumAc: number; sumNac: number; mismatches: string[] }
+  const tripAggMap = new Map<string, TripAgg>()
   for (const r of tripRows.rows) {
     const tn = normalizeTrainNo(r.train_no as string)
-    if (!tripDatesMap.has(tn)) tripDatesMap.set(tn, new Set())
-    tripDatesMap.get(tn)!.add(r.date as string)
+    if (!tripAggMap.has(tn)) tripAggMap.set(tn, { dates: new Set(), sumAc: 0, sumNac: 0, mismatches: [] })
+    const agg = tripAggMap.get(tn)!
+    agg.dates.add(r.date as string)
+    agg.sumAc  += (r.ac_count  as number) ?? 0
+    agg.sumNac += (r.nac_count as number) ?? 0
   }
+  // Keep backward-compat alias
+  const tripDatesMap = new Map([...tripAggMap.entries()].map(([k, v]) => [k, v.dates]))
 
   // ── 4. Build result rows ────────────────────────────────────────────────────
   type TrainResult = {
@@ -98,6 +104,7 @@ export async function GET(req: Request) {
     diff_nac:      number
     missing_dates: string[]   // DD-MM-YYYY format
     extra_dates:   string[]   // trips on non-scheduled days
+    coach_mismatch: boolean   // any trip has ac/nac ≠ schedule master
   }
 
   const rows: TrainResult[] = schedule.map(t => {
@@ -111,8 +118,9 @@ export async function GET(req: Request) {
 
     const expAc  = t.ac_count  * occ
     const expNac = t.nac_count * occ
-    const actAc  = t.ac_count  * actTrips
-    const actNac = t.nac_count * actTrips
+    const agg    = tripAggMap.get(t.train_no)
+    const actAc  = agg?.sumAc  ?? 0   // actual SUM from trips table
+    const actNac = agg?.sumNac ?? 0   // actual SUM from trips table
     return {
       train_no:      t.train_no,
       days:          t.days,
@@ -126,6 +134,7 @@ export async function GET(req: Request) {
       diff_nac:      actNac - expNac,
       missing_dates: missingDates,
       extra_dates:   extraDates,
+      coach_mismatch: (agg?.sumAc ?? 0) !== (t.ac_count * actTrips) || (agg?.sumNac ?? 0) !== (t.nac_count * actTrips),
     }
   })
 

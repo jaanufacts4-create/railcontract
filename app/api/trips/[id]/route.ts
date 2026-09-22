@@ -32,14 +32,16 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     date: string; wl_no?: string; acwp?: boolean; supervisor: string; int_acwp?: boolean
     scores:     Record<string, number>
     criteria:   Record<string, [number,number,number,number,number]>
+    ac_count:   number
+    nac_count:  number
     ext_scores: Record<string, number>
     manpower:   Record<string, { required: number; deployed: number }>
     penalties:  Record<string, number>
     intensive_coaches?: Array<{ position: number; coach_type: string; score: number; ext_score: number }>
   }
 
-  await db.execute({ sql: 'UPDATE trips SET date=?, wl_no=?, acwp=?, supervisor=?, month_year=?, int_acwp=? WHERE id=?',
-    args: [body.date, body.wl_no ?? null, body.acwp ? 1 : 0, body.supervisor, body.date.slice(0, 7), body.int_acwp ? 1 : 0, id] })
+  await db.execute({ sql: 'UPDATE trips SET date=?, wl_no=?, acwp=?, supervisor=?, month_year=?, int_acwp=?, ac_count=?, nac_count=? WHERE id=?',
+    args: [body.date, body.wl_no ?? null, body.acwp ? 1 : 0, body.supervisor, body.date.slice(0, 7), body.int_acwp ? 1 : 0, body.ac_count ?? 0, body.nac_count ?? 0, id] })
 
   // Delete & reinsert child records
   await db.execute({ sql: 'DELETE FROM coach_scores WHERE trip_id=?', args: [id] })

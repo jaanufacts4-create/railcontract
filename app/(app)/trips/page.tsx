@@ -21,6 +21,7 @@ type AnalyzeRow = {
   diff_ac: number; diff_nac: number
   missing_dates: string[]
   extra_dates: string[]
+  coach_mismatch: boolean
 }
 type AnalyzeTotals = {
   occurrences: number; exp_ac: number; exp_nac: number
@@ -285,6 +286,7 @@ function DataAnalyzerTab() {
                     <th style={th}>Diff AC</th>
                     <th style={th}>Diff NAC</th>
                     <th style={{ ...th, color: '#B45309' }}>Extra Trips</th>
+                    <th style={th}>Coach ⚠</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -337,6 +339,14 @@ function DataAnalyzerTab() {
                           <span style={{ color: 'var(--text-4)' }}>—</span>
                         )}
                       </td>
+                      <td style={td()}>
+                        {r.coach_mismatch ? (
+                          <span title="Some trips have coach count different from schedule master"
+                            style={{ color: '#B45309', fontWeight: 700, fontSize: 13 }}>⚠</span>
+                        ) : (
+                          <span style={{ color: 'var(--text-4)' }}>✓</span>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -356,6 +366,7 @@ function DataAnalyzerTab() {
                       {result.totals.diff_nac > 0 ? `+${result.totals.diff_nac}` : result.totals.diff_nac}
                     </td>
                     <td style={td()}></td>
+                    <td style={td()}></td>
                   </tr>
                 </tfoot>
               </table>
@@ -363,7 +374,7 @@ function DataAnalyzerTab() {
           </div>
 
           <p style={{ fontSize: 11, color: 'var(--text-4)', margin: 0 }}>
-            Diff = Actual − Expected · <span style={{ color: '#B91C1C' }}>Red = shortfall</span> · <span style={{ color: '#166534' }}>Green = surplus</span> · <span style={{ color: '#B45309' }}>Amber = trips on non-scheduled day</span>
+            Diff = Actual − Expected · <span style={{ color: '#B91C1C' }}>Red = shortfall</span> · <span style={{ color: '#166534' }}>Green = surplus</span> · <span style={{ color: '#B45309' }}>Amber = trips on non-scheduled day</span> · ⚠ = coach count mismatch vs schedule
           </p>
         </>
       )}

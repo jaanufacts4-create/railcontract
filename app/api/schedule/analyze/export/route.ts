@@ -65,14 +65,19 @@ export async function GET(req: Request) {
 
   // ── Actual trip dates ─────────────────────────────────────────────────────────────
   const tripRows = await db.execute(
-    `SELECT train_no, "date" FROM trips WHERE "date" >= '${from}' AND "date" <= '${to}'`
+    `SELECT train_no, "date", ac_count, nac_count FROM trips WHERE "date" >= '${from}' AND "date" <= '${to}'`
   )
-  const tripDatesMap = new Map<string, Set<string>>()
+  type TripAgg = { dates: Set<string>; sumAc: number; sumNac: number }
+  const tripAggMap = new Map<string, TripAgg>()
   for (const r of tripRows.rows) {
     const tn = normalizeTrainNo(r.train_no as string)
-    if (!tripDatesMap.has(tn)) tripDatesMap.set(tn, new Set())
-    tripDatesMap.get(tn)!.add(r.date as string)
+    if (!tripAggMap.has(tn)) tripAggMap.set(tn, { dates: new Set(), sumAc: 0, sumNac: 0 })
+    const agg = tripAggMap.get(tn)!
+    agg.dates.add(r.date as string)
+    agg.sumAc  += (r.ac_count  as number) ?? 0
+    agg.sumNac += (r.nac_count as number) ?? 0
   }
+  const tripDatesMap = new Map([...tripAggMap.entries()].map(([k, v]) => [k, v.dates]))
 
   // ── Build rows ────────────────────────────────────────────────────────────────────────────
   type Row = {
@@ -95,8 +100,9 @@ export async function GET(req: Request) {
 
     const expAc  = t.ac_count  * occ
     const expNac = t.nac_count * occ
-    const actAc  = t.ac_count  * actTrips
-    const actNac = t.nac_count * actTrips
+    const agg    = tripAggMap.get(t.train_no)
+    const actAc  = agg?.sumAc  ?? 0
+    const actNac = agg?.sumNac ?? 0
     return {
       train_no: t.train_no, days: t.days, occurrences: occ,
       exp_ac: expAc, exp_nac: expNac,

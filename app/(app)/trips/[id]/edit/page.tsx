@@ -315,6 +315,7 @@ export default function EditTripPage() {
       body: JSON.stringify({
         date, train_no: trainNo, wl_no: wlNo || null,
         acwp, supervisor, month_year: monthYear,
+        ac_count: acCount, nac_count: nacCount,
         scores,
         criteria:          Object.fromEntries(Object.entries(criteria).map(([p, c]) => [p, c])),
         ext_scores:        acwp ? {} : extScores,
