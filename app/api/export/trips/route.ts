@@ -217,8 +217,10 @@ export async function GET(req: Request) {
       let mpPenalty = 0
       for (const mp of mpRows) mpPenalty += calcManpowerPenalty(mp.required, mp.deployed, cfg.min_wages)
 
-      // Annex penalties only for Normal trips (not Intensive)
-      const annexTotal = intRows.length === 0 ? amounts.reduce((s, a) => s + a, 0) : 0
+      // Annex penalties: apply if trip has any normal coaches (normalPenalty > 0)
+      // Mixed trips (normal + intensive) still get annex on normal portion
+      const rawAnnex = amounts.reduce((s, a) => s + a, 0)
+      const annexTotal = normalPenalty > 0 ? rawAnnex : 0
 
       const intBHPenalty = 0  // removed — was double-counting mpPenalty after annex fix
 

@@ -156,17 +156,18 @@ export async function GET(req: Request) {
       mpPenalty += calcManpowerPenalty(mp.required, mp.deployed, cfg.min_wages)
     }
 
-    // Annex penalties — only for Normal trips (not Intensive)
+    // Annex penalties — only when trip has normal coaches (normalPenalty > 0)
+    // Mixed trips (some normal + some intensive) still get annex on normal part
     let annexTotal = 0
     const penMap: Record<number, number> = {}
-    if (intRows.length === 0) {
-      for (const p of penRows) {
-        penMap[p.penalty_type] = p.amount
-        annexTotal += p.amount
-      }
+    for (const p of penRows) {
+      penMap[p.penalty_type] = p.amount
+      annexTotal += p.amount
     }
+    // Will zero out after normalPenalty is computed if purely intensive
 
     const normalPenalty = acSlab.totalPenalty + nacSlab.totalPenalty + (extSlab?.totalPenalty ?? 0)
+    if (normalPenalty === 0) annexTotal = 0  // purely intensive trip — no annex
 
     // Intensive cleaning penalty
     const acIntScores:  number[] = []
