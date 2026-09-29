@@ -567,10 +567,8 @@ export async function GET(req: Request) {
 
       const iAnnexMap: Record<number, number> = {}
       for (const r of iPenRes.rows) iAnnexMap[r.penalty_type as number] = r.amount as number
-      const iAnnexNoMP = Object.entries(iAnnexMap)
-        .filter(([k]) => Number(k) <= 13)
-        .reduce((s: number, [, v]) => s + v, 0)
-      const iTripBH = r2(iAnnexNoMP + iMpPenalty)
+      // iTripBH zeroed — annex A2 and MP already counted in Normal sheet's tripBH
+      const iTripBH = 0
       dayIntBH += iTripBH
 
       // Build sequential coach list
