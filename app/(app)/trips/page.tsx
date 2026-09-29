@@ -421,14 +421,15 @@ export default function TripsPage() {
     setPenaltyMap({})
     fetch(`/api/summary?month_year=${monthYear}`)
       .then(r => r.json())
-      .then((data: { rows?: Array<{ trip: { id: number }; normalPenalty: number; intensivePenalty: number; manpowerPenalty: number; annexTotal: number; grandTotal: number }> }) => {
+      .then((data: { rows?: Array<{ trip: { id: number }; normalPenalty: number; intensivePenalty: number; manpowerPenalty: number; annexTotal: number; intBHPenalty: number; grandTotal: number }> }) => {
         const m: PenaltyMap = {}
         for (const row of data.rows ?? []) {
           m[row.trip.id] = {
             normal:    row.normalPenalty    ?? 0,
             intensive: row.intensivePenalty ?? 0,
             manpower:  row.manpowerPenalty  ?? 0,
-            annex:     row.annexTotal       ?? 0,
+            // annexTotal + A1-Back Side Intensive (if trip has intensive scores, charged again)
+            annex:     (row.annexTotal ?? 0) + (row.intBHPenalty ?? 0),
             total:     row.grandTotal       ?? 0,
           }
         }

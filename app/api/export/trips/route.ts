@@ -219,6 +219,9 @@ export async function GET(req: Request) {
 
       const annexTotal = amounts.reduce((s, a) => s + a, 0)
 
+      // A1-Back Side Intensive: if trip has intensive scores, annex + MP is charged again
+      const intBHPenalty = intRows.length > 0 ? annexTotal + mpPenalty : 0
+
       // Flags
       const flags: string[] = []
       const sched = schedule.find(s => s.train_no === trainNo)
@@ -235,7 +238,7 @@ export async function GET(req: Request) {
         intensive: r2(intensivePenalty),
         manpower:  r2(mpPenalty),
         annex:     r2(annexTotal),
-        total:     r2(normalPenalty + intensivePenalty + mpPenalty + annexTotal),
+        total:     r2(normalPenalty + intensivePenalty + mpPenalty + annexTotal + intBHPenalty),
         flags,
       })
     }
