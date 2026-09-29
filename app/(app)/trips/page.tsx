@@ -428,8 +428,7 @@ export default function TripsPage() {
             normal:    row.normalPenalty    ?? 0,
             intensive: row.intensivePenalty ?? 0,
             manpower:  row.manpowerPenalty  ?? 0,
-            // annexTotal + A1-Back Side Intensive (if trip has intensive scores, charged again)
-            annex:     (row.annexTotal ?? 0) + (row.intBHPenalty ?? 0),
+            annex:     row.annexTotal       ?? 0,
             total:     row.grandTotal       ?? 0,
           }
         }
