@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import ExcelJS from 'exceljs'
 import { db, ensureDB } from '@/lib/db'
+import { calcSlabs, calcManpowerPenalty, rateWithoutGST } from '@/lib/calculations'
+import { coachCategory } from '@/lib/types'
 
 const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
 const MONTHS = ['January','February','March','April','May','June',
@@ -95,6 +97,91 @@ export async function GET(req: Request) {
   // ── Build workbook ────────────────────────────────────────────────────────
   const wb = new ExcelJS.Workbook()
 
+  // ══ Load config for penalty calculations ═══════════════════════════════════
+  const cfgRows = await db.execute('SELECT key, value FROM config')
+  const cfg: Record<string, number> = {}
+  for (const r of cfgRows.rows) cfg[r.key as string] = Number(r.value)
+  const acRateNG  = rateWithoutGST(cfg.ac_rate_gst  || 516.99, cfg.gst_pct || 18)
+  const nacRateNG = rateWithoutGST(cfg.nac_rate_gst || 485.01, cfg.gst_pct || 18)
+  const extRateNG = rateWithoutGST(cfg.ext_rate_gst || 165.66, cfg.gst_pct || 18)
+
+  // ══ Pre-compute penalties for each trip ══════════════════════════════════════
+  type TripPenalty = { normal: number; intensive: number; manpower: number; annex: number; total: number; flags: string[] }
+  const penaltyCache = new Map<number, TripPenalty>()
+  const schedSet = new Set(schedule.map(s => s.train_no))
+  const DAYS_ARR = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+
+  for (const t of trips) {
+    const tripId = t.id as number
+    const trainNo = t.train_no as string
+    const acwp = Boolean(t.acwp)
+    const intAcwp = Boolean((t as Record<string,unknown>).int_acwp)
+
+    const [scoresRes, masterRes, mpRes, penRes, intRes] = await Promise.all([
+      db.execute({ sql: 'SELECT position, score FROM coach_scores WHERE trip_id=? ORDER BY position', args: [tripId] }),
+      db.execute({ sql: 'SELECT position, coach_type FROM train_master WHERE train_no=? ORDER BY position', args: [trainNo] }),
+      db.execute({ sql: 'SELECT required, deployed FROM manpower WHERE trip_id=?', args: [tripId] }),
+      db.execute({ sql: 'SELECT penalty_type, amount FROM annex_penalties WHERE trip_id=?', args: [tripId] }),
+      db.execute({ sql: 'SELECT position, coach_type, score, ext_score FROM intensive_scores WHERE trip_id=? ORDER BY position', args: [tripId] }),
+    ])
+
+    const typeMap: Record<number, string> = {}
+    for (const r of masterRes.rows) typeMap[r.position as number] = r.coach_type as string
+    const intPosSet = new Set(intRes.rows.map(r => r.position as number))
+
+    const acScores: number[] = [], nacScores: number[] = [], extScores: number[] = []
+    for (const r of scoresRes.rows) {
+      const pos = r.position as number; const score = r.score as number
+      if (pos < 0) { extScores.push(score) }
+      else if (!intPosSet.has(pos)) {
+        const cat = coachCategory(typeMap[pos] ?? '')
+        if (cat === 'AC') acScores.push(score)
+        else if (cat === 'NAC') nacScores.push(score)
+      }
+    }
+    const acSlab   = calcSlabs(acScores,  acRateNG, 15)
+    const nacSlab  = calcSlabs(nacScores, nacRateNG, 15)
+    const extSlab  = acwp ? null : calcSlabs(extScores, extRateNG, 3)
+    const normalPenalty = acSlab.totalPenalty + nacSlab.totalPenalty + (extSlab?.totalPenalty ?? 0)
+
+    const acIntScores: number[] = [], nacIntScores: number[] = [], extIntScores: number[] = []
+    for (const r of intRes.rows) {
+      const cat = coachCategory(r.coach_type as string)
+      if (cat === 'AC') acIntScores.push(r.score as number)
+      else if (cat === 'NAC') nacIntScores.push(r.score as number)
+      if (!intAcwp) extIntScores.push((r.ext_score ?? 0) as number)
+    }
+    const acIntSlab  = acIntScores.length  ? calcSlabs(acIntScores,  acRateNG,  18) : null
+    const nacIntSlab = nacIntScores.length ? calcSlabs(nacIntScores, nacRateNG, 18) : null
+    const extIntSlab = (!intAcwp && extIntScores.length) ? calcSlabs(extIntScores, extRateNG, 3) : null
+    const intensivePenalty = (acIntSlab?.totalPenalty ?? 0) + (nacIntSlab?.totalPenalty ?? 0) + (extIntSlab?.totalPenalty ?? 0)
+
+    let mpPenalty = 0
+    for (const mp of mpRes.rows) mpPenalty += calcManpowerPenalty(mp.required as number, mp.deployed as number, cfg.min_wages)
+
+    let annexTotal = 0
+    for (const p of penRes.rows) annexTotal += p.amount as number
+
+    // Flags
+    const flags: string[] = []
+    const sched = schedule.find(s => s.train_no === trainNo)
+    if (!sched) { flags.push('Not in schedule') }
+    else {
+      const [dy, dm, dd] = (t.date as string).split('-').map(Number)
+      const dow = DAYS_ARR[new Date(Date.UTC(dy, dm - 1, dd)).getUTCDay()]
+      if (!sched.days.includes('Daily') && !sched.days.includes(dow)) flags.push('Off-schedule day')
+    }
+
+    penaltyCache.set(tripId, {
+      normal: Math.round(normalPenalty * 100) / 100,
+      intensive: Math.round(intensivePenalty * 100) / 100,
+      manpower: Math.round(mpPenalty * 100) / 100,
+      annex: Math.round(annexTotal * 100) / 100,
+      total: Math.round((normalPenalty + intensivePenalty + mpPenalty + annexTotal) * 100) / 100,
+      flags,
+    })
+  }
+
   // ════════════════════════════════════════════════════════════════════
   // Sheet 1 — Trip Entries
   // ════════════════════════════════════════════════════════════════════
@@ -108,23 +195,29 @@ export async function GET(req: Request) {
   ws1.getColumn(7).width = 6
   ws1.getColumn(8).width = 6
   ws1.getColumn(9).width = 8
+  ws1.getColumn(10).width = 11  // RAT. PEN.
+  ws1.getColumn(11).width = 11  // INT. PEN.
+  ws1.getColumn(12).width = 11  // MP PEN.
+  ws1.getColumn(13).width = 11  // ANNEX A2
+  ws1.getColumn(14).width = 12  // TOTAL PEN.
+  ws1.getColumn(15).width = 20  // FLAG
 
   // Title
   const t1 = ws1.getRow(1)
   cell(t1, 1).value = `Trip Entries — ${monthName}`
   cell(t1, 1).font  = { bold: true, size: 12 }
-  ws1.mergeCells(1, 1, 1, 9)
+  ws1.mergeCells(1, 1, 1, 15)
   ws1.getRow(1).height = 22
 
   // Summary
   const s1 = ws1.getRow(2)
   cell(s1, 1).value = `Total Trips: ${trips.length}`
   cell(s1, 1).font  = { bold: true, size: 9 }
-  ws1.mergeCells(2, 1, 2, 9)
+  ws1.mergeCells(2, 1, 2, 15)
 
   // Headers
   const h1 = ws1.getRow(3)
-  const hdrs1 = ['Date','Train No.','WL No.','ACWP','Supervisor','AC','NAC','Ext','INT']
+  const hdrs1 = ['Date','Train No.','WL No.','ACWP','Supervisor','AC','NAC','Ext','INT','Rat. Pen. (₹)','Int. Pen. (₹)','MP Pen. (₹)','Annex A2 (₹)','Total Pen. (₹)','Flag']
   hdrs1.forEach((v, i) => { cell(h1, i+1).value = v; hdrStyle(cell(h1, i+1)) })
   ws1.getRow(3).height = 18
 
@@ -143,10 +236,24 @@ export async function GET(req: Request) {
     cell(r, 7).value = Number(t.nac_count)
     cell(r, 8).value = Number(t.ext_count)
     cell(r, 9).value = Number(t.int_count)
-    for (let c = 1; c <= 9; c++) dataStyle(r.getCell(c))
-    r.getCell(6).font = { bold: true, size: 9, color: { argb: 'FF1F4E79' } }
-    r.getCell(7).font = { bold: true, size: 9, color: { argb: 'FF375623' } }
-    r.getCell(8).font = { bold: true, size: 9, color: { argb: 'FF833C00' } }
+    const pen = penaltyCache.get(t.id as number)
+    const fmt2 = (v: number) => v > 0 ? Math.round(v * 100) / 100 : null
+    cell(r, 10).value = pen ? fmt2(pen.normal)    : null
+    cell(r, 11).value = pen ? fmt2(pen.intensive) : null
+    cell(r, 12).value = pen ? fmt2(pen.manpower)  : null
+    cell(r, 13).value = pen ? fmt2(pen.annex)     : null
+    cell(r, 14).value = pen ? fmt2(pen.total)     : null
+    cell(r, 15).value = pen?.flags.length ? pen.flags.join(', ') : '—'
+    for (let c = 1; c <= 15; c++) dataStyle(r.getCell(c))
+    r.getCell(6).font  = { bold: true, size: 9, color: { argb: 'FF1F4E79' } }
+    r.getCell(7).font  = { bold: true, size: 9, color: { argb: 'FF375623' } }
+    r.getCell(8).font  = { bold: true, size: 9, color: { argb: 'FF833C00' } }
+    // Penalty cols: red if non-zero
+    for (let c = 10; c <= 14; c++) {
+      const v = r.getCell(c).value
+      if (v && Number(v) > 0) r.getCell(c).font = { bold: true, size: 9, color: { argb: 'FFDC2626' } }
+    }
+    if (pen?.flags.length) r.getCell(15).font = { bold: true, size: 9, color: { argb: 'FFD97706' } }
   }
 
   // Totals
@@ -157,7 +264,14 @@ export async function GET(req: Request) {
     cell(tr, 7).value = trips.reduce((s, t) => s + Number(t.nac_count), 0)
     cell(tr, 8).value = trips.reduce((s, t) => s + Number(t.ext_count), 0)
     cell(tr, 9).value = trips.reduce((s, t) => s + Number(t.int_count), 0)
-    for (let c = 1; c <= 9; c++) {
+    const allPens = [...penaltyCache.values()]
+    const r2 = (v: number) => Math.round(v * 100) / 100
+    cell(tr, 10).value = r2(allPens.reduce((s, p) => s + p.normal,    0))
+    cell(tr, 11).value = r2(allPens.reduce((s, p) => s + p.intensive, 0))
+    cell(tr, 12).value = r2(allPens.reduce((s, p) => s + p.manpower,  0))
+    cell(tr, 13).value = r2(allPens.reduce((s, p) => s + p.annex,     0))
+    cell(tr, 14).value = r2(allPens.reduce((s, p) => s + p.total,     0))
+    for (let c = 1; c <= 14; c++) {
       tr.getCell(c).font = { bold: true, size: 9 }
       tr.getCell(c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: TOTAL_BG } }
       tr.getCell(c).border = { top:{style:'medium'}, bottom:{style:'medium'} }

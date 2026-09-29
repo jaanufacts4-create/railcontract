@@ -37,7 +37,7 @@ export async function GET(req: Request) {
       db.execute({ sql: 'SELECT position, coach_type FROM train_master WHERE train_no=? ORDER BY position', args: [trip.train_no as string] }),
       db.execute({ sql: 'SELECT section, required, deployed FROM manpower WHERE trip_id=?', args: [tripId] }),
       db.execute({ sql: 'SELECT penalty_type, amount FROM annex_penalties WHERE trip_id=?', args: [tripId] }),
-      db.execute({ sql: 'SELECT coach_type, score, ext_score FROM intensive_scores WHERE trip_id=? ORDER BY position', args: [tripId] }),
+      db.execute({ sql: 'SELECT position, coach_type, score, ext_score FROM intensive_scores WHERE trip_id=? ORDER BY position', args: [tripId] }),
     ])
 
     // Build position → type map
@@ -45,6 +45,10 @@ export async function GET(req: Request) {
     for (const r of masterRes.rows) typeMap[r.position as number] = r.coach_type as string
 
     const acwp = Boolean(trip.acwp)
+
+    // Positions that are in intensive_scores — exclude from normal calculation
+    // (same logic as export/route.ts) to avoid double-counting
+    const intPosSet = new Set(intRes.rows.map(r => r.position as number))
 
     // Split scores by category
     // Positive positions = AC/NAC interior; negative positions = exterior (when ACWP=false)
@@ -58,7 +62,8 @@ export async function GET(req: Request) {
       if (pos < 0) {
         // Exterior score (stored with negative position)
         extScores.push(score)
-      } else {
+      } else if (!intPosSet.has(pos)) {
+        // Intensive coaches go to intensive section only, skip here
         const cat = coachCategory(typeMap[pos] ?? '')
         if      (cat === 'AC')  acScores.push(score)
         else if (cat === 'NAC') nacScores.push(score)
