@@ -156,12 +156,14 @@ export async function GET(req: Request) {
       mpPenalty += calcManpowerPenalty(mp.required, mp.deployed, cfg.min_wages)
     }
 
-    // Annex penalties
+    // Annex penalties — only for Normal trips (not Intensive)
     let annexTotal = 0
     const penMap: Record<number, number> = {}
-    for (const p of penRows) {
-      penMap[p.penalty_type] = p.amount
-      annexTotal += p.amount
+    if (intRows.length === 0) {
+      for (const p of penRows) {
+        penMap[p.penalty_type] = p.amount
+        annexTotal += p.amount
+      }
     }
 
     const normalPenalty = acSlab.totalPenalty + nacSlab.totalPenalty + (extSlab?.totalPenalty ?? 0)

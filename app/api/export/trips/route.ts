@@ -217,7 +217,8 @@ export async function GET(req: Request) {
       let mpPenalty = 0
       for (const mp of mpRows) mpPenalty += calcManpowerPenalty(mp.required, mp.deployed, cfg.min_wages)
 
-      const annexTotal = amounts.reduce((s, a) => s + a, 0)
+      // Annex penalties only for Normal trips (not Intensive)
+      const annexTotal = intRows.length === 0 ? amounts.reduce((s, a) => s + a, 0) : 0
 
       // A1-Back Side Intensive: if trip has intensive scores, annex + MP is charged again
       const intBHPenalty = intRows.length > 0 ? annexTotal + mpPenalty : 0
