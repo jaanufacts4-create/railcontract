@@ -10,7 +10,7 @@ type Trip = {
   ac_count: number; nac_count: number; ext_count: number; int_count: number
   int_ac_count: number; int_nac_count: number; int_ext_count: number
 }
-type PenaltyBreakdown = { normal: number; intensive: number; manpower: number; annex: number; total: number }
+type PenaltyBreakdown = { normal: number; intensive: number; manpower: number; annex: number; intBH: number; total: number }
 type PenaltyMap = Record<number, PenaltyBreakdown>
 
 // ── Data Analyzer types ────────────────────────────────────────────────────────
@@ -429,6 +429,7 @@ export default function TripsPage() {
             intensive: row.intensivePenalty ?? 0,
             manpower:  row.manpowerPenalty  ?? 0,
             annex:     row.annexTotal       ?? 0,
+            intBH:     row.intBHPenalty     ?? 0,
             total:     row.grandTotal       ?? 0,
           }
         }
@@ -489,10 +490,11 @@ export default function TripsPage() {
         intensive: a.intensive + p.intensive,
         manpower:  a.manpower  + p.manpower,
         annex:     a.annex     + p.annex,
+        intBH:     a.intBH     + p.intBH,
         total:     a.total     + p.total,
       }
     },
-    { normal: 0, intensive: 0, manpower: 0, annex: 0, total: 0 }
+    { normal: 0, intensive: 0, manpower: 0, annex: 0, intBH: 0, total: 0 }
   )
   const penaltyLoaded = visible.length > 0 && visible.every(t => penaltyMap[t.id] != null)
 
@@ -642,6 +644,7 @@ export default function TripsPage() {
                   { label: 'Int. Pen.',  val: penaltyTotals.intensive, color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' },
                   { label: 'MP Pen.',    val: penaltyTotals.manpower,  color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
                   { label: 'Annex A2',  val: penaltyTotals.annex,     color: '#4F46E5', bg: '#EEF2FF', border: '#C7D2FE' },
+                  { label: 'A1-Back Int.', val: penaltyTotals.intBH,   color: '#BE185D', bg: '#FDF2F8', border: '#FBCFE8' },
                 ] as { label: string; val: number; color: string; bg: string; border: string }[]).map(({ label, val, color, bg, border }) => (
                   <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, background: bg, border: `1px solid ${border}`, borderRadius: 10, padding: '5px 10px' }}>
                     <div style={{ width: 6, height: 6, borderRadius: '50%', background: color }} />
@@ -711,6 +714,7 @@ export default function TripsPage() {
                   <th style={{ color: '#8B5CF6', fontSize: 11 }}>Int. Pen.</th>
                   <th style={{ color: '#F59E0B', fontSize: 11 }}>MP Pen.</th>
                   <th style={{ color: '#6366F1', fontSize: 11 }}>Annex A2</th>
+                  <th style={{ color: '#BE185D', fontSize: 11 }}>A1-Back Int.</th>
                   <th style={{ color: '#DC2626', fontSize: 11, fontWeight: 700 }}>Total Pen.</th>
                   <th style={{ width: 40 }}>Flag</th>
                   <th style={{ width: 100 }}></th>
@@ -755,11 +759,11 @@ export default function TripsPage() {
                         ? <span className="badge" style={{ background: 'rgba(124,58,237,.12)', color: '#7C3AED', fontWeight: 700 }}>{t.int_count}</span>
                         : <span style={{ color: 'var(--text-4)' }}>—</span>}
                     </td>
-                    {(['normal','intensive','manpower','annex'] as const).map(key => (
+                    {(['normal','intensive','manpower','annex','intBH'] as const).map(key => (
                       <td key={key}>
                         {penaltyMap[t.id] != null
                           ? penaltyMap[t.id][key] > 0
-                            ? <span style={{ fontWeight: 600, color: key === 'normal' ? '#EF4444' : key === 'intensive' ? '#8B5CF6' : key === 'manpower' ? '#F59E0B' : '#6366F1', fontSize: 12 }}>
+                            ? <span style={{ fontWeight: 600, color: key === 'normal' ? '#EF4444' : key === 'intensive' ? '#8B5CF6' : key === 'manpower' ? '#F59E0B' : key === 'annex' ? '#6366F1' : '#BE185D', fontSize: 12 }}>
                                 ₹{penaltyMap[t.id][key].toLocaleString('en-IN')}
                               </span>
                             : <span style={{ color: 'var(--text-4)', fontSize: 12 }}>—</span>
