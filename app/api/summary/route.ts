@@ -6,6 +6,9 @@ import { coachCategory } from '@/lib/types'
 /**
  * GET /api/summary?month_year=2026-03
  * Returns fully calculated summary rows (Normal Summ equivalent).
+ * 
+ * Optimised: loads all child data in 5 bulk queries (not N×5 per-trip queries)
+ * then processes everything in memory.
  */
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
@@ -13,7 +16,7 @@ export async function GET(req: Request) {
   if (!monthYear) return NextResponse.json({ error: 'month_year required' }, { status: 400 })
   await ensureDB()
 
-  // Load config
+  // ── 1. Config ────────────────────────────────────────────────────────────────
   const cfgRows = await db.execute('SELECT key, value FROM config')
   const cfg: Record<string, number> = {}
   for (const r of cfgRows.rows) cfg[r.key as string] = Number(r.value)
@@ -22,49 +25,122 @@ export async function GET(req: Request) {
   const nacRateNoGST = rateWithoutGST(cfg.nac_rate_gst, cfg.gst_pct)
   const extRateNoGST = rateWithoutGST(cfg.ext_rate_gst, cfg.gst_pct)
 
-  // Load trips for the month
-  const trips = await db.execute({
+  // ── 2. Trips ─────────────────────────────────────────────────────────────────
+  const tripsRes = await db.execute({
     sql:  'SELECT * FROM trips WHERE month_year=? ORDER BY date ASC, id ASC',
     args: [monthYear],
   })
+  const trips = tripsRes.rows
+  if (trips.length === 0) {
+    return NextResponse.json({ month_year: monthYear, rows: [], config: cfg })
+  }
 
-  const results = await Promise.all(trips.rows.map(async (trip) => {
-    const tripId = trip.id as number
+  // Collect unique train numbers for train_master bulk load
+  const trainNos = [...new Set(trips.map(t => t.train_no as string))]
 
-    // Coach scores + train master (to classify AC/NAC)
-    const [scoresRes, masterRes, mpRes, penRes, intRes] = await Promise.all([
-      db.execute({ sql: 'SELECT position, score FROM coach_scores WHERE trip_id=? ORDER BY position', args: [tripId] }),
-      db.execute({ sql: 'SELECT position, coach_type FROM train_master WHERE train_no=? ORDER BY position', args: [trip.train_no as string] }),
-      db.execute({ sql: 'SELECT section, required, deployed FROM manpower WHERE trip_id=?', args: [tripId] }),
-      db.execute({ sql: 'SELECT penalty_type, amount FROM annex_penalties WHERE trip_id=?', args: [tripId] }),
-      db.execute({ sql: 'SELECT position, coach_type, score, ext_score FROM intensive_scores WHERE trip_id=? ORDER BY position', args: [tripId] }),
-    ])
+  // ── 3. Bulk load all child data (5 queries total, regardless of trip count) ──
+  const [allScores, allMaster, allMp, allPen, allInt] = await Promise.all([
+    db.execute({
+      sql:  `SELECT trip_id, position, score FROM coach_scores
+             WHERE trip_id IN (SELECT id FROM trips WHERE month_year=?)
+             ORDER BY trip_id, position`,
+      args: [monthYear],
+    }),
+    db.execute({
+      sql:  `SELECT train_no, position, coach_type FROM train_master
+             WHERE train_no IN (${trainNos.map(() => '?').join(',')})`,
+      args: trainNos,
+    }),
+    db.execute({
+      sql:  `SELECT trip_id, section, required, deployed FROM manpower
+             WHERE trip_id IN (SELECT id FROM trips WHERE month_year=?)`,
+      args: [monthYear],
+    }),
+    db.execute({
+      sql:  `SELECT trip_id, penalty_type, amount FROM annex_penalties
+             WHERE trip_id IN (SELECT id FROM trips WHERE month_year=?)`,
+      args: [monthYear],
+    }),
+    db.execute({
+      sql:  `SELECT trip_id, position, coach_type, score, ext_score FROM intensive_scores
+             WHERE trip_id IN (SELECT id FROM trips WHERE month_year=?)
+             ORDER BY trip_id, position`,
+      args: [monthYear],
+    }),
+  ])
 
-    // Build position → type map
-    const typeMap: Record<number, string> = {}
-    for (const r of masterRes.rows) typeMap[r.position as number] = r.coach_type as string
+  // ── 4. Index bulk data by trip_id / train_no ──────────────────────────────────
+  // train_master: train_no → Map<position, coach_type>
+  const masterByTrain = new Map<string, Map<number, string>>()
+  for (const r of allMaster.rows) {
+    const tn = r.train_no as string
+    if (!masterByTrain.has(tn)) masterByTrain.set(tn, new Map())
+    masterByTrain.get(tn)!.set(r.position as number, r.coach_type as string)
+  }
 
-    const acwp = Boolean(trip.acwp)
+  // coach_scores: trip_id → [{position, score}]
+  const scoresByTrip = new Map<number, {position: number; score: number}[]>()
+  for (const r of allScores.rows) {
+    const tid = r.trip_id as number
+    if (!scoresByTrip.has(tid)) scoresByTrip.set(tid, [])
+    scoresByTrip.get(tid)!.push({ position: r.position as number, score: r.score as number })
+  }
 
-    // Positions that are in intensive_scores — exclude from normal calculation
-    // (same logic as export/route.ts) to avoid double-counting
-    const intPosSet = new Set(intRes.rows.map(r => r.position as number))
+  // manpower: trip_id → [{section, required, deployed}]
+  const mpByTrip = new Map<number, {section: string; required: number; deployed: number}[]>()
+  for (const r of allMp.rows) {
+    const tid = r.trip_id as number
+    if (!mpByTrip.has(tid)) mpByTrip.set(tid, [])
+    mpByTrip.get(tid)!.push({ section: r.section as string, required: r.required as number, deployed: r.deployed as number })
+  }
 
-    // Split scores by category
-    // Positive positions = AC/NAC interior; negative positions = exterior (when ACWP=false)
+  // annex_penalties: trip_id → [{penalty_type, amount}]
+  const penByTrip = new Map<number, {penalty_type: number; amount: number}[]>()
+  for (const r of allPen.rows) {
+    const tid = r.trip_id as number
+    if (!penByTrip.has(tid)) penByTrip.set(tid, [])
+    penByTrip.get(tid)!.push({ penalty_type: r.penalty_type as number, amount: r.amount as number })
+  }
+
+  // intensive_scores: trip_id → [{position, coach_type, score, ext_score}]
+  const intByTrip = new Map<number, {position: number; coach_type: string; score: number; ext_score: number}[]>()
+  for (const r of allInt.rows) {
+    const tid = r.trip_id as number
+    if (!intByTrip.has(tid)) intByTrip.set(tid, [])
+    intByTrip.get(tid)!.push({
+      position:   r.position   as number,
+      coach_type: r.coach_type as string,
+      score:      r.score      as number,
+      ext_score:  (r.ext_score ?? 0) as number,
+    })
+  }
+
+  // ── 5. Compute per-trip ───────────────────────────────────────────────────────
+  const results = trips.map(trip => {
+    const tripId   = trip.id       as number
+    const trainNo  = trip.train_no as string
+    const acwp     = Boolean(trip.acwp)
+    const intAcwp  = Boolean(trip.int_acwp)
+
+    const typeMap  = masterByTrain.get(trainNo) ?? new Map<number, string>()
+    const scores   = scoresByTrip.get(tripId) ?? []
+    const mpRows   = mpByTrip.get(tripId)     ?? []
+    const penRows  = penByTrip.get(tripId)    ?? []
+    const intRows  = intByTrip.get(tripId)    ?? []
+
+    // Positions in intensive_scores — skip in normal calculation
+    const intPosSet = new Set(intRows.map(r => r.position))
+
+    // Classify normal scores
     const acScores:  number[] = []
     const nacScores: number[] = []
     const extScores: number[] = []
 
-    for (const r of scoresRes.rows) {
-      const pos   = r.position as number
-      const score = r.score    as number
+    for (const { position: pos, score } of scores) {
       if (pos < 0) {
-        // Exterior score (stored with negative position)
         extScores.push(score)
       } else if (!intPosSet.has(pos)) {
-        // Intensive coaches go to intensive section only, skip here
-        const cat = coachCategory(typeMap[pos] ?? '')
+        const cat = coachCategory(typeMap.get(pos) ?? '')
         if      (cat === 'AC')  acScores.push(score)
         else if (cat === 'NAC') nacScores.push(score)
       }
@@ -76,30 +152,29 @@ export async function GET(req: Request) {
 
     // Manpower penalty
     let mpPenalty = 0
-    for (const mp of mpRes.rows) {
-      mpPenalty += calcManpowerPenalty(mp.required as number, mp.deployed as number, cfg.min_wages)
+    for (const mp of mpRows) {
+      mpPenalty += calcManpowerPenalty(mp.required, mp.deployed, cfg.min_wages)
     }
 
-    // Annex penalties sum
+    // Annex penalties
     let annexTotal = 0
     const penMap: Record<number, number> = {}
-    for (const p of penRes.rows) {
-      penMap[p.penalty_type as number] = p.amount as number
-      annexTotal += p.amount as number
+    for (const p of penRows) {
+      penMap[p.penalty_type] = p.amount
+      annexTotal += p.amount
     }
 
     const normalPenalty = acSlab.totalPenalty + nacSlab.totalPenalty + (extSlab?.totalPenalty ?? 0)
 
     // Intensive cleaning penalty
-    const intAcwp = Boolean(trip.int_acwp)
-    const acIntScores: number[] = []
+    const acIntScores:  number[] = []
     const nacIntScores: number[] = []
     const extIntScores: number[] = []
-    for (const r of intRes.rows) {
-      const cat = coachCategory(r.coach_type as string)
-      if (cat === 'AC')  acIntScores.push(r.score as number)
-      else if (cat === 'NAC') nacIntScores.push(r.score as number)
-      if (!intAcwp) extIntScores.push((r.ext_score ?? 0) as number)
+    for (const r of intRows) {
+      const cat = coachCategory(r.coach_type)
+      if      (cat === 'AC')  acIntScores.push(r.score)
+      else if (cat === 'NAC') nacIntScores.push(r.score)
+      if (!intAcwp) extIntScores.push(r.ext_score)
     }
     const acIntSlab  = acIntScores.length  ? calcSlabs(acIntScores,  acRateNoGST,  18) : null
     const nacIntSlab = nacIntScores.length ? calcSlabs(nacIntScores, nacRateNoGST, 18) : null
@@ -115,11 +190,11 @@ export async function GET(req: Request) {
       annexTotal,
       normalPenalty,
       intensivePenalty,
-      ratingPenalty: normalPenalty + intensivePenalty, // backward compat
+      ratingPenalty: normalPenalty + intensivePenalty,
       grandTotal: normalPenalty + intensivePenalty + mpPenalty + annexTotal,
-      manpower:   mpRes.rows,
+      manpower: mpRows,
     }
-  }))
+  })
 
   return NextResponse.json({ month_year: monthYear, rows: results, config: cfg })
 }
