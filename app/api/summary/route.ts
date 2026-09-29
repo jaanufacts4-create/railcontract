@@ -183,10 +183,7 @@ export async function GET(req: Request) {
     const extIntSlab = (!intAcwp && extIntScores.length) ? calcSlabs(extIntScores, extRateNoGST, 3) : null
     const intensivePenalty = (acIntSlab?.totalPenalty ?? 0) + (nacIntSlab?.totalPenalty ?? 0) + (extIntSlab?.totalPenalty ?? 0)
 
-    // A1-Back Side Intensive: if trip has intensive scores, the same annex + MP
-    // penalty is charged a second time (once for normal cleaning, once for intensive).
-    // This matches the PM MCC Excel export (column L "A1-Back Side Intensive").
-    const intBHPenalty = intRows.length > 0 ? annexTotal + mpPenalty : 0
+    const intBHPenalty = 0  // removed — was double-counting mpPenalty after annex fix
 
     return {
       trip,
@@ -199,7 +196,7 @@ export async function GET(req: Request) {
       normalPenalty,
       intensivePenalty,
       ratingPenalty: normalPenalty + intensivePenalty,
-      grandTotal: normalPenalty + intensivePenalty + mpPenalty + annexTotal + intBHPenalty,
+      grandTotal: normalPenalty + intensivePenalty + mpPenalty + annexTotal,
       manpower: mpRows,
     }
   })

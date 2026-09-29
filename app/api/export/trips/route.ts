@@ -220,8 +220,7 @@ export async function GET(req: Request) {
       // Annex penalties only for Normal trips (not Intensive)
       const annexTotal = intRows.length === 0 ? amounts.reduce((s, a) => s + a, 0) : 0
 
-      // A1-Back Side Intensive: if trip has intensive scores, annex + MP is charged again
-      const intBHPenalty = intRows.length > 0 ? annexTotal + mpPenalty : 0
+      const intBHPenalty = 0  // removed — was double-counting mpPenalty after annex fix
 
       // Flags
       const flags: string[] = []
@@ -239,7 +238,7 @@ export async function GET(req: Request) {
         intensive: r2(intensivePenalty),
         manpower:  r2(mpPenalty),
         annex:     r2(annexTotal),
-        total:     r2(normalPenalty + intensivePenalty + mpPenalty + annexTotal + intBHPenalty),
+        total:     r2(normalPenalty + intensivePenalty + mpPenalty + annexTotal),
         flags,
       })
     }
