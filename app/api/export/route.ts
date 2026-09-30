@@ -610,9 +610,10 @@ export async function GET(req: Request) {
           row.getCell(COL.B).value  = isNaN(Number(trainNo)) ? trainNo : Number(trainNo)
           row.getCell(COL.AR).value = iMpReq
           row.getCell(COL.AS).value = iMpDeploy
-          for (let i = 1; i <= 13; i++) row.getCell(COL.AT + i - 1).value = iAnnexMap[i] ?? 0
-          row.getCell(COL.AT + 13).value = iMpPenalty   // BG = MP shortage
-          row.getCell(COL.BH).value      = iTripBH
+          // Annex A2 and MP not charged in Intensive sheet — already in Normal sheet
+          for (let i = 1; i <= 13; i++) row.getCell(COL.AT + i - 1).value = 0
+          row.getCell(COL.AT + 13).value = 0   // MP shortage = 0 in intensive
+          row.getCell(COL.BH).value      = 0   // iTripBH = 0
         }
         row.getCell(COL.C).value = section
         row.getCell(COL.E).value = rate
