@@ -138,7 +138,8 @@ export async function GET(req: Request) {
 
     for (const { position: pos, score } of scores) {
       if (pos < 0) {
-        extScores.push(score)
+        // Exterior score for coach at position -pos; skip if that coach is intensive
+        if (!intPosSet.has(-pos)) extScores.push(score)
       } else if (!intPosSet.has(pos)) {
         const cat = coachCategory(typeMap.get(pos) ?? '')
         if      (cat === 'AC')  acScores.push(score)

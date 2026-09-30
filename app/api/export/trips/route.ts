@@ -158,11 +158,11 @@ export async function GET(req: Request) {
       mpByTrip.get(tid)!.push({ required: r.required as number, deployed: r.deployed as number })
     }
 
-    const penByTrip = new Map<number, number[]>()
+    const penByTrip = new Map<number, {penalty_type:number; amount:number}[]>()
     for (const r of allPen.rows) {
       const tid = r.trip_id as number
       if (!penByTrip.has(tid)) penByTrip.set(tid, [])
-      penByTrip.get(tid)!.push(r.amount as number)
+      penByTrip.get(tid)!.push({ penalty_type: r.penalty_type as number, amount: r.amount as number })
     }
 
     const intByTrip = new Map<number, {position: number; coach_type: string; score: number; ext_score: number}[]>()
@@ -182,7 +182,7 @@ export async function GET(req: Request) {
       const typeMap = masterByTrain.get(trainNo) ?? new Map<number, string>()
       const scores  = scoresByTrip.get(tripId) ?? []
       const mpRows  = mpByTrip.get(tripId)     ?? []
-      const amounts = penByTrip.get(tripId)    ?? []
+      const penItems = penByTrip.get(tripId)   ?? []
       const intRows = intByTrip.get(tripId)    ?? []
 
       const intPosSet = new Set(intRows.map(r => r.position))
@@ -217,9 +217,10 @@ export async function GET(req: Request) {
       let mpPenalty = 0
       for (const mp of mpRows) mpPenalty += calcManpowerPenalty(mp.required, mp.deployed, cfg.min_wages)
 
-      // Annex penalties: apply if trip has any normal coaches (normalPenalty > 0)
+      // Annex penalties: apply only if trip has normal coaches (normalPenalty > 0)
       // Mixed trips (normal + intensive) still get annex on normal portion
-      const rawAnnex = amounts.reduce((s, a) => s + a, 0)
+      // Filter penalty_type <= 13 to exclude MP if ever stored in annex_penalties
+      const rawAnnex = penItems.filter(p => p.penalty_type <= 13).reduce((s, p) => s + p.amount, 0)
       const annexTotal = normalPenalty > 0 ? rawAnnex : 0
 
       const intBHPenalty = 0  // removed — was double-counting mpPenalty after annex fix
