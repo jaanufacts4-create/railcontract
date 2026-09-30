@@ -90,6 +90,7 @@ type CumItem = { item_no: number; item_name: string; unit: string; rate_gst: num
 
 type MainTab = 'status' | 'summary' | 'loa' | 'billing'
 type StatusTab = 'detail' | 'daily' | 'trains'
+type SummView = 'trip' | 'date'
 
 function ReportsContent() {
   const params = useSearchParams()
@@ -186,6 +187,7 @@ function ReportsContent() {
   const [summRows,  setSummRows]  = useState<SummaryRow[]>([])
   const [loadingS,  setLoadingS]  = useState(false)
   const [exportingXl, setExportingXl] = useState(false)
+  const [summView,    setSummView]    = useState<SummView>('trip')
 
   useEffect(() => { loadSummary() }, [monthYear])
 
@@ -227,6 +229,24 @@ function ReportsContent() {
   const totalManpower = summRows.reduce((s, r) => s + r.manpowerPenalty, 0)
   const totalAnnex    = summRows.reduce((s, r) => s + r.annexTotal,       0)
   const grandTotal    = summRows.reduce((s, r) => s + r.grandTotal,       0)
+
+  // ── Date-wise grouping ──────────────────────────────────────────────────────
+  type DateGroup = { date: string; trips: number; normal: number; intensive: number; manpower: number; annex: number; grand: number }
+  const dateGroups: DateGroup[] = (() => {
+    const map = new Map<string, DateGroup>()
+    for (const r of summRows) {
+      const d = r.trip.date
+      if (!map.has(d)) map.set(d, { date: d, trips: 0, normal: 0, intensive: 0, manpower: 0, annex: 0, grand: 0 })
+      const g = map.get(d)!
+      g.trips++
+      g.normal     += r.acSlab.totalPenalty + r.nacSlab.totalPenalty + (r.extSlab?.totalPenalty ?? 0)
+      g.intensive  += r.ratingPenalty - (r.acSlab.totalPenalty + r.nacSlab.totalPenalty + (r.extSlab?.totalPenalty ?? 0))
+      g.manpower   += r.manpowerPenalty
+      g.annex      += r.annexTotal
+      g.grand      += r.grandTotal
+    }
+    return [...map.values()].sort((a, b) => a.date.localeCompare(b.date))
+  })()
 
   const STATUS_TABS: { id: StatusTab; label: string; icon: React.ElementType }[] = [
     { id: 'detail', label: 'Schedule Status', icon: ListFilter   },
@@ -544,12 +564,73 @@ function ReportsContent() {
             <div className="card" style={{ overflow: 'hidden', padding: 0 }}>
               <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
-                  <h2 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Trip Details</h2>
-                  <p style={{ fontSize: 12, color: 'var(--text-4)', margin: '2px 0 0' }}>{summRows.length} trips</p>
+                  <h2 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', margin: 0 }}>
+                    {summView === 'trip' ? 'Trip Details' : 'Date-wise Summary'}
+                  </h2>
+                  <p style={{ fontSize: 12, color: 'var(--text-4)', margin: '2px 0 0' }}>
+                    {summView === 'trip' ? `${summRows.length} trips` : `${dateGroups.length} dates`}
+                  </p>
+                </div>
+                {/* View toggle */}
+                <div style={{ display: 'flex', gap: 4, background: 'var(--surface-2)', borderRadius: 8, padding: 3 }}>
+                  {(['trip', 'date'] as SummView[]).map(v => (
+                    <button key={v} onClick={() => setSummView(v)} style={{
+                      padding: '4px 12px', fontSize: 11, fontWeight: 600, borderRadius: 6,
+                      border: 'none', cursor: 'pointer',
+                      background: summView === v ? 'var(--surface)' : 'transparent',
+                      color:      summView === v ? 'var(--text)'    : 'var(--text-3)',
+                      boxShadow:  summView === v ? 'var(--shadow-sm)' : 'none',
+                    }}>
+                      {v === 'trip' ? 'Trip-wise' : 'Date-wise'}
+                    </button>
+                  ))}
                 </div>
               </div>
               <div style={{ overflowX: 'auto' }}>
-                <table className="table-grid" style={{ fontSize: 12 }}>
+                {/* ── Date-wise table ─────────────────────────────────── */}
+                {summView === 'date' && (
+                  <table className="table-grid" style={{ fontSize: 12 }}>
+                    <thead>
+                      <tr>
+                        <th style={{ textAlign: 'left', paddingLeft: 20 }}>Date</th>
+                        <th>Trips</th>
+                        <th style={{ background: 'rgba(37,99,235,.12)', color: 'var(--primary)' }}>Normal Pen.</th>
+                        <th style={{ background: 'rgba(99,102,241,.1)', color: '#6366F1' }}>Int. Pen.</th>
+                        <th style={{ background: 'rgba(245,158,11,.1)', color: 'var(--warning)' }}>MP Pen.</th>
+                        <th style={{ background: 'rgba(139,92,246,.12)', color: '#8B5CF6' }}>Annex A2</th>
+                        <th style={{ background: 'rgba(239,68,68,.14)', color: 'var(--danger)' }}>Grand Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dateGroups.map(g => (
+                        <tr key={g.date}>
+                          <td style={{ textAlign: 'left', paddingLeft: 20, fontWeight: 600, color: 'var(--text)' }}>
+                            {g.date.split('-').reverse().join('-')}
+                          </td>
+                          <td style={{ color: 'var(--text-3)' }}>{g.trips}</td>
+                          <td>{g.normal    > 0 ? <span className="badge badge-blue">{fmt(g.normal)}</span>    : '—'}</td>
+                          <td>{g.intensive > 0 ? <span className="badge badge-gray">{fmt(g.intensive)}</span> : '—'}</td>
+                          <td>{g.manpower  > 0 ? <span className="badge badge-yellow">{fmt(g.manpower)}</span>  : '—'}</td>
+                          <td>{g.annex     > 0 ? <span className="badge badge-purple">{fmt(g.annex)}</span>   : '—'}</td>
+                          <td><span style={{ fontWeight: 700, color: 'var(--danger)' }}>{fmt(g.grand)}</span></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr style={{ background: 'var(--surface-2)' }}>
+                        <td style={{ textAlign: 'right', fontWeight: 600, paddingRight: 12, color: 'var(--text-3)', fontSize: 11, paddingLeft: 20 }}>TOTAL</td>
+                        <td style={{ fontWeight: 700, color: 'var(--text)' }}>{summRows.length}</td>
+                        <td><span className="badge badge-blue">{fmt(dateGroups.reduce((s,g)=>s+g.normal,0))}</span></td>
+                        <td><span className="badge badge-gray">{fmt(dateGroups.reduce((s,g)=>s+g.intensive,0))}</span></td>
+                        <td><span className="badge badge-yellow">{fmt(dateGroups.reduce((s,g)=>s+g.manpower,0))}</span></td>
+                        <td><span className="badge badge-purple">{fmt(dateGroups.reduce((s,g)=>s+g.annex,0))}</span></td>
+                        <td><span style={{ fontWeight: 700, color: 'var(--danger)', fontSize: 13 }}>{fmt(grandTotal)}</span></td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                )}
+                {/* ── Trip-wise table ─────────────────────────────────── */}
+                {summView === 'trip' && <table className="table-grid" style={{ fontSize: 12 }}>
                   <thead>
                     <tr>
                       <th rowSpan={2} style={{ textAlign: 'left', paddingLeft: 20 }}>Date</th>
@@ -601,7 +682,7 @@ function ReportsContent() {
                       <td><span style={{ fontWeight: 700, color: 'var(--danger)', fontSize: 13 }}>{fmt(grandTotal)}</span></td>
                     </tr>
                   </tfoot>
-                </table>
+                </table>}
               </div>
             </div>
           )}

@@ -217,6 +217,7 @@ body {
 .badge-red     { background: var(--danger-light);  color: var(--danger);  }
 .badge-yellow  { background: var(--warning-light); color: var(--warning); }
 .badge-gray    { background: var(--surface-2);     color: var(--text-3);  }
+.badge-purple  { background: rgba(139,92,246,.12);    color: #7C3AED;        }
 
 /* Input */
 .input {
