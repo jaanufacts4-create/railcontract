@@ -174,7 +174,7 @@ export async function GET(req: Request) {
     // Will zero out after normalPenalty is computed if purely intensive
 
     const normalPenalty = acSlab.totalPenalty + nacSlab.totalPenalty + (extSlab?.totalPenalty ?? 0)
-    if (normalPenalty === 0) annexTotal = 0  // purely intensive trip — no annex
+    if (acScores.length === 0 && nacScores.length === 0) annexTotal = 0  // purely intensive trip (no normal coaches) — no annex
 
     // Intensive cleaning penalty
     const acIntScores:  number[] = []

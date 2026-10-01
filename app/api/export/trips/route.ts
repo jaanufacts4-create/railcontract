@@ -217,11 +217,13 @@ export async function GET(req: Request) {
       let mpPenalty = 0
       for (const mp of mpRows) mpPenalty += calcManpowerPenalty(mp.required, mp.deployed, cfg.min_wages)
 
-      // Annex penalties: apply only if trip has normal coaches (normalPenalty > 0)
+      // Annex penalties: apply only if trip has normal coaches (acScores or nacScores exist)
+      // Condition: normal coaches PRESENT (not zero penalty — good scores still get annex)
       // Mixed trips (normal + intensive) still get annex on normal portion
       // Filter penalty_type <= 13 to exclude MP if ever stored in annex_penalties
       const rawAnnex = penItems.filter(p => p.penalty_type <= 13).reduce((s, p) => s + p.amount, 0)
-      const annexTotal = normalPenalty > 0 ? rawAnnex : 0
+      const hasNormalCoaches = acScores.length > 0 || nacScores.length > 0
+      const annexTotal = hasNormalCoaches ? rawAnnex : 0
 
       const intBHPenalty = 0  // removed — was double-counting mpPenalty after annex fix
 
