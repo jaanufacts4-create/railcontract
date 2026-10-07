@@ -593,8 +593,8 @@ export default function OBHSScheduleModule({ apiBase, reportApi }: {
                       style={{background:'none',border:'none',cursor:'pointer',color:'#7C3AED'}}><X size={16}/></button>
                   </div>
                 </div>
-                <div style={{overflowY:'scroll',maxHeight:'calc(100vh - 300px)',scrollbarWidth:'thin'}}>
-                  <table className="table-grid" style={{fontSize:12}}>
+                <div style={{overflow:'auto',maxHeight:'calc(100vh - 300px)'}}>
+                  <table className="table-grid" style={{fontSize:12,minWidth:1150}}>
                     <thead>
                       <tr>
                         <th style={{width:36,textAlign:'center'}}>
