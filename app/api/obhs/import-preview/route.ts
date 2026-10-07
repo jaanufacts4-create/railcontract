@@ -4,7 +4,7 @@ import { db, ensureDB } from '@/lib/db'
 
 function parseManpower(raw: string): { ehk: number; janitors: number } | null {
   // Tolerant: allow spaces inside parens, e.g. "( 1 + 10 )"
-  const m = raw.toString().trim().match(/^\(\s*(\d+)\s*\+\s*(\d+)\s*\)$/)
+  const m = raw.toString().trim().match(/^\(?\s*(\d+)\s*\+\s*(\d+)\s*\)?$/)
   if (!m) return null
   return { ehk: parseInt(m[1]), janitors: parseInt(m[2]) }
 }
@@ -135,7 +135,7 @@ export async function POST(req: NextRequest) {
     const lastCol    = Math.min(row.actualCellCount + 3, 25)
     for (let c = lastCol; c >= 8; c--) {
       const val = row.getCell(c).value?.toString()?.trim() ?? ''
-      if (/^\(\s*\d+\s*\+\s*\d+\s*\)$/.test(val)) { manpowerRaw = val; manpowerCol = c; break }
+      if (/^\(?\s*\d+\s*\+\s*\d+\s*\)?$/.test(val)) { manpowerRaw = val; manpowerCol = c; break }
     }
     if (!manpowerRaw || manpowerCol < 0) return  // not a trip-start row
 
