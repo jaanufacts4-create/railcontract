@@ -575,7 +575,7 @@ export default function OBHSScheduleModule({ apiBase, reportApi }: {
 
             {/* Import preview */}
             {importPreview&&(
-              <div className="card" style={{padding:0,overflow:'hidden',border:'2px solid #6D28D9'}}>
+              <div className="card" style={{padding:0,border:'2px solid #6D28D9'}}>
                 <div style={{padding:'12px 18px',background:'#F5F3FF',borderBottom:'1px solid #DDD6FE',display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:8}}>
                   <div>
                     <span style={{fontSize:13,fontWeight:700,color:'#5B21B6'}}>📥 Excel Preview — {importPreview.sheet_name}</span>
@@ -593,7 +593,7 @@ export default function OBHSScheduleModule({ apiBase, reportApi }: {
                       style={{background:'none',border:'none',cursor:'pointer',color:'#7C3AED'}}><X size={16}/></button>
                   </div>
                 </div>
-                <div style={{overflow:'auto',maxHeight:'calc(100vh - 300px)'}}>
+                <div style={{overflowX:'auto',overflowY:'auto',maxHeight:'calc(100vh - 340px)'}}>
                   <table className="table-grid" style={{fontSize:12,minWidth:1150}}>
                     <thead>
                       <tr>
@@ -655,7 +655,7 @@ export default function OBHSScheduleModule({ apiBase, reportApi }: {
             )}
 
             {/* Entries table */}
-            <div ref={entriesRef} className="card" style={{padding:0,overflow:'hidden'}}>
+            <div ref={entriesRef} className="card" style={{padding:0}}>
               <div style={{padding:'12px 18px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid var(--border)'}}>
                 <span style={{fontSize:13,fontWeight:700,color:'var(--text)'}}>
                   Entries — {new Date(monthYear+'-02').toLocaleString('default',{month:'long',year:'numeric'})}
@@ -685,8 +685,8 @@ export default function OBHSScheduleModule({ apiBase, reportApi }: {
                   No entries for this month — click <strong>Add Entry</strong> to start
                 </div>
               ):(
-                <div style={{overflow:'auto',maxHeight:'calc(100vh - 300px)'}}>
-                  <table className="table-grid" style={{fontSize:12,minWidth:900}}>
+                <div style={{overflowX:'auto',overflowY:'auto',maxHeight:'calc(100vh - 340px)'}}>
+                  <table className="table-grid" style={{fontSize:12,minWidth:780}}>
                     <thead>
                       <tr style={{position:'sticky',top:0,zIndex:1}}>
                         <th style={{width:36,textAlign:'center'}}>
