@@ -93,6 +93,7 @@ type ImportPreview = {
 function TrainForm({ initial, onSave, onCancel, saving }: {
   initial?: Partial<OBHSTrain>; onSave:(d:Partial<OBHSTrain>)=>void; onCancel:()=>void; saving:boolean
 }) {
+  const DAYS_ALL = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
   const [f, setF] = useState({
     train_no: initial?.train_no??'', days: initial?.days??'[]',
     ehk_ws: initial?.ehk_ws??1, ac_ws: initial?.ac_ws??0, nac_ws: initial?.nac_ws??0,
@@ -109,9 +110,38 @@ function TrainForm({ initial, onSave, onCancel, saving }: {
         onChange={e => set(key, type==='number' ? Number(e.target.value) : e.target.value)} />
     </div>
   )
+  function toggleDay(day: string) {
+    let curr: string[] = (() => { try { return JSON.parse(f.days) } catch { return [] } })()
+    if (day === 'Daily') { setF(p=>({...p,days:JSON.stringify(['Daily'])})); return }
+    curr = curr.filter(d=>d!=='Daily')
+    curr = curr.includes(day) ? curr.filter(d=>d!==day) : [...curr, day]
+    setF(p=>({...p,days:JSON.stringify(curr)}))
+  }
+  const parsedDays: string[] = (() => { try { return JSON.parse(f.days) } catch { return [] } })()
   return (
     <div style={{display:'flex',flexDirection:'column',gap:10}}>
       {inp('Train No.','train_no','text')}
+      {/* Days picker */}
+      <div>
+        <label style={{fontSize:11,color:'var(--text-3)',display:'block',marginBottom:6}}>Runs On (Days)</label>
+        <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+          {['Daily',...DAYS_ALL].map(day=>{
+            const short = day==='Daily'?'Daily':day.slice(0,3)
+            const active = parsedDays.includes(day)
+            return (
+              <button key={day} type="button" onClick={()=>toggleDay(day)}
+                style={{padding:'4px 10px',borderRadius:20,border:'1.5px solid',cursor:'pointer',
+                  fontSize:11,fontWeight:600,transition:'all .15s',
+                  background:active?'var(--primary)':('transparent'),
+                  borderColor:active?'var(--primary)':'var(--border)',
+                  color:active?'#fff':'var(--text-3)'}}>
+                {short}
+              </button>
+            )
+          })}
+        </div>
+        {parsedDays.length===0&&<p style={{fontSize:11,color:'var(--danger)',margin:'4px 0 0'}}>⚠ Please select at least one day</p>}
+      </div>
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
         {inp('EHK Stations','ehk_ws','number','1')}
         {inp('AC Stations','ac_ws','number','1')}
@@ -155,6 +185,7 @@ export default function OBHSScheduleModule({ apiBase, reportApi }: {
   const [entrySaving,  setEntrySaving]  = useState(false)
   const [msg,          setMsg]          = useState('')
   const [downloading,  setDownloading]  = useState(false)
+  const [selEntries,   setSelEntries]   = useState<Set<number>>(new Set())
   const entriesRef   = useRef<HTMLDivElement>(null)
 
   // ── Excel Import state ────────────────────────────────────────────
@@ -175,7 +206,7 @@ export default function OBHSScheduleModule({ apiBase, reportApi }: {
     if (!selected) { setEntries([]); return }
     setLoading(true)
     const r = await fetch(`${apiBase}/entries?train_no=${encodeURIComponent(selected)}&month_year=${monthYear}`)
-    setEntries(await r.json()); setLoading(false)
+    setEntries(await r.json()); setLoading(false); setSelEntries(new Set())
   }
   useEffect(()=>{ loadTrains() },[apiBase])
   useEffect(()=>{ loadEntries() },[selected,monthYear,apiBase])
@@ -234,6 +265,14 @@ export default function OBHSScheduleModule({ apiBase, reportApi }: {
   async function deleteEntry(id: number) {
     if (!confirm('Delete this entry?')) return
     await fetch(`${apiBase}/entries/${id}`,{method:'DELETE'}); loadEntries()
+  }
+
+  async function deleteSelectedEntries() {
+    if (selEntries.size === 0) return
+    if (!confirm(`Delete ${selEntries.size} selected entries?`)) return
+    await Promise.all([...selEntries].map(id => fetch(`${apiBase}/entries/${id}`,{method:'DELETE'})))
+    setSelEntries(new Set())
+    await loadEntries()
   }
 
   async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -620,8 +659,15 @@ export default function OBHSScheduleModule({ apiBase, reportApi }: {
               <div style={{padding:'12px 18px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid var(--border)'}}>
                 <span style={{fontSize:13,fontWeight:700,color:'var(--text)'}}>
                   Entries — {new Date(monthYear+'-02').toLocaleString('default',{month:'long',year:'numeric'})}
+                  {selEntries.size>0&&<span style={{marginLeft:8,fontSize:12,color:'var(--primary)'}}>{selEntries.size} selected</span>}
                 </span>
                 <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                  {selEntries.size>0&&(
+                    <button className="btn btn-sm" onClick={deleteSelectedEntries}
+                      style={{background:'#EF4444',color:'#fff',border:'none',cursor:'pointer',display:'flex',alignItems:'center',gap:5,padding:'5px 12px',borderRadius:7,fontSize:12,fontWeight:600}}>
+                      <Trash2 size={12}/> Delete ({selEntries.size})
+                    </button>
+                  )}
                   {!showForm&&<button className="btn btn-primary btn-sm" onClick={openAddForm}><Plus size={13}/> Add Entry</button>}
                   <button className="btn btn-secondary btn-sm" disabled={importLoading}
                     onClick={()=>importFileRef.current?.click()}
@@ -639,11 +685,16 @@ export default function OBHSScheduleModule({ apiBase, reportApi }: {
                   No entries for this month — click <strong>Add Entry</strong> to start
                 </div>
               ):(
-                <div style={{overflowY:'scroll',maxHeight:'calc(100vh - 300px)',scrollbarWidth:'thin'}}>
-                  <table className="table-grid" style={{fontSize:12}}>
+                <div style={{overflow:'auto',maxHeight:'calc(100vh - 300px)'}}>
+                  <table className="table-grid" style={{fontSize:12,minWidth:900}}>
                     <thead>
                       <tr style={{position:'sticky',top:0,zIndex:1}}>
-                        <th style={{textAlign:'left',paddingLeft:16}}>Date</th>
+                        <th style={{width:36,textAlign:'center'}}>
+                          <input type="checkbox"
+                            checked={selEntries.size===entries.length&&entries.length>0}
+                            onChange={e=>setSelEntries(e.target.checked?new Set(entries.map(en=>en.id)):new Set())}/>
+                        </th>
+                        <th style={{textAlign:'left',paddingLeft:8}}>Date</th>
                         <th>EHK</th><th>AC♠</th><th>NAC♠</th><th>PSI%</th><th>Slab</th>
                         <th>AC Hrs</th><th>NAC Hrs</th>
                         <th style={{color:'#F59E0B'}}>PSI Pen</th>
@@ -658,9 +709,14 @@ export default function OBHSScheduleModule({ apiBase, reportApi }: {
                     <tbody>
                       {entries.map(e=>{
                         const c=compute(e,train)
+                        const chk = selEntries.has(e.id)
                         return (
-                          <tr key={e.id}>
-                            <td style={{textAlign:'left',paddingLeft:16,fontWeight:600,color:'var(--text-2)'}}>{fmtDate(e.date)}/{monthYear.slice(5,7)}</td>
+                          <tr key={e.id} style={{background:chk?'var(--primary-muted)':''}}>
+                            <td style={{textAlign:'center'}}>
+                              <input type="checkbox" checked={chk}
+                                onChange={ev=>setSelEntries(prev=>{const s=new Set(prev);ev.target.checked?s.add(e.id):s.delete(e.id);return s})}/>
+                            </td>
+                            <td style={{textAlign:'left',paddingLeft:8,fontWeight:600,color:'var(--text-2)'}}>{fmtDate(e.date)}/{monthYear.slice(5,7)}</td>
                             <td><span style={{fontSize:11,fontWeight:700,padding:'1px 6px',borderRadius:5,
                               background:e.ehk_present?'rgba(34,197,94,.15)':'rgba(239,68,68,.15)',
                               color:e.ehk_present?'#16a34a':'#DC2626'}}>{e.ehk_present?'Yes':'No'}</span></td>
