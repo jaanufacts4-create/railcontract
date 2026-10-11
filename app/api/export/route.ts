@@ -583,9 +583,14 @@ export async function GET(req: Request) {
       const acInt  = allInt.filter(c => coachCategory(c.ct) === 'AC')
       const nacInt = allInt.filter(c => coachCategory(c.ct) === 'NAC')
 
-      const acIntSlab  = acInt.length  ? calcSlabs(acInt.map(c => c.score),     acRateNG,  18) : null
-      const nacIntSlab = nacInt.length ? calcSlabs(nacInt.map(c => c.score),    nacRateNG, 18) : null
-      const extIntSlab = (!intAcwp && allInt.length) ? calcSlabs(allInt.map(c => c.extScore), extRateNG, 3) : null
+      // < 50% rating coaches → excluded from count and penalty (but score still shown in grid)
+      const acIntValid  = acInt.filter(c => (c.score     / 18) * 100 >= 50)
+      const nacIntValid = nacInt.filter(c => (c.score    / 18) * 100 >= 50)
+      const allIntValid = allInt.filter(c => (c.extScore /  3) * 100 >= 50)
+
+      const acIntSlab  = acIntValid.length  ? calcSlabs(acIntValid.map(c => c.score),     acRateNG,  18) : null
+      const nacIntSlab = nacIntValid.length ? calcSlabs(nacIntValid.map(c => c.score),    nacRateNG, 18) : null
+      const extIntSlab = (!intAcwp && allIntValid.length) ? calcSlabs(allIntValid.map(c => c.extScore), extRateNG, 3) : null
 
       dayIntAC  += acIntSlab?.totalPenalty  ?? 0
       dayIntNAC += nacIntSlab?.totalPenalty ?? 0
@@ -602,6 +607,7 @@ export async function GET(req: Request) {
         penaltyCol: number,
         bg: string,
         isFirst: boolean,
+        validCount: number,
       ) {
         const row = ws2.getRow(rowNum)
         if (isFirst) {
@@ -634,7 +640,7 @@ export async function GET(req: Request) {
           return
         }
 
-        row.getCell(COL.D).value = coaches.length
+        row.getCell(COL.D).value = validCount
         for (const c of coaches) {
           row.getCell(COL.G + c.seq - 1).value = c[scoreKey]
         }
@@ -664,9 +670,9 @@ export async function GET(req: Request) {
         row.getCell(COL.C).font = { size: 9, bold: true }
       }
 
-      writeIntRow(iRow,     'AC',       acInt,  'score',    acRateG,  acRateNG,  acIntSlab,  COL.AO, LIGHT_PURPLE, true)
-      writeIntRow(iRow + 1, 'NAC',      nacInt, 'score',    nacRateG, nacRateNG, nacIntSlab, COL.AP, LIGHT_LAVNAC, false)
-      writeIntRow(iRow + 2, 'Exterior', allInt, 'extScore', extRateG, extRateNG, extIntSlab, COL.AQ, LIGHT_ORG_I,  false)
+      writeIntRow(iRow,     'AC',       acInt,  'score',    acRateG,  acRateNG,  acIntSlab,  COL.AO, LIGHT_PURPLE, true,  acIntValid.length)
+      writeIntRow(iRow + 1, 'NAC',      nacInt, 'score',    nacRateG, nacRateNG, nacIntSlab, COL.AP, LIGHT_LAVNAC, false, nacIntValid.length)
+      writeIntRow(iRow + 2, 'Exterior', allInt, 'extScore', extRateG, extRateNG, extIntSlab, COL.AQ, LIGHT_ORG_I,  false, allIntValid.length)
 
       // Merge A, B, AR, AS, AT-BH across 3 rows (same pattern as Normal sheet)
       const r1 = iRow, r3 = iRow + 2

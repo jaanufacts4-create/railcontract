@@ -186,9 +186,13 @@ export async function GET(req: Request) {
       else if (cat === 'NAC') nacIntScores.push(r.score)
       if (!intAcwp) extIntScores.push(r.ext_score)
     }
-    const acIntSlab  = acIntScores.length  ? calcSlabs(acIntScores,  acRateNoGST,  18) : null
-    const nacIntSlab = nacIntScores.length ? calcSlabs(nacIntScores, nacRateNoGST, 18) : null
-    const extIntSlab = (!intAcwp && extIntScores.length) ? calcSlabs(extIntScores, extRateNoGST, 3) : null
+    // < 50% rating coaches → excluded from count and penalty
+    const acIntValid  = acIntScores.filter(s => (s / 18) * 100 >= 50)
+    const nacIntValid = nacIntScores.filter(s => (s / 18) * 100 >= 50)
+    const extIntValid = extIntScores.filter(s => (s /  3) * 100 >= 50)
+    const acIntSlab  = acIntValid.length  ? calcSlabs(acIntValid,  acRateNoGST,  18) : null
+    const nacIntSlab = nacIntValid.length ? calcSlabs(nacIntValid, nacRateNoGST, 18) : null
+    const extIntSlab = (!intAcwp && extIntValid.length) ? calcSlabs(extIntValid, extRateNoGST, 3) : null
     const intensivePenalty = (acIntSlab?.totalPenalty ?? 0) + (nacIntSlab?.totalPenalty ?? 0) + (extIntSlab?.totalPenalty ?? 0)
 
     const intBHPenalty = 0  // removed — was double-counting mpPenalty after annex fix
