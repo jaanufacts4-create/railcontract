@@ -212,6 +212,7 @@ function ReportsContent() {
       URL.revokeObjectURL(url)
     } catch (e) {
       console.error(e)
+      alert('Export failed. Please try again.')
     } finally {
       setExportingXl(false)
     }

@@ -15,7 +15,7 @@ type OBHSRecord = {
 
 type TrainRow = { train: string; ehk: number; acObhs: number; nacObhs: number }
 
-function fmt(n: number) { return Number(n).toLocaleString('en-IN', { maximumFractionDigits: 2 }) }
+function fmt(n: number, d = 2) { return Number(n).toLocaleString('en-IN', { maximumFractionDigits: d, minimumFractionDigits: d }) }
 
 export default function OBHSPage() {
   const [records,    setRecords]    = useState<OBHSRecord[]>([])
@@ -167,7 +167,7 @@ export default function OBHSPage() {
                         return (
                           <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
                             <td style={{ padding: '7px 16px', fontWeight: 600, color: 'var(--text)' }}>{t.train}</td>
-                            <td style={{ padding: '7px 16px', color: 'var(--text-2)' }}>{fmt(t.ehk)}</td>
+                            <td style={{ padding: '7px 16px', color: 'var(--text-2)' }}>{fmt(t.ehk, key === '12204' ? 3 : 2)}</td>
                             <td style={{ padding: '7px 16px', color: 'var(--text-2)' }}>{fmt(t.acObhs)}</td>
                             <td style={{ padding: '7px 16px', color: 'var(--text-2)' }}>{fmt(t.nacObhs)}</td>
                             <td style={{ padding: '7px 16px' }}>

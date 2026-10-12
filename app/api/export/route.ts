@@ -1065,16 +1065,18 @@ export async function GET(req: Request) {
   s5r++ // blank row
 
   // ── Save monthly totals to DB for billing certificate ────────────
-  await db.execute({
-    sql: `INSERT OR REPLACE INTO mcc_monthly_totals
-          (month_year, norm_ac, norm_nac, norm_ext, norm_vb, int_ac, int_nac, int_ext, int_vb, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-    args: [
-      monthYear,
-      Math.round(totalNormAC), Math.round(totalNormNAC), Math.round(totalNormExt), Math.round(totalNormVB),
-      Math.round(totalIntAC),  Math.round(totalIntNAC),  Math.round(totalIntExt),  Math.round(totalIntVB),
-    ],
-  })
+  try {
+    await db.execute({
+      sql: `INSERT OR REPLACE INTO mcc_monthly_totals
+            (month_year, norm_ac, norm_nac, norm_ext, norm_vb, int_ac, int_nac, int_ext, int_vb, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+      args: [
+        monthYear,
+        Math.round(totalNormAC), Math.round(totalNormNAC), Math.round(totalNormExt), Math.round(totalNormVB),
+        Math.round(totalIntAC),  Math.round(totalIntNAC),  Math.round(totalIntExt),  Math.round(totalIntVB),
+      ],
+    })
+  } catch { /* non-critical — totals used for billing convenience only; export continues */ }
 
   // ── Section C: MCC Penalty Details ───────────────────────────────
   ws5Title(s5r++, 'SECTION C: MCC PENALTY DETAILS (₹)')
