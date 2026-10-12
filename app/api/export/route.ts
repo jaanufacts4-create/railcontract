@@ -960,6 +960,59 @@ export async function GET(req: Request) {
   }).catch(() => ({ rows: [] }))
   const obhsRow = obhsRes.rows[0]
 
+  // ── Compute OBHS hours & penalty from schedule entries ─────────────
+  let obhsEhkHrs = 0, obhsAcHrs = 0, obhsNacHrs = 0, obhsGrandTotal = 0
+  try {
+    const { rows: obhsEntries } = await db.execute({
+      sql: `SELECT e.*, t.ehk_ws, t.ac_ws, t.nac_ws, t.journey_hrs,
+                   t.ehk_rate, t.ac_rate, t.nac_rate, t.min_wages
+            FROM obhs_entries e
+            JOIN obhs_trains t ON t.train_no = e.train_no
+            WHERE e.month_year = ?`,
+      args: [monthYear],
+    })
+    for (const row of obhsEntries) {
+      const F = Number(row.ehk_present ?? 0)
+      const G = Number(row.ac_short ?? 0)
+      const H = Number(row.nac_short ?? 0)
+      const P = Number(row.psi_pct ?? 0)
+      const C = Number(row.ehk_ws ?? 0)
+      const D = Number(row.ac_ws ?? 0)
+      const E2 = Number(row.nac_ws ?? 0)
+      const L = Number(row.journey_hrs ?? 0)
+      const M = Number(row.ehk_rate ?? 0)
+      const N2 = Number(row.ac_rate ?? 0)
+      const O2 = Number(row.nac_rate ?? 0)
+      const min_wages = Number(row.min_wages ?? 0)
+
+      obhsEhkHrs += C * L
+      obhsAcHrs  += Math.max(0, D - G) * L
+      obhsNacHrs += Math.max(0, E2 - H) * L
+
+      const tripEHK  = C * L * M
+      const tripAC   = D * L * N2
+      const tripNAC  = E2 * L * O2
+      const fullTrip = tripEHK + tripAC + tripNAC
+
+      let psiPenalty = 0, staffPenalty = 0, janitorPenalty = 0, ehkPenalty = 0
+      if (F === 0 && D === G && E2 === H) {
+        staffPenalty = fullTrip / 2
+      } else {
+        if      (P < 50) psiPenalty = fullTrip / 2
+        else if (P < 65) psiPenalty = fullTrip * 0.20
+        else if (P < 75) psiPenalty = fullTrip * 0.10
+        else if (P < 85) psiPenalty = fullTrip * 0.05
+        if (G > 0 || H > 0) janitorPenalty = (G * L * N2) + (H * L * N2)
+        if (F === 0) ehkPenalty = min_wages * 3
+      }
+      const otherPen = Number(row.w_penalty ?? 0) + Number(row.x_penalty ?? 0)
+        + Number(row.aa_penalty ?? 0) + Number(row.ab_penalty ?? 0)
+        + Number(row.ac_penalty ?? 0) + Number(row.ad_penalty ?? 0)
+        + Number(row.ae_penalty ?? 0) + Number(row.af_penalty ?? 0)
+      obhsGrandTotal += psiPenalty + staffPenalty + janitorPenalty + ehkPenalty + otherPen
+    }
+  } catch { /* non-critical — OBHS schedule may not exist for this month */ }
+
   // Grand totals across all days
   let totalNormAC = 0, totalNormNAC = 0, totalNormExt = 0, totalNormVB = 0
   let totalIntAC  = 0, totalIntNAC  = 0, totalIntExt  = 0, totalIntVB  = 0
@@ -1033,11 +1086,11 @@ export async function GET(req: Request) {
   ws5Header(s5r++, ['Coach Type', 'OBHS Hours (Month Total)', 'Remarks'])
   ws5.mergeCells(s5r - 1, 3, s5r - 1, 6)
   const obhsTypes = [
-    ['AC Coaches',         obhsRow ? Number(obhsRow.ac_obhs_hrs  ?? 0) : 0],
-    ['NAC Coaches',        obhsRow ? Number(obhsRow.nac_obhs_hrs ?? 0) : 0],
+    ['AC Coaches',         obhsAcHrs],
+    ['NAC Coaches',        obhsNacHrs],
     ['VB Coaches',         obhsRow ? Number(obhsRow.vb_obhs_hrs  ?? 0) : 0],
     ['Garib Rath Coaches', obhsRow ? Number(obhsRow.garibrath_obhs_hrs ?? 0) : 0],
-    ['EHK',                obhsRow ? Number(obhsRow.ehk_hrs ?? 0) : 0],
+    ['EHK',                obhsEhkHrs],
   ]
   for (const [lbl, hrs] of obhsTypes) {
     ws5Data(s5r, [lbl as string, hrs as number, '—'])
@@ -1110,10 +1163,10 @@ export async function GET(req: Request) {
   s5r += 2
 
   // ── Section D: OBHS Penalty (manual fill) ───────────────────────
-  ws5Title(s5r++, 'SECTION D: OBHS PENALTY (₹) — fill manually')
+  ws5Title(s5r++, 'SECTION D: OBHS PENALTY (₹)')
   ws5Header(s5r++, ['Description', 'Amount (₹)', 'Remarks'])
   ws5.mergeCells(s5r - 1, 3, s5r - 1, 6)
-  ws5Data(s5r, ['OBHS Penalty (from OBHS records)', 0, '—'])
+  ws5Data(s5r, ['OBHS Penalty (from OBHS Schedule records)', Math.round(obhsGrandTotal * 100) / 100, '—'])
   ws5.mergeCells(s5r, 3, s5r, 6)
   s5r += 2
 
@@ -1139,7 +1192,7 @@ export async function GET(req: Request) {
   ws5.mergeCells(s5r - 1, 3, s5r - 1, 6)
   const grandRows = [
     ['Section C', 'MCC Penalty (Rating + Annex A-1 Back)',           r2(normRatingPen + intRatingPen + normBHTotal + intBHTotal)],
-    ['Section D', 'OBHS Penalty',                                    0],
+    ['Section D', 'OBHS Penalty',                                    Math.round(obhsGrandTotal * 100) / 100],
     ['Section E', 'Rail Madad Penalty',                              0],
     ['Section F', 'Inspection Penalty',                              0],
   ]
@@ -1148,7 +1201,7 @@ export async function GET(req: Request) {
     ws5.mergeCells(s5r, 3, s5r, 6)
     s5r++
   }
-  ws5Total(s5r, ['', 'GRAND TOTAL PENALTY', r2(normRatingPen + intRatingPen + normBHTotal + intBHTotal)])
+  ws5Total(s5r, ['', 'GRAND TOTAL PENALTY', r2(normRatingPen + intRatingPen + normBHTotal + intBHTotal + obhsGrandTotal)])
   ws5.mergeCells(s5r, 3, s5r, 6)
 
   // Column widths for ws5

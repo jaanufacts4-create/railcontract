@@ -215,9 +215,6 @@ export async function GET(req: NextRequest) {
     tc.fill = HEADER_FILL('FFD6E4BC')
     ws.getRow(1).height = 22
 
-    // Min wages note
-    ws.getCell('AG1').value = 'Min Wages EHK'
-    ws.getCell('AH1').value = Number(train.min_wages)
 
     // Headers row 2
     const hdrs2 = [
