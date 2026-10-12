@@ -986,8 +986,8 @@ export async function GET(req: Request) {
       const min_wages = Number(row.min_wages ?? 0)
 
       obhsEhkHrs += C * L
-      obhsAcHrs  += Math.max(0, D - G) * L
-      obhsNacHrs += Math.max(0, E2 - H) * L
+      obhsAcHrs  += D * L          // full schedule hours (not penalised)
+      obhsNacHrs += E2 * L         // full schedule hours
 
       const tripEHK  = C * L * M
       const tripAC   = D * L * N2
@@ -1086,7 +1086,7 @@ export async function GET(req: Request) {
   ws5Header(s5r++, ['Coach Type', 'OBHS Hours (Month Total)', 'Remarks'])
   ws5.mergeCells(s5r - 1, 3, s5r - 1, 6)
   const obhsTypes = [
-    ['AC Coaches',         obhsAcHrs],
+    ['AC Coaches',         obhsAcHrs + (obhsRow ? Number(obhsRow.vb_obhs_hrs ?? 0) : 0) + (obhsRow ? Number(obhsRow.garibrath_obhs_hrs ?? 0) : 0)],
     ['NAC Coaches',        obhsNacHrs],
     ['VB Coaches',         obhsRow ? Number(obhsRow.vb_obhs_hrs  ?? 0) : 0],
     ['Garib Rath Coaches', obhsRow ? Number(obhsRow.garibrath_obhs_hrs ?? 0) : 0],
