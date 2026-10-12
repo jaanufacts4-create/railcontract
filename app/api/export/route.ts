@@ -1089,7 +1089,7 @@ export async function GET(req: Request) {
   ws5Header(s5r++, ['Coach Type', 'OBHS Hours (Month Total)', 'Remarks'])
   ws5.mergeCells(s5r - 1, 3, s5r - 1, 6)
   const obhsTypes = [
-    ['AC Coaches',         obhsAcHrs + (obhsRow ? Number(obhsRow.vb_obhs_hrs ?? 0) : 0) + (obhsRow ? Number(obhsRow.garibrath_obhs_hrs ?? 0) : 0)],
+    ['AC Coaches',         obhsAcHrs], // includes VB (22488) + GR (12204) from entries
     ['NAC Coaches',        obhsNacHrs],
     ['VB Coaches',         obhsVbHrs > 0 ? obhsVbHrs : (obhsRow ? Number(obhsRow.vb_obhs_hrs ?? 0) : 0)],
     ['Garib Rath Coaches', obhsGrHrs > 0 ? obhsGrHrs : (obhsRow ? Number(obhsRow.garibrath_obhs_hrs ?? 0) : 0)],
