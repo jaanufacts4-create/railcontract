@@ -36,7 +36,30 @@ export async function POST(req: NextRequest) {
     prevUptoPay[Number(r.item_no)] = Number(r.upto_payment) || 0
   })
 
-  const o  = obhs[0] ?? {}
+  // ── Compute OBHS hours from obhs_entries (same as export/route.ts Section A) ──
+  let obhsEhkHrs = 0, obhsAcHrs = 0, obhsNacHrs = 0, obhsVbHrs = 0, obhsGrHrs = 0
+  try {
+    const { rows: obhsEntries } = await db.execute({
+      sql: `SELECT e.ehk_ws, e.ac_ws, e.nac_ws, e.train_no,
+                   t.journey_hrs
+            FROM obhs_entries e
+            JOIN obhs_trains t ON t.train_no = e.train_no
+            WHERE e.month_year = ?`,
+      args: [month_year],
+    })
+    for (const row of obhsEntries) {
+      const C  = Number(row.ehk_ws    ?? 0)
+      const D  = Number(row.ac_ws     ?? 0)
+      const E2 = Number(row.nac_ws    ?? 0)
+      const L  = Number(row.journey_hrs ?? 0)
+      const tno = String(row.train_no ?? '')
+      obhsEhkHrs += C * L
+      obhsAcHrs  += D * L
+      obhsNacHrs += E2 * L
+      if (tno.startsWith('22488')) obhsVbHrs += D * L
+      if (tno.startsWith('12204')) obhsGrHrs += D * L
+    }
+  } catch { /* non-critical */ }
 
   // J18:J26 — "since last certificate" quantities from mcc_monthly_totals
   const jQty: number[] = [
@@ -44,11 +67,11 @@ export async function POST(req: NextRequest) {
     Math.round((Number(mt.norm_nac) || 0) + (Number(mt.int_nac) || 0)),  // NAC
     Math.round((Number(mt.norm_ext) || 0) + (Number(mt.int_ext) || 0)),  // Exterior
     Math.round((Number(mt.norm_vb)  || 0) + (Number(mt.int_vb)  || 0)),  // VB
-    Math.round((Number(o.ac_obhs_hrs)        || 0) * 100) / 100,
-    Math.round((Number(o.nac_obhs_hrs)       || 0) * 100) / 100,
-    Math.round((Number(o.vb_obhs_hrs)        || 0) * 100) / 100,
-    Math.round((Number(o.garibrath_obhs_hrs) || 0) * 100) / 100,
-    Math.round((Number(o.ehk_hrs)            || 0) * 100) / 100,
+    Math.round(obhsAcHrs  * 100) / 100,
+    Math.round(obhsNacHrs * 100) / 100,
+    Math.round(obhsVbHrs  * 100) / 100,
+    Math.round(obhsGrHrs  * 100) / 100,
+    Math.round(obhsEhkHrs * 100) / 100,
   ]
 
   // ── Date helpers ─────────────────────────────────────────────────────────
