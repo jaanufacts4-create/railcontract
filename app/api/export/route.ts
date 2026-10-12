@@ -961,7 +961,7 @@ export async function GET(req: Request) {
   const obhsRow = obhsRes.rows[0]
 
   // ── Compute OBHS hours & penalty from schedule entries ─────────────
-  let obhsEhkHrs = 0, obhsAcHrs = 0, obhsNacHrs = 0, obhsGrandTotal = 0
+  let obhsEhkHrs = 0, obhsAcHrs = 0, obhsNacHrs = 0, obhsGrandTotal = 0, obhsVbHrs = 0, obhsGrHrs = 0
   try {
     const { rows: obhsEntries } = await db.execute({
       sql: `SELECT e.*, t.ehk_ws, t.ac_ws, t.nac_ws, t.journey_hrs,
@@ -988,6 +988,9 @@ export async function GET(req: Request) {
       obhsEhkHrs += C * L
       obhsAcHrs  += D * L          // full schedule hours (not penalised)
       obhsNacHrs += E2 * L         // full schedule hours
+      const tno = String(row.train_no ?? '')
+      if (tno.startsWith('22488')) obhsVbHrs += D * L
+      if (tno.startsWith('12204')) obhsGrHrs += D * L
 
       const tripEHK  = C * L * M
       const tripAC   = D * L * N2
@@ -1088,8 +1091,8 @@ export async function GET(req: Request) {
   const obhsTypes = [
     ['AC Coaches',         obhsAcHrs + (obhsRow ? Number(obhsRow.vb_obhs_hrs ?? 0) : 0) + (obhsRow ? Number(obhsRow.garibrath_obhs_hrs ?? 0) : 0)],
     ['NAC Coaches',        obhsNacHrs],
-    ['VB Coaches',         obhsRow ? Number(obhsRow.vb_obhs_hrs  ?? 0) : 0],
-    ['Garib Rath Coaches', obhsRow ? Number(obhsRow.garibrath_obhs_hrs ?? 0) : 0],
+    ['VB Coaches',         obhsVbHrs > 0 ? obhsVbHrs : (obhsRow ? Number(obhsRow.vb_obhs_hrs ?? 0) : 0)],
+    ['Garib Rath Coaches', obhsGrHrs > 0 ? obhsGrHrs : (obhsRow ? Number(obhsRow.garibrath_obhs_hrs ?? 0) : 0)],
     ['EHK',                obhsEhkHrs],
   ]
   for (const [lbl, hrs] of obhsTypes) {
