@@ -684,11 +684,12 @@ export async function GET(req: Request) {
 
       // Collect into dayAggMap for summary sheets
       const vbInt = allInt.filter(c => isVB(c.ct)).length
+      const vbIntValid = allIntValid.filter(c => isVB(c.ct)).length
       const iagg = getAgg(date)
-      iagg.intAC     += acInt.length
-      iagg.intNAC    += nacInt.length
-      iagg.intExt    += intAcwp ? 0 : allInt.length
-      iagg.intVB     += vbInt
+      iagg.intAC     += acIntValid.length
+      iagg.intNAC    += nacIntValid.length
+      iagg.intExt    += intAcwp ? 0 : allIntValid.length
+      iagg.intVB     += vbIntValid
       iagg.intACPen  += acIntSlab?.totalPenalty  ?? 0
       iagg.intNACPen += nacIntSlab?.totalPenalty ?? 0
       iagg.intExtPen += extIntSlab?.totalPenalty ?? 0
