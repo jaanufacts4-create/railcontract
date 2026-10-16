@@ -194,6 +194,8 @@ export async function GET(req: Request) {
 
   // ── Data rows ─────────────────────────────────────────────────────────
   let currentRow = 6
+  const normPageBreaks: number[] = []
+  let normDateCount = 0
 
   // Group trips by date
   const byDate = new Map<string, typeof tripsRes.rows>()
@@ -422,6 +424,8 @@ export async function GET(req: Request) {
     grandAO += dayAOTotal
     grandAP += dayAPTotal
     grandAQ += dayAQTotal
+    normDateCount++
+    if (normDateCount % 3 === 0) normPageBreaks.push(currentRow - 1)
     currentRow++
   }
 
@@ -451,6 +455,18 @@ export async function GET(req: Request) {
 
   // ── Freeze top rows ──────────────────────────────────────────────────
   ws.views = [{ state: 'frozen', xSplit: 6, ySplit: 5 }]
+
+  // ── Print setup (landscape, A4, fit to 1 page wide, repeat header rows) ──
+  ws.pageSetup.orientation    = 'landscape'
+  ws.pageSetup.paperSize      = 9   // A4
+  ws.pageSetup.fitToPage      = true
+  ws.pageSetup.fitToWidth     = 1
+  ws.pageSetup.fitToHeight    = 0
+  ws.pageSetup.margins        = { left: 0.2, right: 0.2, top: 0.5, bottom: 0.5, header: 0.2, footer: 0.2 }
+  ws.pageSetup.printTitlesRow = '1:5'
+  for (const brk of normPageBreaks) {
+    try { (ws as any).model.rowBreaks = (ws as any).model.rowBreaks || []; (ws as any).model.rowBreaks.push({ id: brk, max: 16383, min: 0, man: 1 }) } catch { /* skip */ }
+  }
 
   // ════════════════════════════════════════════════════════════════════
   // ── SHEET 2: Intensive Summ ─────────────────────────────────────────
@@ -536,6 +552,8 @@ export async function GET(req: Request) {
   // ── Intensive data rows ──────────────────────────────────────────────
   let iRow = 5
   let igAC = 0, igNAC = 0, igExt = 0, igBH = 0
+  const intPageBreaks: number[] = []
+  let intDateCount = 0
 
   const LIGHT_PURPLE = 'FFE8D5F5'
   const LIGHT_LAVNAC = 'FFD5E8F5'
@@ -719,6 +737,8 @@ export async function GET(req: Request) {
     igNAC += dayIntNAC
     igExt += dayIntExt
     igBH  += dayIntBH
+    intDateCount++
+    if (intDateCount % 3 === 0) intPageBreaks.push(iRow - 1)
     iRow++
   }
 
@@ -749,6 +769,18 @@ export async function GET(req: Request) {
   for (let i = COL.AE; i <= COL.BH; i++) ws2.getColumn(i).width = 10
 
   ws2.views = [{ state: 'frozen', xSplit: 6, ySplit: 4 }]
+
+  // ── Print setup for Intensive sheet ──────────────────────────────────
+  ws2.pageSetup.orientation    = 'landscape'
+  ws2.pageSetup.paperSize      = 9
+  ws2.pageSetup.fitToPage      = true
+  ws2.pageSetup.fitToWidth     = 1
+  ws2.pageSetup.fitToHeight    = 0
+  ws2.pageSetup.margins        = { left: 0.2, right: 0.2, top: 0.5, bottom: 0.5, header: 0.2, footer: 0.2 }
+  ws2.pageSetup.printTitlesRow = '1:4'
+  for (const brk of intPageBreaks) {
+    try { (ws2 as any).model.rowBreaks = (ws2 as any).model.rowBreaks || []; (ws2 as any).model.rowBreaks.push({ id: brk, max: 16383, min: 0, man: 1 }) } catch { /* skip */ }
+  }
 
   // ════════════════════════════════════════════════════════════════════
   // SHEET 3: Normal+Int+VB Summ
@@ -948,6 +980,17 @@ export async function GET(req: Request) {
 
   ws4.getColumn(1).width = 12
   for (let c4 = 2; c4 <= 12; c4++) ws4.getColumn(c4).width = 18
+
+  // Print setup for ws3 and ws4
+  for (const wsN of [ws3, ws4]) {
+    wsN.pageSetup.orientation = 'landscape'
+    wsN.pageSetup.paperSize   = 9
+    wsN.pageSetup.fitToPage   = true
+    wsN.pageSetup.fitToWidth  = 1
+    wsN.pageSetup.fitToHeight = 0
+    wsN.pageSetup.margins     = { left: 0.3, right: 0.3, top: 0.5, bottom: 0.5, header: 0.2, footer: 0.2 }
+    wsN.pageSetup.printTitlesRow = '1:3'
+  }
 
   // ════════════════════════════════════════════════════════════════════
   // SHEET 5: Summary of Penalty
@@ -1215,6 +1258,14 @@ export async function GET(req: Request) {
   ws5.getColumn(4).width = 16
   ws5.getColumn(5).width = 16
   ws5.getColumn(6).width = 16
+
+  // Print setup for Summary of Penalty (portrait, A4, fit to 1 page wide)
+  ws5.pageSetup.orientation    = 'portrait'
+  ws5.pageSetup.paperSize      = 9
+  ws5.pageSetup.fitToPage      = true
+  ws5.pageSetup.fitToWidth     = 1
+  ws5.pageSetup.fitToHeight    = 0
+  ws5.pageSetup.margins        = { left: 0.5, right: 0.5, top: 0.75, bottom: 0.75, header: 0.3, footer: 0.3 }
 
   // ── Stream buffer ────────────────────────────────────────────────────
   const buf = await wb.xlsx.writeBuffer()
