@@ -2,6 +2,14 @@ import { createClient } from '@libsql/client'
 
 // Local dev: uses a SQLite file (no Turso account needed).
 // Production: set TURSO_DATABASE_URL + TURSO_AUTH_TOKEN in .env.local / Vercel env.
+const isProduction = process.env.NODE_ENV === 'production'
+if (isProduction && !process.env.TURSO_DATABASE_URL) {
+  throw new Error(
+    '❌ TURSO_DATABASE_URL is not set in production environment!\n' +
+    'Data cannot be saved. Please configure this environment variable in Vercel.\n' +
+    'Go to: Vercel Dashboard → Your Project → Settings → Environment Variables'
+  )
+}
 const url       = process.env.TURSO_DATABASE_URL ?? 'file:./dev.db'
 const authToken = process.env.TURSO_AUTH_TOKEN   ?? undefined
 
