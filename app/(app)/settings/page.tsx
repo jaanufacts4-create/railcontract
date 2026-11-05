@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { Save, IndianRupee, Percent, BadgeInfo, Users, Plus, Trash2, KeyRound, ShieldCheck, User } from 'lucide-react'
+import { Save, IndianRupee, Percent, BadgeInfo, Users, Plus, Trash2, KeyRound, ShieldCheck, User, Lock, Unlock } from 'lucide-react'
 
 const FIELDS = [
   { key: 'ac_rate_gst',     label: 'AC Rate (with GST)',           prefix: '₹', icon: IndianRupee, desc: 'Per coach per trip rate for AC coaches including GST (Primary MCC)' },
@@ -11,7 +11,16 @@ const FIELDS = [
   { key: 'nirmal_rate_gst', label: 'Nirmal Rate (with GST)',       prefix: '₹', icon: IndianRupee, desc: 'Per coach rate for Nirmal (AC & NAC, same rate for both) including GST' },
 ]
 
-type UserRow = { username: string; role: string; created_at: string }
+const SECTION_OPTIONS = [
+  { id: 'primary',   label: 'Primary MCC / OBHS Bill' },
+  { id: 'nirmal',    label: 'Nirmal Bill' },
+  { id: 'secondary', label: 'Secondary Bill' },
+  { id: 'laundry',   label: 'Departmental Laundry' },
+  { id: 'dashboard', label: 'Dashboard' },
+  { id: 'documents', label: 'Contract Documents' },
+]
+
+type UserRow = { username: string; role: string; created_at: string; permissions: string[] | null }
 
 export default function SettingsPage() {
   /* ── Billing config ── */
@@ -38,6 +47,7 @@ export default function SettingsPage() {
   const [newUser,      setNewUser]      = useState('')
   const [newPass,      setNewPass]      = useState('')
   const [newRole,      setNewRole]      = useState<'user' | 'admin'>('user')
+  const [newPerms,     setNewPerms]     = useState<string[]>([])
   const [addingUser,   setAddingUser]   = useState(false)
   const [userMsg,      setUserMsg]      = useState<{ type: 'ok'|'err'; text: string } | null>(null)
 
@@ -46,22 +56,43 @@ export default function SettingsPage() {
   const [resetPass,    setResetPass]    = useState('')
   const [resetting,    setResetting]    = useState(false)
 
+  // Edit permissions modal state
+  const [permTarget,   setPermTarget]   = useState<UserRow | null>(null)
+  const [editPerms,    setEditPerms]    = useState<string[]>([])
+  const [savingPerms,  setSavingPerms]  = useState(false)
+
   async function loadUsers() {
     const r = await fetch('/api/auth/users'); if (!r.ok) return
-    const d = await r.json(); setUsers(d.users)
+    const d = await r.json()
+    // parse permissions JSON string → array
+    const parsed = (d.users as Array<{ username: string; role: string; created_at: string; permissions?: string | string[] | null }>).map(u => ({
+      ...u,
+      permissions: u.permissions
+        ? (typeof u.permissions === 'string' ? JSON.parse(u.permissions) as string[] : u.permissions as string[])
+        : null,
+    }))
+    setUsers(parsed)
   }
   useEffect(() => { loadUsers() }, [])
 
+  function toggleNewPerm(id: string) {
+    setNewPerms(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id])
+  }
+  function toggleEditPerm(id: string) {
+    setEditPerms(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id])
+  }
+
   async function addUser(e: React.FormEvent) {
     e.preventDefault(); setUserMsg(null); setAddingUser(true)
+    const permissions = newRole === 'user' && newPerms.length > 0 ? newPerms : null
     const r = await fetch('/api/auth/users', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: newUser, password: newPass, role: newRole }),
+      body: JSON.stringify({ username: newUser, password: newPass, role: newRole, permissions }),
     })
     const d = await r.json()
     if (r.ok) {
       setUserMsg({ type: 'ok', text: `User "${newUser}" created successfully` })
-      setNewUser(''); setNewPass(''); setNewRole('user')
+      setNewUser(''); setNewPass(''); setNewRole('user'); setNewPerms([])
       loadUsers()
     } else {
       setUserMsg({ type: 'err', text: d.error || 'Failed to create user' })
@@ -83,6 +114,28 @@ export default function SettingsPage() {
     })
     if (r.ok) { setResetTarget(null); setResetPass('') }
     setResetting(false)
+  }
+
+  function openEditPerms(u: UserRow) {
+    setPermTarget(u)
+    setEditPerms(u.permissions ?? [])
+  }
+
+  async function savePermissions(e: React.FormEvent) {
+    e.preventDefault(); setSavingPerms(true)
+    // null means full access; empty array also means full access for simplicity
+    const permissions = editPerms.length > 0 ? editPerms : null
+    const r = await fetch('/api/auth/users', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: permTarget?.username, permissions }),
+    })
+    if (r.ok) { setPermTarget(null); loadUsers() }
+    setSavingPerms(false)
+  }
+
+  function permLabel(perms: string[] | null) {
+    if (!perms || perms.length === 0) return null
+    return perms.map(id => SECTION_OPTIONS.find(s => s.id === id)?.label ?? id)
   }
 
   return (
@@ -137,27 +190,56 @@ export default function SettingsPage() {
 
         {/* User list */}
         <div style={{ padding: '8px 0' }}>
-          {users.map(u => (
-            <div key={u.username} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 20px', borderBottom: '1px solid var(--border)' }}>
-              <div style={{ width: 32, height: 32, borderRadius: 8, background: u.role === 'admin' ? 'linear-gradient(135deg,#2563EB,#7C3AED)' : 'var(--surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                {u.role === 'admin' ? <ShieldCheck size={15} color="#fff" /> : <User size={15} style={{ color: 'var(--text-3)' }} />}
+          {users.map(u => {
+            const labels = permLabel(u.permissions)
+            return (
+              <div key={u.username} style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 8, background: u.role === 'admin' ? 'linear-gradient(135deg,#2563EB,#7C3AED)' : 'var(--surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    {u.role === 'admin' ? <ShieldCheck size={15} color="#fff" /> : <User size={15} style={{ color: 'var(--text-3)' }} />}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', margin: 0 }}>{u.username}</p>
+                    <p style={{ fontSize: 11, color: 'var(--text-4)', margin: 0, textTransform: 'capitalize' }}>{u.role}</p>
+                  </div>
+                  {u.role !== 'admin' && (
+                    <button onClick={() => openEditPerms(u)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, color: '#7C3AED', background: 'rgba(124,58,237,.1)', border: 'none', borderRadius: 7, padding: '5px 10px', cursor: 'pointer' }}>
+                      {u.permissions && u.permissions.length > 0 ? <Lock size={12} /> : <Unlock size={12} />}
+                      Sections
+                    </button>
+                  )}
+                  <button onClick={() => { setResetTarget(u.username); setResetPass('') }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, color: 'var(--primary)', background: 'var(--primary-light)', border: 'none', borderRadius: 7, padding: '5px 10px', cursor: 'pointer' }}>
+                    <KeyRound size={12} /> Reset Password
+                  </button>
+                  {u.username !== 'admin' && (
+                    <button onClick={() => deleteUser(u.username)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 600, color: 'var(--danger)', background: 'rgba(239,68,68,.1)', border: 'none', borderRadius: 7, padding: '5px 10px', cursor: 'pointer' }}>
+                      <Trash2 size={12} /> Delete
+                    </button>
+                  )}
+                </div>
+                {/* Permissions badges */}
+                {labels && labels.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 8, paddingLeft: 44 }}>
+                    {labels.map(l => (
+                      <span key={l} style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: 'rgba(124,58,237,.1)', color: '#7C3AED', border: '1px solid rgba(124,58,237,.2)' }}>
+                        {l}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {u.role !== 'admin' && (!labels || labels.length === 0) && (
+                  <div style={{ paddingLeft: 44, marginTop: 6 }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: 'rgba(34,197,94,.1)', color: '#16a34a', border: '1px solid rgba(34,197,94,.2)' }}>
+                      Full Access
+                    </span>
+                  </div>
+                )}
               </div>
-              <div style={{ flex: 1 }}>
-                <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', margin: 0 }}>{u.username}</p>
-                <p style={{ fontSize: 11, color: 'var(--text-4)', margin: 0, textTransform: 'capitalize' }}>{u.role}</p>
-              </div>
-              <button onClick={() => { setResetTarget(u.username); setResetPass('') }}
-                style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, color: 'var(--primary)', background: 'var(--primary-light)', border: 'none', borderRadius: 7, padding: '5px 10px', cursor: 'pointer' }}>
-                <KeyRound size={12} /> Reset Password
-              </button>
-              {u.username !== 'admin' && (
-                <button onClick={() => deleteUser(u.username)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 600, color: 'var(--danger)', background: 'rgba(239,68,68,.1)', border: 'none', borderRadius: 7, padding: '5px 10px', cursor: 'pointer' }}>
-                  <Trash2 size={12} /> Delete
-                </button>
-              )}
-            </div>
-          ))}
+            )
+          })}
           {users.length === 0 && (
             <p style={{ textAlign: 'center', padding: '20px', fontSize: 13, color: 'var(--text-4)' }}>No users found</p>
           )}
@@ -173,7 +255,7 @@ export default function SettingsPage() {
               onChange={e => setNewUser(e.target.value)} style={{ flex: 1, minWidth: 140, fontSize: 13 }} />
             <input type="password" className="input" placeholder="Password (min 6 chars)" required value={newPass}
               onChange={e => setNewPass(e.target.value)} style={{ flex: 1, minWidth: 160, fontSize: 13 }} />
-            <select value={newRole} onChange={e => setNewRole(e.target.value as 'user' | 'admin')}
+            <select value={newRole} onChange={e => { setNewRole(e.target.value as 'user' | 'admin'); setNewPerms([]) }}
               style={{ padding: '8px 12px', borderRadius: 10, border: '1.5px solid var(--border-md)', background: 'var(--surface)', color: 'var(--text)', fontSize: 13, cursor: 'pointer' }}>
               <option value="user">User</option>
               <option value="admin">Admin</option>
@@ -182,6 +264,25 @@ export default function SettingsPage() {
               <Plus size={14} />{addingUser ? 'Adding…' : 'Add User'}
             </button>
           </div>
+
+          {/* Section permissions for new user */}
+          {newRole === 'user' && (
+            <div style={{ marginTop: 14 }}>
+              <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-3)', marginBottom: 8 }}>
+                Section Access <span style={{ fontWeight: 400, color: 'var(--text-4)' }}>(leave all unchecked = full access)</span>
+              </p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {SECTION_OPTIONS.map(s => (
+                  <label key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderRadius: 8, border: `1.5px solid ${newPerms.includes(s.id) ? 'rgba(124,58,237,.5)' : 'var(--border-md)'}`, background: newPerms.includes(s.id) ? 'rgba(124,58,237,.08)' : 'var(--surface)', cursor: 'pointer', fontSize: 12, fontWeight: 500, color: newPerms.includes(s.id) ? '#7C3AED' : 'var(--text-3)', userSelect: 'none', transition: 'all .15s' }}>
+                    <input type="checkbox" checked={newPerms.includes(s.id)} onChange={() => toggleNewPerm(s.id)}
+                      style={{ accentColor: '#7C3AED', width: 13, height: 13 }} />
+                    {s.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
           {userMsg && (
             <div style={{ marginTop: 10, padding: '8px 12px', borderRadius: 8, fontSize: 12, fontWeight: 500,
               background: userMsg.type === 'ok' ? 'rgba(34,197,94,.1)' : 'rgba(239,68,68,.1)',
@@ -209,6 +310,48 @@ export default function SettingsPage() {
                 </button>
                 <button type="submit" disabled={resetting} className="btn btn-primary" style={{ flex: 1, padding: '10px', fontSize: 13 }}>
                   {resetting ? 'Saving…' : 'Reset Password'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Edit Permissions Modal ── */}
+      {permTarget && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999 }}>
+          <div className="card" style={{ width: 400, padding: 28 }}>
+            <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>Edit Section Access</h3>
+            <p style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 18 }}>
+              Control which sections <strong>{permTarget.username}</strong> can see and use
+            </p>
+            <form onSubmit={savePermissions} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-3)', marginBottom: 10 }}>
+                  Allowed Sections <span style={{ fontWeight: 400, color: 'var(--text-4)' }}>(leave all unchecked = full access)</span>
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {SECTION_OPTIONS.map(s => (
+                    <label key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 8, border: `1.5px solid ${editPerms.includes(s.id) ? 'rgba(124,58,237,.5)' : 'var(--border-md)'}`, background: editPerms.includes(s.id) ? 'rgba(124,58,237,.08)' : 'var(--surface-2)', cursor: 'pointer', fontSize: 13, fontWeight: 500, color: editPerms.includes(s.id) ? '#7C3AED' : 'var(--text)', userSelect: 'none', transition: 'all .15s' }}>
+                      <input type="checkbox" checked={editPerms.includes(s.id)} onChange={() => toggleEditPerm(s.id)}
+                        style={{ accentColor: '#7C3AED', width: 15, height: 15 }} />
+                      {s.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+              {editPerms.length === 0 && (
+                <div style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(34,197,94,.08)', border: '1px solid rgba(34,197,94,.25)', fontSize: 12, color: '#16a34a', fontWeight: 500 }}>
+                  ✓ No restrictions — user will have full access to all sections
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button type="button" onClick={() => setPermTarget(null)}
+                  style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1.5px solid var(--border-md)', background: 'transparent', color: 'var(--text-3)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                  Cancel
+                </button>
+                <button type="submit" disabled={savingPerms} className="btn btn-primary" style={{ flex: 1, padding: '10px', fontSize: 13 }}>
+                  {savingPerms ? 'Saving…' : 'Save Access'}
                 </button>
               </div>
             </form>

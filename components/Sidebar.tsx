@@ -99,12 +99,20 @@ export default function Sidebar() {
   const path = usePathname()
   const { theme, setTheme } = useTheme()
   const [collapsed, setCollapsed] = useState(false)
+  // null = full access (admin), string[] = permitted group IDs
+  const [permissions, setPermissions] = useState<string[] | null | 'loading'>('loading')
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(
     () => Object.fromEntries(GROUPS.map(g => [g.id, false]))
   )
   const [openSubGroups, setOpenSubGroups] = useState<Record<string, boolean>>({ penalties: true })
 
   useEffect(() => {
+    // Load user permissions
+    fetch('/api/auth/me')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setPermissions(d.permissions ?? null) })
+      .catch(() => setPermissions(null))
+
     const s = localStorage.getItem('sb-collapsed')
     if (s === '1') setCollapsed(true)
     const og = localStorage.getItem('sb-open-groups')
@@ -135,6 +143,11 @@ export default function Sidebar() {
       return next
     })
   }
+
+  // Filter groups by permissions (null = full access)
+  const visibleGroups = permissions === 'loading' || permissions === null
+    ? GROUPS
+    : GROUPS.filter(g => (permissions as string[]).includes(g.id))
 
   const w = collapsed ? 'var(--sb-w-col)' : 'var(--sb-w)'
 
@@ -261,7 +274,7 @@ export default function Sidebar() {
           )
         })()}
 
-        {GROUPS.map(group => {
+        {visibleGroups.map(group => {
           const GroupIcon = GROUP_ICONS[group.id]
           const isOpen    = openGroups[group.id] !== false
 

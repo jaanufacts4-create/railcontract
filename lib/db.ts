@@ -38,6 +38,7 @@ let _mccMonthlyTotalsMigrated = false
 let _monthlyBillsMigrated  = false
 let _freshDataV2Migrated   = false
 let _rawDataV2Migrated     = false
+let _userPermsMigrated     = false
 export async function ensureDB() {
   if (!_migrated) {
     await migrate()
@@ -127,6 +128,10 @@ export async function ensureDB() {
     await migrateRawDataV2()
     await migrateTripCoachCount()
     _rawDataV2Migrated = true
+  }
+  if (!_userPermsMigrated) {
+    await migrateUserPermissions()
+    _userPermsMigrated = true
   }
   // NOTE: ensureIndexes() is NOT called here to avoid Vercel timeout on cold start.
   // Call it once manually via: GET /api/admin/ensure-indexes
@@ -1207,4 +1212,10 @@ async function migrateTripCoachCount() {
   for (const col of ['ac_count INTEGER NOT NULL DEFAULT 0', 'nac_count INTEGER NOT NULL DEFAULT 0']) {
     try { await db.execute(`ALTER TABLE trips ADD COLUMN ${col}`) } catch { /* already exists */ }
   }
+}
+
+/** ─── User Permissions column ───────────────────────────────────────────── */
+async function migrateUserPermissions() {
+  // NULL = full access, JSON array = restricted to those group IDs
+  try { await db.execute("ALTER TABLE users ADD COLUMN permissions TEXT") } catch { /* already exists */ }
 }
