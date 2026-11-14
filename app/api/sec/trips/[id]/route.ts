@@ -83,7 +83,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const wageRows = await db.execute(
       "SELECT key, value FROM config WHERE key IN ('sec_min_wages','sec_wage_periods')"
     )
-    const minWages = resolveWageFromConfig(date, wageRows.rows as { key: unknown; value: unknown }[])
+    const minWages = resolveWageFromConfig(date, wageRows.rows as unknown as { key: unknown; value: unknown }[])
     annex_b = { ...annex_b, 12: shortage * 2 * minWages }
   }
 
