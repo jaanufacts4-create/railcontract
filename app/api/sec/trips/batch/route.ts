@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server'
 import { db, ensureDB } from '@/lib/db'
+import { resolveWageFromConfig } from '@/lib/secWages'
 
 /**
  * POST /api/sec/trips/batch
- * Saves Interior + Exterior trips in ONE DB connection (was 2 round-trips before).
+ * Saves Interior + Exterior trips in ONE DB connection.
  * Body: {
  *   date, train_no, coach_count, ac_count,
  *   req_manpower, avail_manpower, washing_line,
@@ -14,18 +15,19 @@ import { db, ensureDB } from '@/lib/db'
  * }
  */
 export async function POST(req: Request) {
-  await ensureDB()   // ← single connection for both saves
+  await ensureDB()
 
   const body = await req.json()
   const {
-    date, train_no, coach_count, ac_count,
+    date, train_no, coach_count,
     req_manpower, avail_manpower, washing_line,
-    is_acwp, coach_criteria, coach_ratings, annex_b,
+    is_acwp, coach_criteria, coach_ratings,
   } = body
+  let annex_b: Record<string, number> = body.annex_b ?? {}
 
   const month_year = date.slice(0, 7)
 
-  // ── Duplicate check for both types at once ────────────────────────────────
+  // ── Duplicate check ───────────────────────────────────────────────────────
   const dupCheck = await db.execute({
     sql:  `SELECT cleaning_type FROM sec_trips WHERE date=? AND train_no=? AND cleaning_type IN ('Interior','Exterior')`,
     args: [date, train_no],
@@ -36,6 +38,16 @@ export async function POST(req: Request) {
       { error: `Entry for Train ${train_no} (${types}) on ${date} already exists.` },
       { status: 409 },
     )
+  }
+
+  // ── Auto-calculate Annex B slot 12 (Staff Shortage) ──────────────────────
+  const shortage = Math.max(0, Number(req_manpower) - Number(avail_manpower))
+  if (shortage > 0 && !Number(annex_b[12] ?? annex_b['12'] ?? 0)) {
+    const wageRows = await db.execute(
+      "SELECT key, value FROM config WHERE key IN ('sec_min_wages','sec_wage_periods')"
+    )
+    const minWages = resolveWageFromConfig(date, wageRows.rows as { key: unknown; value: unknown }[])
+    annex_b = { ...annex_b, 12: shortage * 2 * minWages }
   }
 
   // ── Insert Interior trip ──────────────────────────────────────────────────
@@ -54,7 +66,7 @@ export async function POST(req: Request) {
   })
   const exteriorId = Number(extId)
 
-  // ── Build all rating inserts (run parallel) ───────────────────────────────
+  // ── Build all rating inserts ──────────────────────────────────────────────
   const ratingStmts: { sql: string; args: (string | number)[] }[] = []
 
   // Interior: 4 criteria rows × n coaches
@@ -80,16 +92,14 @@ export async function POST(req: Request) {
     }
   }
 
-  // Annex B
+  // Annex B (slot 12 auto-added above if applicable)
   const annexStmts: { sql: string; args: (string | number)[] }[] = []
-  if (annex_b) {
-    for (const [slot, amount] of Object.entries(annex_b)) {
-      if (Number(amount) > 0) {
-        annexStmts.push({
-          sql:  'INSERT INTO sec_annex_b (trip_id, penalty_slot, amount) VALUES (?,?,?)',
-          args: [interiorId, Number(slot), Number(amount)],
-        })
-      }
+  for (const [slot, amount] of Object.entries(annex_b)) {
+    if (Number(amount) > 0) {
+      annexStmts.push({
+        sql:  'INSERT INTO sec_annex_b (trip_id, penalty_slot, amount) VALUES (?,?,?)',
+        args: [interiorId, Number(slot), Number(amount)],
+      })
     }
   }
 

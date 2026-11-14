@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db, ensureDB } from '@/lib/db'
+import { resolveWageFromConfig } from '@/lib/secWages'
 
 /* ─── GET /api/sec/trips/[id] ─── */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -18,7 +19,6 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const trip = tripRes.rows[0]
   const coachCount = Number(trip.coach_count)
 
-  // Build coach_criteria[criterion-1][coachSlot-1]
   const criteriaMap: Record<number, Record<number, number>> = {}
   for (const r of ratingsRes.rows) {
     const crit = Number(r.criterion)
@@ -27,7 +27,6 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     criteriaMap[crit][slot] = Number(r.rating)
   }
 
-  // Return as 2D array for Interior (4 criteria) or 1D for Exterior
   const isInterior = trip.cleaning_type === 'Interior'
   const numCriteria = isInterior ? 4 : 1
   const coachCriteria: number[][] = []
@@ -41,12 +40,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     coachCriteria.push(row)
   }
 
-  // Also return flat coachRatings for backward compat
   const coachRatings = ratingsRes.rows.map(r => ({ slot: Number(r.coach_slot), criterion: Number(r.criterion), rating: Number(r.rating) }))
   const annexB: Record<number, number> = {}
   for (const r of annexRes.rows) annexB[Number(r.penalty_slot)] = Number(r.amount)
 
-  // Include rates in response so edit page needs only one API call
   const cfgRes = await db.execute("SELECT key, value FROM config WHERE key IN ('sec_rate_per_coach','sec_rate_per_coach_exterior')")
   const cfg: Record<string, number> = {}
   for (const r of cfgRes.rows) cfg[r.key as string] = Number(r.value)
@@ -66,8 +63,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   const {
     date, train_no, cleaning_type, coach_count,
     req_manpower, avail_manpower, washing_line, is_acwp, supervisor,
-    coach_criteria, coach_ratings, annex_b,
+    coach_criteria, coach_ratings,
   } = body
+  let annex_b: Record<string, number> = body.annex_b ?? {}
 
   const month_year = date.slice(0, 7)
 
@@ -78,6 +76,16 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
            WHERE id=?`,
     args: [date, train_no, cleaning_type, coach_count, req_manpower, avail_manpower, washing_line, is_acwp ? 1 : 0, month_year, supervisor ?? '', id],
   })
+
+  // ── Auto-calculate Annex B slot 12 (Staff Shortage) ──────────────────────
+  const shortage = Math.max(0, Number(req_manpower) - Number(avail_manpower))
+  if (shortage > 0 && !Number(annex_b[12] ?? annex_b['12'] ?? 0)) {
+    const wageRows = await db.execute(
+      "SELECT key, value FROM config WHERE key IN ('sec_min_wages','sec_wage_periods')"
+    )
+    const minWages = resolveWageFromConfig(date, wageRows.rows as { key: unknown; value: unknown }[])
+    annex_b = { ...annex_b, 12: shortage * 2 * minWages }
+  }
 
   // Replace ratings
   await db.execute({ sql: 'DELETE FROM sec_coach_ratings WHERE trip_id=?', args: [id] })
@@ -100,16 +108,14 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     }
   }
 
-  // Replace Annexure B
+  // Replace Annexure B (slot 12 auto-added above if applicable)
   await db.execute({ sql: 'DELETE FROM sec_annex_b WHERE trip_id=?', args: [id] })
-  if (annex_b) {
-    for (const [slot, amount] of Object.entries(annex_b)) {
-      if (Number(amount) > 0) {
-        await db.execute({
-          sql:  'INSERT INTO sec_annex_b (trip_id, penalty_slot, amount) VALUES (?,?,?)',
-          args: [id, Number(slot), Number(amount)],
-        })
-      }
+  for (const [slot, amount] of Object.entries(annex_b)) {
+    if (Number(amount) > 0) {
+      await db.execute({
+        sql:  'INSERT INTO sec_annex_b (trip_id, penalty_slot, amount) VALUES (?,?,?)',
+        args: [id, Number(slot), Number(amount)],
+      })
     }
   }
 

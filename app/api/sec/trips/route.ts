@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db, ensureDB } from '@/lib/db'
+import { resolveWageFromConfig } from '@/lib/secWages'
 
 /* ─── GET /api/sec/trips?month_year=YYYY-MM ──────────────────────── */
 export async function GET(req: Request) {
@@ -58,8 +59,8 @@ export async function POST(req: Request) {
     req_manpower, avail_manpower, washing_line, is_acwp, supervisor,
     coach_criteria,  // number[][] Interior: [crit1[], crit2[], crit3[], crit4[]]
     coach_ratings,   // number[]   Exterior: per-coach values 0-3
-    annex_b,         // Record<number, number>
   } = body
+  let annex_b: Record<string, number> = body.annex_b ?? {}
 
   const month_year = date.slice(0, 7)
 
@@ -75,6 +76,16 @@ export async function POST(req: Request) {
     )
   }
 
+  // ── Auto-calculate Annex B slot 12 (Staff Shortage) ──────────────────────
+  const shortage = Math.max(0, Number(req_manpower) - Number(avail_manpower))
+  if (shortage > 0 && !Number(annex_b[12] ?? annex_b['12'] ?? 0)) {
+    const wageRows = await db.execute(
+      "SELECT key, value FROM config WHERE key IN ('sec_min_wages','sec_wage_periods')"
+    )
+    const minWages = resolveWageFromConfig(date, wageRows.rows as { key: unknown; value: unknown }[])
+    annex_b = { ...annex_b, 12: shortage * 2 * minWages }
+  }
+
   const { lastInsertRowid } = await db.execute({
     sql:  `INSERT INTO sec_trips
              (date, train_no, cleaning_type, coach_count, req_manpower, avail_manpower, washing_line, is_acwp, month_year, supervisor)
@@ -83,11 +94,10 @@ export async function POST(req: Request) {
   })
   const tripId = Number(lastInsertRowid)
 
-  // ── Batch-insert coach ratings (was sequential, now parallel) ────────────
+  // ── Batch-insert coach ratings ────────────────────────────────────────────
   const ratingStmts: { sql: string; args: (string | number)[] }[] = []
 
   if (coach_criteria?.length) {
-    // Interior: 4 criteria arrays
     for (let crit = 0; crit < coach_criteria.length; crit++) {
       const arr = coach_criteria[crit] as number[]
       for (let i = 0; i < arr.length; i++) {
@@ -98,7 +108,6 @@ export async function POST(req: Request) {
       }
     }
   } else if (coach_ratings?.length) {
-    // Exterior: single value per coach
     for (let i = 0; i < coach_ratings.length; i++) {
       ratingStmts.push({
         sql:  'INSERT INTO sec_coach_ratings (trip_id, coach_slot, criterion, rating) VALUES (?,?,?,?)',
@@ -107,22 +116,19 @@ export async function POST(req: Request) {
     }
   }
 
-  // Run all rating inserts in parallel instead of one-by-one
   if (ratingStmts.length > 0) {
     await Promise.all(ratingStmts.map(s => db.execute(s)))
   }
 
-  // ── Annex B (usually small, can stay sequential) ─────────────────────────
-  if (annex_b) {
-    const annexStmts = Object.entries(annex_b)
-      .filter(([, amount]) => Number(amount) > 0)
-      .map(([slot, amount]) => ({
-        sql:  'INSERT INTO sec_annex_b (trip_id, penalty_slot, amount) VALUES (?,?,?)',
-        args: [tripId, Number(slot), Number(amount)] as (string | number)[],
-      }))
-    if (annexStmts.length > 0) {
-      await Promise.all(annexStmts.map(s => db.execute(s)))
-    }
+  // ── Annex B (slot 12 auto-added above if applicable) ─────────────────────
+  const annexStmts = Object.entries(annex_b)
+    .filter(([, amount]) => Number(amount) > 0)
+    .map(([slot, amount]) => ({
+      sql:  'INSERT INTO sec_annex_b (trip_id, penalty_slot, amount) VALUES (?,?,?)',
+      args: [tripId, Number(slot), Number(amount)] as (string | number)[],
+    }))
+  if (annexStmts.length > 0) {
+    await Promise.all(annexStmts.map(s => db.execute(s)))
   }
 
   return NextResponse.json({ ok: true, id: tripId })
