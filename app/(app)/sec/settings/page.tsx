@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { Save, IndianRupee, Users, CheckCircle2, Plus, Trash2, Calendar } from 'lucide-react'
+import { Save, IndianRupee, Users, CheckCircle2, Plus, Trash2, Calendar, RefreshCw, AlertCircle } from 'lucide-react'
 
 type WagePeriod = { from: string; to: string; rate: string }
 
@@ -26,6 +26,10 @@ export default function SecSettingsPage() {
 
   // Wage periods
   const [periods, setPeriods] = useState<WagePeriod[]>([])
+
+  // Backfill state
+  const [backfilling, setBackfilling] = useState(false)
+  const [backfillMsg, setBackfillMsg] = useState<{ type: 'ok'|'err'; text: string } | null>(null)
 
   useEffect(() => {
     fetch('/api/config').then(r => r.json()).then(d => {
@@ -63,6 +67,17 @@ export default function SecSettingsPage() {
     })
     setSaving(false); setSaved(true)
     setTimeout(() => setSaved(false), 2500)
+  }
+
+  async function backfillSlot12() {
+    setBackfilling(true); setBackfillMsg(null)
+    try {
+      const r = await fetch('/api/sec/trips/backfill-slot12', { method: 'POST' })
+      const d = await r.json()
+      if (r.ok) setBackfillMsg({ type: 'ok', text: d.message || 'Done' })
+      else setBackfillMsg({ type: 'err', text: d.error || 'Failed' })
+    } catch { setBackfillMsg({ type: 'err', text: 'Network error' }) }
+    setBackfilling(false)
   }
 
   return (
@@ -184,6 +199,38 @@ export default function SecSettingsPage() {
           : saving ? 'Saving…' : <><Save size={14} /> Save Settings</>
         }
       </button>
+
+      {/* Backfill card */}
+      <div className="card" style={{ padding: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(234,179,8,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <RefreshCw size={16} style={{ color: '#ca8a04' }} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', margin: '0 0 3px' }}>Recalculate Slot 12 — Existing Trips</p>
+            <p style={{ fontSize: 12, color: 'var(--text-4)', margin: '0 0 12px', lineHeight: 1.5 }}>
+              Puraani trips (jo wage periods save karne se pehle save hui thin) ka slot 12 missing hoga.
+              Yeh button ek baar chalao — sirf wohi trips update hongi jinka slot 12 abhi tak zero hai.
+            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <button onClick={backfillSlot12} disabled={backfilling}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600,
+                  color: '#ca8a04', background: 'rgba(234,179,8,.15)', border: '1.5px solid rgba(234,179,8,.3)',
+                  borderRadius: 9, padding: '8px 16px', cursor: backfilling ? 'wait' : 'pointer', whiteSpace: 'nowrap' }}>
+                <RefreshCw size={14} style={{ animation: backfilling ? 'spin 1s linear infinite' : 'none' }} />
+                {backfilling ? 'Calculating…' : 'Recalculate Slot 12'}
+              </button>
+              {backfillMsg && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600,
+                  color: backfillMsg.type === 'ok' ? 'var(--success)' : 'var(--danger)' }}>
+                  <AlertCircle size={13} />
+                  {backfillMsg.text}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Formula card */}
       <div className="card" style={{ padding: 16 }}>
